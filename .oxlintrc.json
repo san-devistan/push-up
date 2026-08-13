@@ -1,0 +1,117 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "react",
+    "react-perf",
+    "jsx-a11y",
+    "import",
+    "promise",
+    "node"
+  ],
+  "options": {
+    "typeAware": true,
+    "typeCheck": false,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "version": "19.2.0"
+    }
+  },
+  "rules": {
+    "complexity": ["error", { "max": 12 }],
+    "max-depth": ["error", 4],
+    "max-lines": [
+      "error",
+      {
+        "max": 400,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "max-lines-per-function": [
+      "error",
+      {
+        "max": 200,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
+    "max-params": ["error", 6],
+    "no-empty": "error",
+    "no-underscore-dangle": [
+      "error",
+      {
+        "allow": ["_creationTime", "_id"]
+      }
+    ],
+    "no-duplicate-imports": "error",
+    "prefer-const": "error",
+    "import/no-cycle": ["error", { "maxDepth": 3 }],
+    "import/no-relative-parent-imports": "error",
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/interactive-supports-focus": "error",
+    "jsx-a11y/label-has-associated-control": "error",
+    "jsx-a11y/no-autofocus": "error",
+    "jsx-a11y/prefer-tag-over-role": "error",
+    "react/button-has-type": "error",
+    "react/jsx-max-depth": ["error", { "max": 5 }],
+    "react/jsx-no-constructed-context-values": "error",
+    "react/no-array-index-key": "error",
+    "react/react-in-jsx-scope": "off",
+    "react-perf/jsx-no-new-array-as-prop": "error",
+    "react-perf/jsx-no-new-function-as-prop": "error",
+    "react-perf/jsx-no-new-object-as-prop": "error",
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports"
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/restrict-template-expressions": "error"
+  },
+  "overrides": [
+    {
+      "files": ["apps/mobile/components/ui/**/*.tsx"],
+      "rules": {
+        "import/namespace": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    ".agents/**",
+    "**/.agents/**",
+    ".codex/**",
+    ".expo/**",
+    ".nitro/**",
+    ".output/**",
+    ".pnpm-store/**",
+    ".tanstack/**",
+    ".turbo/**",
+    ".vinxi/**",
+    "coverage/**",
+    "dist/**",
+    "node_modules/**",
+    "apps/web/src/routeTree.gen.*",
+    "packages/backend/convex/_generated/**"
+  ]
+}
