@@ -11,3 +11,6 @@ peerDependencyRules:
 allowBuilds:
   esbuild: true
   msw: false
+
+patchedDependencies:
+  react-native-nitro-pose-exercises@1.1.19: patches/react-native-nitro-pose-exercises@1.1.19.patch

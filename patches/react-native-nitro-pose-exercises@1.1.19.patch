@@ -1,0 +1,15 @@
+diff --git a/ios/NitroPoseExercises.swift b/ios/NitroPoseExercises.swift
+index 1c21499a7a5bbef694b70f7c4d890d3c03121760..3bb3b83b3dea933d2ac6d91c814291bba97d08f5 100644
+--- a/ios/NitroPoseExercises.swift
++++ b/ios/NitroPoseExercises.swift
+@@ -168,8 +168,8 @@ private static func cgOrientation(orientation: CameraOrientation, isMirrored: Bo
+   switch orientation {
+   case .up:    return isMirrored ? .upMirrored    : .up
+   case .down:  return isMirrored ? .downMirrored  : .down
+-  case .left:  return isMirrored ? .leftMirrored  : .left
+-  case .right: return isMirrored ? .rightMirrored : .right
++  case .left:  return isMirrored ? .rightMirrored : .left
++  case .right: return isMirrored ? .leftMirrored  : .right
+   @unknown default: return .up
+   }
+ }

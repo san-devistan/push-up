@@ -105,7 +105,7 @@ function getOverlayStyle(
 
   return overlayStyle
     ? StyleSheet.compose<ViewStyle, ViewStyle, ViewStyle>(
-        StyleSheet.absoluteFillObject,
+        StyleSheet.absoluteFill,
         overlayStyle
       )
     : StyleSheet.absoluteFill

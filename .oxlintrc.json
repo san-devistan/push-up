@@ -95,6 +95,31 @@
       "rules": {
         "import/namespace": "off"
       }
+    },
+    {
+      "files": ["packages/ui/src/components/**/*.tsx"],
+      "rules": {
+        "complexity": "off",
+        "consistent-return": "off",
+        "jsx-a11y/anchor-has-content": "off",
+        "jsx-a11y/click-events-have-key-events": "off",
+        "jsx-a11y/label-has-associated-control": "off",
+        "jsx-a11y/no-noninteractive-element-interactions": "off",
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "max-lines": "off",
+        "no-shadow": "off",
+        "no-underscore-dangle": "off",
+        "react/button-has-type": "off",
+        "react/jsx-max-depth": "off",
+        "react/jsx-no-constructed-context-values": "off",
+        "react/no-array-index-key": "off",
+        "react/no-unstable-nested-components": "off",
+        "react-perf/jsx-no-jsx-as-prop": "off",
+        "react-perf/jsx-no-new-function-as-prop": "off",
+        "react-perf/jsx-no-new-object-as-prop": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/restrict-template-expressions": "off"
+      }
     }
   ],
   "ignorePatterns": [

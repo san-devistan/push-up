@@ -28,6 +28,19 @@ const MenubarRadioGroup = MenubarPrimitive.RadioGroup
 const FullWindowOverlay =
   Platform.OS === "ios" ? RNFullWindowOverlay : React.Fragment
 
+function getCloseMenu(
+  onValueChange: ((value: string | undefined) => void) | undefined,
+  setValue: React.Dispatch<React.SetStateAction<string | undefined>>
+) {
+  return () => {
+    if (onValueChange) {
+      onValueChange(undefined)
+      return
+    }
+    setValue(undefined)
+  }
+}
+
 function Menubar({
   className,
   value: valueProp,
@@ -36,15 +49,7 @@ function Menubar({
 }: React.ComponentProps<typeof MenubarPrimitive.Root>) {
   const id = React.useId()
   const [value, setValue] = React.useState<string | undefined>(undefined)
-
-  // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- React Compiler handles event handler identity; avoid useCallback so React Doctor can optimize this component.
-  const closeMenu = () => {
-    if (onValueChangeProp) {
-      onValueChangeProp(undefined)
-      return
-    }
-    setValue(undefined)
-  }
+  const closeMenu = getCloseMenu(onValueChangeProp, setValue)
 
   return (
     <>

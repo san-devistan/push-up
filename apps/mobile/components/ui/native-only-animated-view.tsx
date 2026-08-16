@@ -8,15 +8,6 @@ type NativeOnlyAnimatedViewProps = Omit<
   children?: React.ReactNode
 }
 
-/**
- * This component is used to wrap animated views that should only be animated on native.
- * @param props - The props for the animated view.
- * @returns The animated view if the platform is native, otherwise the children.
- * @example
- * <NativeOnlyAnimatedView entering={FadeIn} exiting={FadeOut}>
- *   <Text>I am only animated on native</Text>
- * </NativeOnlyAnimatedView>
- */
 function NativeOnlyAnimatedView({
   children,
   ...props

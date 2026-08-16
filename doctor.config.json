@@ -7,9 +7,59 @@
         "files": [
           "components/ui/**",
           "apps/mobile/components/ui/**",
-          "packages/ui/src/components/**"
+          "packages/ui/src/components/**",
+          "src/components/**"
         ],
         "rules": ["deslop/unused-file"]
+      },
+      {
+        "files": ["packages/ui/src/components/**", "src/components/**"],
+        "rules": [
+          "eslint/complexity",
+          "eslint/max-lines",
+          "eslint/no-shadow",
+          "eslint/no-underscore-dangle",
+          "jsx-a11y/anchor-has-content",
+          "jsx-a11y/click-events-have-key-events",
+          "jsx-a11y/label-has-associated-control",
+          "jsx-a11y/no-noninteractive-element-interactions",
+          "jsx-a11y/prefer-tag-over-role",
+          "react/button-has-type",
+          "react/jsx-max-depth",
+          "react/jsx-no-constructed-context-values",
+          "react/no-array-index-key",
+          "react/no-unstable-nested-components",
+          "react-perf/jsx-no-jsx-as-prop",
+          "react-perf/jsx-no-new-function-as-prop",
+          "react-perf/jsx-no-new-object-as-prop",
+          "react-doctor/effect-needs-cleanup",
+          "react-doctor/js-combine-iterations",
+          "react-doctor/jsx-no-constructed-context-values",
+          "react-doctor/no-pass-data-to-parent",
+          "react-doctor/no-pass-live-state-to-parent",
+          "react-doctor/no-prop-callback-in-effect",
+          "react-doctor/no-array-index-as-key",
+          "react-doctor/only-export-components",
+          "react-doctor/no-redundant-roles",
+          "react-doctor/no-transition-all",
+          "react-doctor/prefer-dynamic-import",
+          "react-doctor/prefer-tag-over-role",
+          "react-doctor/rerender-memo-before-early-return",
+          "typescript/consistent-return",
+          "typescript/no-unsafe-type-assertion",
+          "typescript/restrict-template-expressions"
+        ]
+      },
+      {
+        "files": [
+          "**/features/workout/camera.tsx",
+          "**/features/workout/_components/time-control.tsx"
+        ],
+        "rules": ["deslop/unused-export"]
+      },
+      {
+        "files": ["**/features/workout/camera.native.tsx"],
+        "rules": ["react-hooks-js/todo"]
       }
     ]
   }

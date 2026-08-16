@@ -3,7 +3,9 @@ import {
   configureReanimatedLogger,
 } from "react-native-reanimated"
 
-configureReanimatedLogger({
-  level: ReanimatedLogLevel.warn,
-  strict: false,
-})
+export function configureMobileReanimatedLogger() {
+  configureReanimatedLogger({
+    level: ReanimatedLogLevel.warn,
+    strict: false,
+  })
+}

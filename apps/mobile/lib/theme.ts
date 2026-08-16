@@ -1,5 +1,4 @@
-// Generated from packages/ui/src/tokens/design-tokens.json. Do not edit by hand.
-import { DarkTheme, DefaultTheme, type Theme } from "@react-navigation/native"
+import { DarkTheme, DefaultTheme, type Theme } from "expo-router"
 
 export const FONT_FAMILY = {
   regular: "Oxanium_400Regular",
@@ -19,33 +18,33 @@ export const FONT_FAMILY = {
 
 export const TYPOGRAPHY = {
   body: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 26,
     fontFamily: FONT_FAMILY.regular,
   },
   small: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     fontFamily: FONT_FAMILY.regular,
   },
   label: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
     fontFamily: FONT_FAMILY.medium,
   },
   "heading-sm": {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
     fontFamily: FONT_FAMILY.headingSemibold,
   },
   "heading-md": {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 28,
+    lineHeight: 34,
     fontFamily: FONT_FAMILY.headingSemibold,
   },
   "heading-lg": {
-    fontSize: 36,
-    lineHeight: 40,
+    fontSize: 40,
+    lineHeight: 44,
     fontFamily: FONT_FAMILY.headingExtrabold,
   },
 } as const
@@ -63,14 +62,14 @@ export const MOTION = {
 
 export const COMPONENT_TOKENS = {
   controlHeight: {
-    compact: 32,
-    default: 40,
-    large: 44,
+    compact: 36,
+    default: 44,
+    large: 48,
   },
   iconSize: {
-    sm: 14,
-    md: 16,
-    lg: 20,
+    sm: 16,
+    md: 18,
+    lg: 22,
   },
 } as const
 

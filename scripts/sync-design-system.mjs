@@ -20,9 +20,6 @@ const WEB_CSS = path.join(ROOT, "packages/ui/src/styles/globals.css")
 const MOBILE_CSS = path.join(ROOT, "apps/mobile/global.css")
 const MOBILE_THEME = path.join(ROOT, "apps/mobile/lib/theme.ts")
 
-const GENERATED_HEADER =
-  "/* Generated from packages/ui/src/tokens/design-tokens.json. Do not edit by hand. */"
-
 function parseArgs(argv) {
   const options = {
     importAppliedCss: "auto",
@@ -266,9 +263,7 @@ function buildWebCss(tokens) {
     ...buildTypographyVars(tokens.typography),
   }
 
-  return `${GENERATED_HEADER}
-
-@import "tailwindcss";
+  return `@import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 ${fontImports}
@@ -315,9 +310,7 @@ function buildMobileCss(tokens, lightTheme, darkTheme) {
     ...buildTypographyVars(tokens.typography),
   }
 
-  return `${GENERATED_HEADER}
-
-@tailwind base;
+  return `@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -359,8 +352,7 @@ function buildTypographyTs(typography) {
 }
 
 function buildThemeTs(tokens, lightTheme, darkTheme) {
-  return `// Generated from packages/ui/src/tokens/design-tokens.json. Do not edit by hand.
-import { DarkTheme, DefaultTheme, type Theme } from "@react-navigation/native"
+  return `import { DarkTheme, DefaultTheme, type Theme } from "expo-router"
 
 export const FONT_FAMILY = ${formatTsValue(tokens.fonts.mobile)} as const
 

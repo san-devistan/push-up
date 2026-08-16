@@ -8,7 +8,7 @@ function Input({
   ...props
 }: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
   const resolvedClassName = cn(
-    "flex h-9 w-full min-w-0 flex-row items-center rounded-3xl border border-transparent bg-input/50 px-3 py-1 text-base leading-5 text-foreground",
+    "flex h-11 w-full min-w-0 flex-row items-center rounded-2xl border border-transparent bg-input/50 px-4 py-2 text-base leading-6 text-foreground",
     props.editable === false &&
       cn(
         "opacity-50",

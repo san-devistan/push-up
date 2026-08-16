@@ -1,26 +1,33 @@
-// oxlint-disable-next-line import/no-unassigned-import -- Reanimated logger must be configured before app modules evaluate.
-import "@/lib/reanimated-logger"
+import { PlanProvider } from "@/features/workout/_hooks/use-plan"
+import { syncPendingSessions } from "@/features/workout/_lib/sync"
+import globalCss from "@/global.css"
 import { useColorScheme } from "@/hooks/use-color-scheme"
+import { authClient, isAuthConfigured } from "@/lib/auth-client"
 import { mobileFonts } from "@/lib/fonts"
+import { configureMobileReanimatedLogger } from "@/lib/reanimated-logger"
 import { NAV_THEME } from "@/lib/theme"
-import { ThemeProvider } from "@react-navigation/native"
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react"
 import { PortalHost } from "@rn-primitives/portal"
-import { ConvexProvider, ConvexReactClient } from "convex/react"
+import { api } from "@workspace/backend/api"
+import { ConvexReactClient, useMutation } from "convex/react"
 import { useFonts } from "expo-font"
-import { Stack } from "expo-router"
+import * as Network from "expo-network"
+import { Stack, ThemeProvider } from "expo-router"
+import * as ScreenOrientation from "expo-screen-orientation"
 import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
-import { useEffect, type ReactNode } from "react"
+import { useEffect, useRef, type ReactNode } from "react"
 import { View } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 
-// oxlint-disable-next-line import/no-relative-parent-imports, import/no-unassigned-import -- Expo Router and NativeWind require the root global CSS side-effect import.
-import "../global.css"
-
+void globalCss
+configureMobileReanimatedLogger()
 void SplashScreen.preventAutoHideAsync()
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL
 const convex = convexUrl
   ? new ConvexReactClient(convexUrl, {
+      expectAuth: true,
       unsavedChangesWarning: false,
     })
   : null
@@ -56,18 +63,81 @@ if (!convex) {
 }
 
 const stackScreenOptions = { headerShown: false } as const
+const sessionScreenOptions = {
+  animation: "fade",
+  gestureEnabled: false,
+} as const
+const rootStyle = { flex: 1 } as const
+const statusBarProps = { style: "auto" } as const
 
 function OptionalConvexProvider({ children }: { children: ReactNode }) {
   if (!convex) {
     return <>{children}</>
   }
 
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>
+  return (
+    <ConvexBetterAuthProvider authClient={authClient} client={convex}>
+      <AnonymousSession />
+      <OutboxSync />
+      {children}
+    </ConvexBetterAuthProvider>
+  )
+}
+
+function OutboxSync() {
+  const { data: authSession } = authClient.useSession()
+  const syncSession = useMutation(api.workoutSessions.sync)
+
+  useEffect(() => {
+    if (authSession) {
+      void syncPendingSessions(syncSession)
+    }
+  }, [authSession, syncSession])
+
+  return null
+}
+
+function AnonymousSession() {
+  const { data: session, isPending } = authClient.useSession()
+  const requested = useRef(false)
+
+  useEffect(() => {
+    async function requestAnonymousSession() {
+      if (!isAuthConfigured || isPending || session || requested.current) {
+        return
+      }
+
+      requested.current = true
+      const { error } = await authClient.signIn.anonymous()
+
+      if (error) {
+        requested.current = false
+        console.warn("Could not create the anonymous profile", error)
+      }
+    }
+
+    void requestAnonymousSession()
+    const subscription = Network.addNetworkStateListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        void requestAnonymousSession()
+      }
+    })
+
+    return () => subscription.remove()
+  }, [isPending, session])
+
+  return null
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme() ?? "light"
+  const colorScheme = useColorScheme() === "dark" ? "dark" : "light"
   const [fontsLoaded, fontLoadError] = useFonts(mobileFonts)
+
+  useEffect(() => {
+    void ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.PORTRAIT_UP
+    )
+  }, [])
 
   useEffect(() => {
     if (fontLoadError) {
@@ -84,21 +154,33 @@ export default function RootLayout() {
   }
 
   return (
-    <OptionalConvexProvider>
-      <ThemeProvider value={NAV_THEME[colorScheme]}>
-        <View
-          className={
-            colorScheme === "dark"
-              ? "dark flex-1 bg-background"
-              : "flex-1 bg-background"
-          }
-        >
-          <Stack screenOptions={stackScreenOptions} />
-          {/* oxlint-disable-next-line react/style-prop-object -- Expo StatusBar accepts string style values. */}
-          <StatusBar style="auto" />
-          <PortalHost />
-        </View>
-      </ThemeProvider>
-    </OptionalConvexProvider>
+    <GestureHandlerRootView style={rootStyle}>
+      <OptionalConvexProvider>
+        <PlanProvider>
+          <ThemeProvider value={NAV_THEME[colorScheme]}>
+            <View
+              className={
+                colorScheme === "dark"
+                  ? "dark flex-1 bg-background"
+                  : "flex-1 bg-background"
+              }
+            >
+              <RootStack />
+              <StatusBar {...statusBarProps} />
+              <PortalHost />
+            </View>
+          </ThemeProvider>
+        </PlanProvider>
+      </OptionalConvexProvider>
+    </GestureHandlerRootView>
+  )
+}
+
+function RootStack() {
+  return (
+    <Stack screenOptions={stackScreenOptions}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="session" options={sessionScreenOptions} />
+    </Stack>
   )
 }

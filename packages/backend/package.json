@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#convex/*": "./convex/*.ts"
+  },
   "exports": {
     "./api": {
       "types": "./convex/_generated/api.d.ts",
@@ -14,13 +17,19 @@
     }
   },
   "scripts": {
+    "check:activity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-activity.mts",
     "dev": "convex dev",
     "deploy": "convex deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/core": "1.6.15",
+    "@better-auth/expo": "1.6.15",
+    "@convex-dev/better-auth": "0.12.5",
+    "better-auth": "1.6.15",
     "convex": "^1.43.0",
     "effect": "^3.22.1",
+    "jose": "6.1.0",
     "ts-pattern": "^5.9.0"
   },
   "devDependencies": {
