@@ -1,23 +1,26 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { Connect } from "@/features/workout/_components/connect"
 import {
   Hero,
   Meter,
-  Slab,
-  StatGrid,
-  StatTile,
+  StatsDivider,
+  StatsList,
+  StatsListRow,
 } from "@/features/workout/_components/figures"
+import {
+  formatCalories,
+  getEstimatedCalories,
+} from "@/features/workout/_lib/calories"
 import type { FailureReason } from "@/features/workout/_lib/counter"
 import { formatDuration, formatSeconds } from "@/features/workout/_lib/format"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import {
-  CheckIcon,
   ClockIcon,
   HouseIcon,
-  TargetIcon,
   TimerIcon,
+  TrendingUpIcon,
+  XCircleIcon,
   ZapIcon,
 } from "lucide-react-native"
 import { ScrollView, StyleSheet, View } from "react-native"
@@ -27,12 +30,14 @@ const FAILURE_REASONS = [
   "body_misalignment",
   "incomplete_lockout",
   "insufficient_depth",
+  "tracking_lost",
 ] as const satisfies readonly FailureReason[]
 const SCREEN_EDGES = ["top", "bottom"] as const
 const FAILURE_LABELS = {
-  body_misalignment: "Body alignment",
-  incomplete_lockout: "Incomplete lockout",
-  insufficient_depth: "Not deep enough",
+  body_misalignment: "align",
+  incomplete_lockout: "lockout",
+  insufficient_depth: "depth",
+  tracking_lost: "tracking",
 } satisfies Record<FailureReason, string>
 const styles = StyleSheet.create({
   content: {
@@ -52,10 +57,12 @@ function getSessionStats(session: WorkoutSession) {
   const averageRepMs = session.attempts.length
     ? Math.round(session.activeRepetitionTimeMs / session.attempts.length)
     : 0
+  const failedReps = session.attempts.filter((attempt) => !attempt.valid).length
   const failureCounts: Record<FailureReason, number> = {
     body_misalignment: 0,
     incomplete_lockout: 0,
     insufficient_depth: 0,
+    tracking_lost: 0,
   }
 
   for (const attempt of session.attempts) {
@@ -64,41 +71,35 @@ function getSessionStats(session: WorkoutSession) {
     }
   }
 
-  return { averageRepMs, failureCounts, successRate }
+  return { averageRepMs, failedReps, failureCounts, successRate }
 }
 
-function FailureBreakdown({
+function formatFailedReps({
+  failedReps,
   failureCounts,
 }: {
+  failedReps: number
   failureCounts: Record<FailureReason, number>
 }) {
+  if (failedReps === 0) {
+    return "0"
+  }
+
   const failures = FAILURE_REASONS.filter((reason) => failureCounts[reason] > 0)
 
   if (failures.length === 0) {
-    return (
-      <View className="flex-row items-center gap-3 rounded-2xl bg-primary/15 p-4">
-        <Icon as={CheckIcon} className="text-primary" />
-        <Text className="font-semibold">Every attempt counted. Clean set.</Text>
-      </View>
-    )
+    return String(failedReps)
   }
 
-  return (
-    <Slab>
-      <Text className="font-semibold">Why attempts did not count</Text>
-      {failures.map((reason) => (
-        <View
-          key={reason}
-          className="flex-row items-center justify-between gap-4"
-        >
-          <Text variant="muted">{FAILURE_LABELS[reason]}</Text>
-          <Text selectable className="font-heading font-bold">
-            {failureCounts[reason]}
-          </Text>
-        </View>
-      ))}
-    </Slab>
-  )
+  const reasons = failures
+    .map((reason) => {
+      const count = failureCounts[reason]
+      const label = FAILURE_LABELS[reason]
+      return count === 1 ? label : `${label} x${count}`
+    })
+    .join(", ")
+
+  return `${failedReps} (${reasons})`
 }
 
 export default function SummaryScreen({
@@ -108,8 +109,11 @@ export default function SummaryScreen({
   onDone: () => void
   session: WorkoutSession
 }) {
-  const { averageRepMs, failureCounts, successRate } = getSessionStats(session)
+  const { averageRepMs, failedReps, failureCounts, successRate } =
+    getSessionStats(session)
   const completed = session.status === "completed"
+  const failedRepSummary = formatFailedReps({ failedReps, failureCounts })
+  const calories = formatCalories(getEstimatedCalories(session.attempts.length))
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={SCREEN_EDGES}>
@@ -119,11 +123,6 @@ export default function SummaryScreen({
         contentInsetAdjustmentBehavior="automatic"
       >
         <Hero
-          caption={
-            completed
-              ? "Target hit. Come back tomorrow to keep the streak."
-              : "Logged anyway — partial sets still count toward your total."
-          }
           label={completed ? "Goal complete" : "Session stopped"}
           suffix={`/${session.targetReps}`}
           value={String(session.validReps)}
@@ -135,27 +134,33 @@ export default function SummaryScreen({
           />
         </Hero>
 
-        <StatGrid>
-          <StatTile
-            icon={TargetIcon}
-            label="Attempts"
-            value={String(session.attempts.length)}
+        <StatsList>
+          <StatsListRow
+            icon={TrendingUpIcon}
+            label="Success rate"
+            value={`${successRate}%`}
           />
-          <StatTile icon={ZapIcon} label="Success" value={`${successRate}%`} />
-          <StatTile
+          <StatsDivider />
+          <StatsListRow
+            icon={XCircleIcon}
+            label="Failed reps"
+            value={failedRepSummary}
+          />
+          <StatsDivider />
+          <StatsListRow
+            icon={TimerIcon}
+            label="Avg rep"
+            value={formatSeconds(averageRepMs)}
+          />
+          <StatsDivider />
+          <StatsListRow
             icon={ClockIcon}
             label="Duration"
             value={formatDuration(session.totalDurationMs)}
           />
-          <StatTile
-            icon={TimerIcon}
-            label="Avg. rep"
-            value={formatSeconds(averageRepMs)}
-          />
-        </StatGrid>
-
-        <FailureBreakdown failureCounts={failureCounts} />
-        <Connect />
+          <StatsDivider />
+          <StatsListRow icon={ZapIcon} label="Calories" value={calories} />
+        </StatsList>
 
         <View className="flex-1" />
         <Button onPress={onDone} style={styles.primaryAction}>

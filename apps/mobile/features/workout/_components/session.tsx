@@ -57,23 +57,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   invalidToastLabel: { color: "#09090b" },
-  positioning: {
-    backgroundColor: "rgba(0, 0, 0, 0.15)",
-    bottom: 0,
-    justifyContent: "flex-end",
-    left: 0,
-    paddingBottom: 124,
-    paddingHorizontal: 20,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
-  positioningBody: { color: "rgba(255, 255, 255, 0.75)" },
-  positioningPanel: {
-    backgroundColor: "rgba(0, 0, 0, 0.78)",
-    borderCurve: "continuous",
-    borderRadius: 24,
-  },
   positioningTitle: { color: "#ffffff" },
   stopButton: {
     backgroundColor: "#e11d48",
@@ -86,24 +69,6 @@ const styles = StyleSheet.create({
   surface: { backgroundColor: "#000000" },
 })
 
-function getStatusLabel({
-  phase,
-  positionReady,
-  trackingPose,
-}: {
-  phase: SessionPhase
-  positionReady: boolean
-  trackingPose: boolean
-}) {
-  if (phase === "active") {
-    return trackingPose ? "Tracking" : "Adjust position"
-  }
-
-  return positionReady
-    ? "Hold still"
-    : "Keep your shoulders, elbows, and wrists in frame"
-}
-
 function CenterOverlay({
   countdown,
   phase,
@@ -111,38 +76,18 @@ function CenterOverlay({
   countdown: number
   phase: SessionPhase
 }) {
-  if (phase === "active") {
+  if (phase !== "countdown") {
     return null
   }
 
-  if (phase === "countdown") {
-    return (
-      <View className="pointer-events-none" style={styles.countdownOverlay}>
-        <Text
-          className="font-heading font-extrabold text-white"
-          style={styles.countdown}
-        >
-          {countdown}
-        </Text>
-      </View>
-    )
-  }
-
   return (
-    <View className="pointer-events-none" style={styles.positioning}>
-      <View className="gap-2 p-5" style={styles.positioningPanel}>
-        <Text
-          className="font-heading text-2xl font-bold"
-          style={styles.positioningTitle}
-        >
-          Get into position
-        </Text>
-        <Text className="text-lg leading-6" style={styles.positioningBody}>
-          Phone upright, 1–2 m in front, front camera facing you. Keep your
-          shoulders, hands, and hips visible — the green skeleton confirms
-          tracking.
-        </Text>
-      </View>
+    <View className="pointer-events-none" style={styles.countdownOverlay}>
+      <Text
+        className="font-heading font-extrabold text-white"
+        style={styles.countdown}
+      >
+        {countdown}
+      </Text>
     </View>
   )
 }
@@ -172,11 +117,9 @@ function HudBar({ percent }: { percent: number }) {
 }
 
 function ActiveScore({
-  statusLabel,
   targetReps,
   validReps,
 }: {
-  statusLabel: string
   targetReps: number
   validReps: number
 }) {
@@ -191,9 +134,6 @@ function ActiveScore({
         <Text style={styles.activeTarget}>/{targetReps}</Text>
       </Text>
       <HudBar percent={(validReps / Math.max(1, targetReps)) * 100} />
-      <Text className="font-semibold" style={styles.positioningTitle}>
-        {statusLabel}
-      </Text>
     </View>
   )
 }
@@ -218,7 +158,6 @@ export default function SessionScreen({
   targetReps: number
 }) {
   const session = useSession({ onComplete, plan, targetReps })
-  const statusLabel = getStatusLabel(session)
 
   return (
     <View className="flex-1" style={styles.surface}>
@@ -226,23 +165,28 @@ export default function SessionScreen({
         isActive
         onError={session.onCameraError}
         onLandmarks={session.onLandmarks}
+        showDepthGuide={session.phase === "active"}
+        showSetupGuides={session.phase !== "active"}
       />
 
       <SafeAreaView className="absolute left-0 right-0 top-0" edges={TOP_EDGE}>
-        <View className="px-5 pt-3">
+        <View
+          className={
+            session.phase === "active" ? "px-5 pt-3" : "items-end px-5 pt-3"
+          }
+        >
           {session.phase === "active" ? (
             <ActiveScore
-              statusLabel={statusLabel}
               targetReps={targetReps}
               validReps={session.validReps}
             />
           ) : (
-            <View className="self-start px-5 py-3" style={styles.hudPanel}>
+            <View className="self-end px-5 py-3" style={styles.hudPanel}>
               <Text
                 className="text-lg font-semibold leading-6"
                 style={styles.positioningTitle}
               >
-                {statusLabel}
+                {session.setupHint}
               </Text>
             </View>
           )}

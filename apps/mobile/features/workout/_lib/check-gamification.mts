@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 
-import { formatMilestoneRemaining, getLevel } from "./gamification.ts"
+import {
+  formatMilestoneRemaining,
+  getLevel,
+  getLevelRequirements,
+} from "./gamification.ts"
 
 const days = (reps: number, count = 30) =>
   Array.from({ length: count }, () => ({ reps }))
@@ -10,6 +14,11 @@ assert.equal(empty.level, 1)
 assert.equal(empty.nextLevel, 2)
 assert.equal(empty.milestones.at(0)?.target, 6)
 assert.equal(empty.milestones.at(1)?.target, 1)
+
+const requirements = getLevelRequirements()
+assert.equal(requirements.length, 100)
+assert.equal(requirements.at(-1)?.level, 100)
+assert.equal(requirements.at(79)?.recentDailyAverage, 50)
 
 const repsAlone = getLevel({ bestStreak: 0, recentDays: [], totalReps: 50 })
 assert.equal(repsAlone.level, 1)

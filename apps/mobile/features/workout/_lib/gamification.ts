@@ -122,7 +122,7 @@ function getMilestones(
     {
       earned: stats.totalReps >= requirement.totalReps,
       id: "totalReps",
-      label: `${requirement.totalReps.toLocaleString()} total reps`,
+      label: `${requirement.totalReps.toLocaleString()} total`,
       target: requirement.totalReps,
       value: stats.totalReps,
     },
@@ -182,6 +182,12 @@ export function getLevel(input: LevelInput) {
     nextRequirement,
     percent,
   }
+}
+
+export function getLevelRequirements() {
+  return Array.from({ length: MAX_LEVEL }, (_, index) =>
+    getRequirement(index + 1)
+  )
 }
 
 export function formatMilestoneRemaining(milestone: LevelMilestone) {

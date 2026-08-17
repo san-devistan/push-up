@@ -13,4 +13,5 @@ allowBuilds:
   msw: false
 
 patchedDependencies:
+  expo-glass-tabs@0.1.1: patches/expo-glass-tabs@0.1.1.patch
   react-native-nitro-pose-exercises@1.1.19: patches/react-native-nitro-pose-exercises@1.1.19.patch

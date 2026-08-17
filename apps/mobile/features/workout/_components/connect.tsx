@@ -1,15 +1,21 @@
 import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { Slab } from "@/features/workout/_components/figures"
+import { clearWorkoutData } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { authClient } from "@/lib/auth-client"
+import { api } from "@workspace/backend/api"
+import { useMutation } from "convex/react"
 import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
+import { LogOutIcon, Trash2Icon } from "lucide-react-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
-import { StyleSheet, View } from "react-native"
+import { Alert, StyleSheet, View } from "react-native"
 import Svg, { Path } from "react-native-svg"
 
 const MARK_SIZE = 18
+type PendingAction = "apple" | "delete" | "google" | "sign-out" | null
 const styles = StyleSheet.create({
   appleDark: {
     backgroundColor: "#ffffff",
@@ -123,54 +129,144 @@ async function connectGoogle() {
 
 function getConnectAction(
   setError: Dispatch<SetStateAction<string | null>>,
+  setPending: Dispatch<SetStateAction<PendingAction>>,
+  pending: PendingAction,
   connect: () => Promise<string | null>
 ) {
   return () => {
     setError(null)
-    void connect().then(setError)
+    setPending(pending)
+    void connect()
+      .then(setError)
+      .finally(() => setPending(null))
+  }
+}
+
+function getSignOutAction(
+  setError: Dispatch<SetStateAction<string | null>>,
+  setPending: Dispatch<SetStateAction<PendingAction>>
+) {
+  return () => {
+    setError(null)
+    setPending("sign-out")
+    void authClient
+      .signOut()
+      .then(({ error }) => setError(error?.message ?? null))
+      .catch(() => setError("Could not sign out."))
+      .finally(() => setPending(null))
+  }
+}
+
+function getDeleteDataAction(
+  clearRemoteData: () => Promise<unknown>,
+  setError: Dispatch<SetStateAction<string | null>>,
+  setPending: Dispatch<SetStateAction<PendingAction>>
+) {
+  return () => {
+    Alert.alert(
+      "Delete workout data?",
+      "This removes your reps, streaks and levels from this profile.",
+      [
+        { style: "cancel", text: "Cancel" },
+        {
+          onPress: () => {
+            setError(null)
+            setPending("delete")
+            void clearRemoteData()
+              .then(() => clearWorkoutData())
+              .catch(() => setError("Could not delete workout data."))
+              .finally(() => setPending(null))
+          },
+          style: "destructive",
+          text: "Delete",
+        },
+      ]
+    )
   }
 }
 
 export function Connect() {
   const { data: authSession } = authClient.useSession()
+  const clearRemoteData = useMutation(api.workoutSessions.clear)
   const isDark = useColorScheme() === "dark"
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingAction>(null)
 
   useEffect(() => {
     void AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
   }, [])
 
-  const withApple = getConnectAction(setError, connectApple)
-  const withGoogle = getConnectAction(setError, connectGoogle)
+  const withApple = getConnectAction(
+    setError,
+    setPending,
+    "apple",
+    connectApple
+  )
+  const withGoogle = getConnectAction(
+    setError,
+    setPending,
+    "google",
+    connectGoogle
+  )
+  const signOut = getSignOutAction(setError, setPending)
+  const deleteData = getDeleteDataAction(
+    () => clearRemoteData({}),
+    setError,
+    setPending
+  )
 
-  if (!authSession?.user.isAnonymous) {
+  if (!authSession) {
     return null
   }
+
+  const isAnonymous = authSession.user.isAnonymous
+  const isConnected = !isAnonymous
+  const disabled = pending !== null
 
   return (
     <Slab>
       <Text className="font-heading text-base font-semibold">
         Connect & Sync
       </Text>
-      <View className="gap-3">
-        {appleAvailable ? (
-          <Button
-            onPress={withApple}
-            style={isDark ? styles.appleDark : styles.appleLight}
-          >
-            <AppleMark color={isDark ? "#09090b" : "#ffffff"} />
-            <Text
-              className="font-semibold"
-              style={isDark ? styles.appleLabelDark : styles.appleLabelLight}
+      {isAnonymous ? (
+        <View className="gap-3">
+          {appleAvailable ? (
+            <Button
+              disabled={disabled}
+              onPress={withApple}
+              style={isDark ? styles.appleDark : styles.appleLight}
             >
-              Apple
-            </Text>
+              <AppleMark color={isDark ? "#09090b" : "#ffffff"} />
+              <Text
+                className="font-semibold"
+                style={isDark ? styles.appleLabelDark : styles.appleLabelLight}
+              >
+                Apple
+              </Text>
+            </Button>
+          ) : null}
+          <Button
+            disabled={disabled}
+            onPress={withGoogle}
+            style={styles.provider}
+            variant="outline"
+          >
+            <GoogleMark />
+            <Text className="font-semibold">Google</Text>
+          </Button>
+        </View>
+      ) : null}
+      <View className="gap-3 border-t border-border pt-3">
+        {isConnected ? (
+          <Button disabled={disabled} onPress={signOut} variant="outline">
+            <Icon as={LogOutIcon} />
+            <Text className="font-semibold">Sign out</Text>
           </Button>
         ) : null}
-        <Button onPress={withGoogle} style={styles.provider} variant="outline">
-          <GoogleMark />
-          <Text className="font-semibold">Google</Text>
+        <Button disabled={disabled} onPress={deleteData} variant="destructive">
+          <Icon as={Trash2Icon} />
+          <Text className="font-semibold">Delete data</Text>
         </Button>
       </View>
       {error ? (

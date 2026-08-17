@@ -1,18 +1,31 @@
 import { Text } from "@/components/ui/text"
 import { cn } from "@/lib/utils"
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import { useState } from "react"
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native"
 
 const HEATMAP_WEEKS = 16
-const COLUMN_MAX_WIDTH = 24
 
 const styles = StyleSheet.create({
   baseline: { height: StyleSheet.hairlineWidth },
   cell: { aspectRatio: 1, borderCurve: "continuous", borderRadius: 3 },
   columnCap: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   columnLabel: { height: 18 },
-  columnSlot: { maxWidth: COLUMN_MAX_WIDTH },
+  heatmapTooltip: {
+    alignSelf: "center",
+    bottom: "130%",
+    minWidth: 72,
+    position: "absolute",
+    zIndex: 20,
+  },
   legendSwatch: { borderRadius: 2, height: 10, width: 10 },
   plot: { height: 124 },
+  selectedCell: { zIndex: 10 },
 })
 
 const RAMP = ["bg-primary/25", "bg-primary/45", "bg-primary/70", "bg-primary"]
@@ -33,16 +46,44 @@ function rampClass(reps: number) {
   return "bg-muted"
 }
 
-function Cell({ date, reps }: { date: string; reps: number }) {
+function Cell({
+  date,
+  isSelected,
+  onSelect,
+  reps,
+}: {
+  date: string
+  isSelected: boolean
+  onSelect: (date: string | null) => void
+  reps: number
+}) {
   const isPlaceholder = date.startsWith("placeholder-")
+  const select = selectDate(onSelect, date)
 
   return (
-    <View
+    <Pressable
       accessible={!isPlaceholder}
       accessibilityLabel={isPlaceholder ? undefined : `${date}: ${reps} reps`}
+      accessibilityRole={isPlaceholder ? undefined : "button"}
       className={rampClass(reps)}
-      style={styles.cell}
-    />
+      disabled={isPlaceholder}
+      onPress={select}
+      style={StyleSheet.compose(styles.cell, isSelected && styles.selectedCell)}
+    >
+      {isSelected ? (
+        <View
+          className="rounded-full bg-popover px-2 py-1 shadow-sm"
+          style={styles.heatmapTooltip}
+        >
+          <Text
+            className="text-center text-xs font-bold tabular-nums text-popover-foreground"
+            numberOfLines={1}
+          >
+            {reps} reps
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   )
 }
 
@@ -51,15 +92,24 @@ function LegendSwatch({ className }: { className: string }) {
 }
 
 function getColumnStyle(percent: number): StyleProp<ViewStyle> {
-  return StyleSheet.compose(styles.columnCap, { height: `${percent}%` })
+  return StyleSheet.compose(styles.columnCap, {
+    height: `${percent}%`,
+  })
 }
 
 export function ActivityHeatmap({
   days,
+  showLegend = true,
 }: {
   days: ReadonlyArray<{ date: string; reps: number }>
+  showLegend?: boolean
 }) {
-  const weeks = Array.from({ length: HEATMAP_WEEKS }, (_, index) =>
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const weekCount = Math.max(
+    1,
+    Math.min(HEATMAP_WEEKS, Math.ceil(days.length / 7))
+  )
+  const weeks = Array.from({ length: weekCount }, (_, index) =>
     days.slice(index * 7, index * 7 + 7)
   )
 
@@ -69,40 +119,86 @@ export function ActivityHeatmap({
         {weeks.map((week) => (
           <View className="flex-1 gap-1" key={week[0]?.date}>
             {week.map((day) => (
-              <Cell date={day.date} key={day.date} reps={day.reps} />
+              <Cell
+                date={day.date}
+                isSelected={day.date === selectedDate}
+                key={day.date}
+                onSelect={setSelectedDate}
+                reps={day.reps}
+              />
             ))}
           </View>
         ))}
       </View>
-      <View className="flex-row items-center justify-end gap-1.5">
-        <Text className="text-xs text-muted-foreground">Less</Text>
-        <LegendSwatch className="bg-muted" />
-        {RAMP.map((className) => (
-          <LegendSwatch className={className} key={className} />
-        ))}
-        <Text className="text-xs text-muted-foreground">More</Text>
-      </View>
+      {showLegend ? (
+        <View className="flex-row items-center justify-end gap-1.5">
+          <Text className="text-xs text-muted-foreground">Less</Text>
+          <LegendSwatch className="bg-muted" />
+          {RAMP.map((className) => (
+            <LegendSwatch className={className} key={className} />
+          ))}
+          <Text className="text-xs text-muted-foreground">More</Text>
+        </View>
+      ) : null}
     </View>
   )
 }
 
-function Column({
-  isPeak,
-  percent,
-  reps,
+function getShortDay(date: string) {
+  if (date.startsWith("placeholder-")) {
+    return ""
+  }
+
+  const timestamp = Date.parse(`${date}T00:00:00.000Z`)
+
+  return Number.isFinite(timestamp)
+    ? new Date(timestamp).toLocaleDateString(undefined, { weekday: "short" })
+    : ""
+}
+
+function getPeakDate(days: ReadonlyArray<{ date: string; reps: number }>) {
+  return days.reduce(
+    (peak, day) => (day.reps >= peak.reps ? day : peak),
+    days[0] ?? { date: "", reps: 0 }
+  ).date
+}
+
+function selectDate(onSelect: (date: string | null) => void, date: string) {
+  return () => onSelect(date)
+}
+
+function clearDate(onSelect: (date: string | null) => void) {
+  return () => onSelect(null)
+}
+
+function DailyColumn({
+  day,
+  isSelected,
+  onSelect,
+  peak,
 }: {
-  isPeak: boolean
-  percent: number
-  reps: number
+  day: { date: string; reps: number }
+  isSelected: boolean
+  onSelect: (date: string | null) => void
+  peak: number
 }) {
-  const columnStyle = getColumnStyle(percent)
+  const select = selectDate(onSelect, day.date)
+  const clear = clearDate(onSelect)
+  const percent = peak > 0 ? Math.max(4, (day.reps / peak) * 100) : 4
 
   return (
-    <View className="h-full flex-1 items-center" style={styles.columnSlot}>
+    <Pressable
+      accessible={!day.date.startsWith("placeholder-")}
+      accessibilityLabel={`${day.date}: ${day.reps} reps`}
+      className="h-full flex-1 items-center"
+      onHoverIn={select}
+      onHoverOut={clear}
+      onPress={select}
+    >
       <View className="justify-center" style={styles.columnLabel}>
-        {isPeak ? (
+        {isSelected ? (
           <Text className="font-heading text-xs font-bold tabular-nums">
-            {reps}
+            {day.reps}
           </Text>
         ) : null}
       </View>
@@ -110,22 +206,30 @@ function Column({
         <View
           className={cn(
             "w-full",
-            reps > 0 ? "bg-primary" : "bg-muted",
-            isPeak ? "" : "opacity-70"
+            day.reps > 0 ? "bg-primary" : "bg-muted",
+            isSelected ? "" : "opacity-70"
           )}
-          style={columnStyle}
+          style={getColumnStyle(percent)}
         />
       </View>
-    </View>
+      <Text className="pt-1 text-xs text-muted-foreground">
+        {getShortDay(day.date)}
+      </Text>
+    </Pressable>
   )
 }
 
-export function WeeklyColumns({
-  weeks,
+export function DailyColumns({
+  days,
 }: {
-  weeks: ReadonlyArray<{ reps: number; start: string }>
+  days: ReadonlyArray<{ date: string; reps: number }>
 }) {
-  const peak = Math.max(0, ...weeks.map((week) => week.reps))
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const peakDate = getPeakDate(days)
+  const activeDate = days.some((day) => day.date === selectedDate)
+    ? selectedDate
+    : peakDate
+  const peak = Math.max(0, ...days.map((day) => day.reps))
 
   return (
     <View className="gap-2">
@@ -133,20 +237,17 @@ export function WeeklyColumns({
         className="flex-row items-stretch justify-between gap-2"
         style={styles.plot}
       >
-        {weeks.map((week) => (
-          <Column
-            key={week.start}
-            isPeak={peak > 0 && week.reps === peak}
-            percent={peak > 0 ? Math.max(3, (week.reps / peak) * 100) : 3}
-            reps={week.reps}
+        {days.map((day) => (
+          <DailyColumn
+            day={day}
+            isSelected={day.date === activeDate}
+            key={day.date}
+            onSelect={setSelectedDate}
+            peak={peak}
           />
         ))}
       </View>
       <View className="bg-border" style={styles.baseline} />
-      <View className="flex-row justify-between">
-        <Text className="text-xs text-muted-foreground">8 weeks ago</Text>
-        <Text className="text-xs text-muted-foreground">This week</Text>
-      </View>
     </View>
   )
 }

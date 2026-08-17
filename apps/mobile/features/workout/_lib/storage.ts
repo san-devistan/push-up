@@ -1,4 +1,8 @@
-import type { WorkoutAttempt } from "@/features/workout/_lib/counter"
+import {
+  finishActiveAttempt,
+  type CounterState,
+  type WorkoutAttempt,
+} from "@/features/workout/_lib/counter"
 import * as Crypto from "expo-crypto"
 import { Storage } from "expo-sqlite/kv-store"
 
@@ -16,6 +20,7 @@ export type TrainingPlan = {
 export type WorkoutSession = {
   activeRepetitionTimeMs: number
   attempts: WorkoutAttempt[]
+  debugPayload: string | null
   endedAt: number
   id: string
   localDate: string
@@ -113,7 +118,8 @@ function isFailureReason(value: unknown) {
   return (
     value === "body_misalignment" ||
     value === "incomplete_lockout" ||
-    value === "insufficient_depth"
+    value === "insufficient_depth" ||
+    value === "tracking_lost"
   )
 }
 
@@ -130,7 +136,9 @@ function isAttempt(value: unknown): value is WorkoutAttempt {
   )
 }
 
-type StoredSession = WorkoutSession
+type StoredSession = Omit<WorkoutSession, "debugPayload"> & {
+  debugPayload?: unknown
+}
 
 function hasSessionNumbers(
   value: Record<string, unknown>
@@ -202,6 +210,8 @@ function parseSession(value: unknown): WorkoutSession | null {
   return {
     activeRepetitionTimeMs: value.activeRepetitionTimeMs,
     attempts: value.attempts,
+    debugPayload:
+      typeof value.debugPayload === "string" ? value.debugPayload : null,
     endedAt: value.endedAt,
     id: value.id,
     localDate: value.localDate,
@@ -223,6 +233,48 @@ export function createSessionId() {
   return Crypto.randomUUID()
 }
 
+export function createWorkoutSession({
+  counterState,
+  debugPayload,
+  endedAt,
+  plan,
+  startedAt,
+  status,
+  targetReps,
+}: {
+  counterState: CounterState
+  debugPayload: string | null
+  endedAt: number
+  plan: TrainingPlan
+  startedAt: number
+  status: WorkoutStatus
+  targetReps: number
+}): WorkoutSession {
+  const finalState =
+    status === "stopped"
+      ? finishActiveAttempt(counterState, endedAt - startedAt)
+      : counterState
+
+  return {
+    activeRepetitionTimeMs: finalState.attempts.reduce(
+      (total, attempt) => total + attempt.durationMs,
+      0
+    ),
+    attempts: finalState.attempts,
+    debugPayload,
+    endedAt,
+    id: createSessionId(),
+    localDate: getLocalDate(startedAt),
+    soundEnabled: plan.soundEnabled,
+    startedAt,
+    status,
+    targetReps,
+    timezoneOffsetMinutes: -new Date(startedAt).getTimezoneOffset(),
+    totalDurationMs: endedAt - startedAt,
+    validReps: finalState.validReps,
+  }
+}
+
 export function loadPlan(): TrainingPlan {
   const value = readJson(KEYS.plan)
 
@@ -237,8 +289,9 @@ export function normalizeTrainingTimes(
   times: readonly TrainingTime[]
 ): TrainingTime[] {
   const seen = new Set<string>()
-  const unique = times
-    .toSorted(
+  const unique = [...times]
+    // oxlint-disable-next-line unicorn/no-array-sort -- Hermes does not support toSorted.
+    .sort(
       (first, second) =>
         first.hour - second.hour || first.minute - second.minute
     )
@@ -285,4 +338,8 @@ export function markSessionSynced(sessionId: string) {
   )
 
   writeJson(KEYS.outbox, sessions)
+}
+
+export function clearWorkoutData() {
+  writeJson(KEYS.outbox, [])
 }

@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  expo-glass-tabs@0.1.1: b2952c0d8f5e479d9e714107fca08d47dba8fce7cee1df3c048059224395afe8
   react-native-nitro-pose-exercises@1.1.19: 11cac023db0f51274f9fa8304f39e44bfc170431decace4409ac79bfeed5e449
 
 importers:
@@ -172,7 +173,7 @@ importers:
         version: 56.0.4(expo@56.0.19)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-glass-tabs:
         specifier: ^0.1.1
-        version: 0.1.1(93b7175f9f7e4eb35161e8432326ff30)
+        version: 0.1.1(patch_hash=b2952c0d8f5e479d9e714107fca08d47dba8fce7cee1df3c048059224395afe8)(93b7175f9f7e4eb35161e8432326ff30)
       expo-haptics:
         specifier: ~56.0.3
         version: 56.0.3(expo@56.0.19)
@@ -10584,7 +10585,9 @@ snapshots:
       metro-runtime: 0.84.4
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-colors@0.74.89': {}
 
@@ -12993,7 +12996,7 @@ snapshots:
       react-native: 0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8)
     optional: true
 
-  expo-glass-tabs@0.1.1(93b7175f9f7e4eb35161e8432326ff30):
+  expo-glass-tabs@0.1.1(patch_hash=b2952c0d8f5e479d9e714107fca08d47dba8fce7cee1df3c048059224395afe8)(93b7175f9f7e4eb35161e8432326ff30):
     dependencies:
       expo-blur: 56.0.4(expo@56.0.19)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-glass-effect: 56.0.4(expo@56.0.19)(react-native@0.85.3(@babel/core@7.29.7)(@react-native/metro-config@0.85.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)

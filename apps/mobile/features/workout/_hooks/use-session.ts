@@ -1,19 +1,32 @@
 import {
   abandonActiveAttempt,
   createCounterState,
-  finishActiveAttempt,
   getDepthGuideY,
   getPoseMetrics,
+  getSetupState,
   isDepthReached,
   isReadyPosition,
   processPoseMetrics,
+  recordTrackingLoss,
   type CounterState,
   type PoseLandmark,
   type PoseMetrics,
+  type WorkoutAttempt,
 } from "@/features/workout/_lib/counter"
 import {
-  createSessionId,
-  getLocalDate,
+  handleCompletedAttempt,
+  notifySessionEnd,
+  speak,
+  stopSpeech,
+} from "@/features/workout/_lib/feedback"
+import {
+  appendSessionDebugFrame,
+  logSessionFrame,
+  serializeSessionDebugFrames,
+  type SessionDebugFrame,
+} from "@/features/workout/_lib/session-debug"
+import {
+  createWorkoutSession,
   saveSession,
   type TrainingPlan,
   type WorkoutSession,
@@ -22,21 +35,23 @@ import {
 import { syncPendingSessions } from "@/features/workout/_lib/sync"
 import { api } from "@workspace/backend/api"
 import { useMutation } from "convex/react"
-import * as Haptics from "expo-haptics"
-import * as Speech from "expo-speech"
 import { useEffect, useRef, useState } from "react"
 
 export type SessionPhase = "active" | "countdown" | "positioning"
 
 const INITIAL_COUNTER_STATE = createCounterState()
+const COUNTDOWN_TRACKING_GRACE_MS = 500
+const GUIDANCE_TOAST_INTERVAL_MS = 1800
 const TRACKING_LOSS_GRACE_MS = 1500
+const TRACKING_TOAST_GRACE_MS = 2200
+const TOAST_DURATION_MS = 1200
 
 function calibrateDepthGuide(
   currentDepthGuideY: number | null,
   landmarks: readonly PoseLandmark[],
-  ready: boolean
+  setupValid: boolean
 ) {
-  return ready
+  return setupValid
     ? (getDepthGuideY(landmarks) ?? currentDepthGuideY)
     : currentDepthGuideY
 }
@@ -49,55 +64,133 @@ function shouldAbandonAttempt(
   return phase === "active" && now - lastPoseAt > TRACKING_LOSS_GRACE_MS
 }
 
-async function speak(value: string, enabled: boolean) {
-  if (!enabled) {
+function shouldShowTrackingToast({
+  lastPoseAt,
+  metrics,
+  now,
+  phase,
+}: {
+  lastPoseAt: number
+  metrics: PoseMetrics | null
+  now: number
+  phase: SessionPhase
+}) {
+  return (
+    phase === "active" && !metrics && now - lastPoseAt > TRACKING_TOAST_GRACE_MS
+  )
+}
+
+function clearToastTimeout(timeout: {
+  current: ReturnType<typeof setTimeout> | null
+}) {
+  if (timeout.current) {
+    clearTimeout(timeout.current)
+  }
+}
+
+function showGuidanceToast({
+  lastGuidanceToast,
+  lastGuidanceToastAt,
+  message,
+  now,
+  showToast,
+}: {
+  lastGuidanceToast: { current: string | null }
+  lastGuidanceToastAt: { current: number }
+  message: string
+  now: number
+  showToast: (message: string) => void
+}) {
+  if (
+    lastGuidanceToast.current === message &&
+    now - lastGuidanceToastAt.current < GUIDANCE_TOAST_INTERVAL_MS
+  ) {
     return
   }
 
-  await Speech.stop()
-  Speech.speak(value, {
-    rate: 1.05,
-    useApplicationAudioSession: false,
-    volume: 1,
-  })
+  lastGuidanceToast.current = message
+  lastGuidanceToastAt.current = now
+  showToast(message)
 }
 
-function buildSession({
-  counterState,
-  endedAt,
-  plan,
-  startedAt,
-  status,
-  targetReps,
+function handleTrackingGuidance({
+  lastGuidanceToast,
+  lastGuidanceToastAt,
+  lastPoseAt,
+  metrics,
+  now,
+  phase,
+  setupHint,
+  showToast,
 }: {
-  counterState: CounterState
-  endedAt: number
-  plan: TrainingPlan
-  startedAt: number
-  status: WorkoutStatus
-  targetReps: number
-}): WorkoutSession {
-  const finalState =
-    status === "stopped"
-      ? finishActiveAttempt(counterState, endedAt - startedAt)
-      : counterState
+  lastGuidanceToast: { current: string | null }
+  lastGuidanceToastAt: { current: number }
+  lastPoseAt: number
+  metrics: PoseMetrics | null
+  now: number
+  phase: SessionPhase
+  setupHint: string
+  showToast: (message: string) => void
+}) {
+  if (shouldShowTrackingToast({ lastPoseAt, metrics, now, phase })) {
+    showGuidanceToast({
+      lastGuidanceToast,
+      lastGuidanceToastAt,
+      message: setupHint,
+      now,
+      showToast,
+    })
+    return
+  }
 
-  return {
-    activeRepetitionTimeMs: finalState.attempts.reduce(
-      (total, attempt) => total + attempt.durationMs,
-      0
-    ),
-    attempts: finalState.attempts,
-    endedAt,
-    id: createSessionId(),
-    localDate: getLocalDate(startedAt),
-    soundEnabled: plan.soundEnabled,
-    startedAt,
-    status,
-    targetReps,
-    timezoneOffsetMinutes: -new Date(startedAt).getTimezoneOffset(),
-    totalDurationMs: endedAt - startedAt,
-    validReps: finalState.validReps,
+  if (metrics) {
+    lastGuidanceToast.current = null
+  }
+}
+
+function captureDebugFrame({
+  debugFrames,
+  lastSessionDebugAt,
+  ...input
+}: Omit<Parameters<typeof logSessionFrame>[0], "lastLoggedAt"> & {
+  debugFrames: { current: SessionDebugFrame[] }
+  lastSessionDebugAt: { current: number }
+}) {
+  const debug = logSessionFrame({
+    ...input,
+    lastLoggedAt: lastSessionDebugAt.current,
+  })
+  lastSessionDebugAt.current = debug.lastLoggedAt
+  if (debug.frame) {
+    appendSessionDebugFrame(debugFrames.current, debug.frame)
+  }
+}
+
+function processActiveFrame({
+  counter,
+  depthReached,
+  metrics,
+  now,
+  onCompleted,
+  sessionStartedAt,
+}: {
+  counter: { current: CounterState }
+  depthReached: boolean
+  metrics: PoseMetrics
+  now: number
+  onCompleted: (attempt: WorkoutAttempt, state: CounterState) => void
+  sessionStartedAt: number
+}) {
+  const result = processPoseMetrics(
+    counter.current,
+    metrics,
+    now - sessionStartedAt,
+    depthReached
+  )
+  counter.current = result.state
+
+  if (result.event.type === "attempt-completed") {
+    onCompleted(result.event.attempt, result.state)
   }
 }
 
@@ -114,28 +207,30 @@ export function useSession({
   const [countdown, setCountdown] = useState(3)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<SessionPhase>("positioning")
-  const [positionReady, setPositionReady] = useState(false)
-  const [trackingPose, setTrackingPose] = useState(false)
+  const [setupHint, setSetupHint] = useState("Fit body in frame")
   const [toast, setToast] = useState<string | null>(null)
   const [validReps, setValidReps] = useState(0)
   const counter = useRef(INITIAL_COUNTER_STATE)
+  const debugFrames = useRef<SessionDebugFrame[]>([])
   const depthGuideY = useRef<number | null>(null)
   const finished = useRef(false)
+  const lastGuidanceToast = useRef<string | null>(null)
+  const lastGuidanceToastAt = useRef(0)
+  const lastSessionDebugAt = useRef(0)
   const lastPoseAt = useRef(0)
   const readySince = useRef<number | null>(null)
   const sessionStartedAt = useRef(0)
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function complete(status: WorkoutStatus, counterState?: CounterState) {
-    if (finished.current) {
-      return
-    }
+    if (finished.current) return
 
     finished.current = true
     const endedAt = Date.now()
     const startedAt = sessionStartedAt.current || endedAt
-    const session = buildSession({
+    const session = createWorkoutSession({
       counterState: counterState ?? counter.current,
+      debugPayload: serializeSessionDebugFrames(debugFrames.current),
       endedAt,
       plan,
       startedAt,
@@ -143,58 +238,16 @@ export function useSession({
       targetReps,
     })
 
-    if (status === "completed") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      void speak("Goal complete", plan.soundEnabled)
-    } else {
-      void Speech.stop()
-    }
+    notifySessionEnd(status, plan.soundEnabled)
     saveSession(session)
     void syncPendingSessions(syncSession)
     onComplete(session)
   }
 
-  function showInvalidToast() {
-    setToast("Did not count")
-    if (toastTimeout.current) {
-      clearTimeout(toastTimeout.current)
-    }
-    toastTimeout.current = setTimeout(() => setToast(null), 1200)
-  }
-
-  function handleActivePose(
-    metrics: PoseMetrics,
-    depthReached: boolean,
-    now: number
-  ) {
-    const elapsedMs = now - sessionStartedAt.current
-    const result = processPoseMetrics(
-      counter.current,
-      metrics,
-      elapsedMs,
-      depthReached
-    )
-    counter.current = result.state
-
-    if (result.event.type !== "attempt-completed") {
-      return
-    }
-
-    if (!result.event.attempt.valid) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-      showInvalidToast()
-      return
-    }
-
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    setValidReps(result.state.validReps)
-
-    if (result.state.validReps >= targetReps) {
-      complete("completed", result.state)
-      return
-    }
-
-    void speak(String(result.state.validReps), plan.soundEnabled)
+  function showToast(message: string) {
+    setToast(message)
+    clearToastTimeout(toastTimeout)
+    toastTimeout.current = setTimeout(() => setToast(null), TOAST_DURATION_MS)
   }
 
   function onLandmarks(landmarks: readonly PoseLandmark[]) {
@@ -202,19 +255,60 @@ export function useSession({
 
     const metrics = getPoseMetrics(landmarks)
     const ready = isReadyPosition(metrics)
+    const setup = getSetupState(landmarks, metrics, ready)
     depthGuideY.current = calibrateDepthGuide(
       depthGuideY.current,
       landmarks,
-      ready
+      setup.valid
     )
 
     const depthReached = isDepthReached(landmarks, depthGuideY.current)
+    const nextSetupHint = setup.hint
+    captureDebugFrame({
+      counterState: counter.current,
+      debugFrames,
+      depthGuideY: depthGuideY.current,
+      depthReached,
+      landmarks,
+      lastSessionDebugAt,
+      metrics,
+      now,
+      phase,
+      ready,
+      sessionStartedAt: sessionStartedAt.current,
+      setupHint: nextSetupHint,
+      trackingGapMs: lastPoseAt.current === 0 ? 0 : now - lastPoseAt.current,
+    })
 
-    setPositionReady(ready)
-    setTrackingPose(metrics !== null)
+    setSetupHint(nextSetupHint)
+    handleTrackingGuidance({
+      lastGuidanceToast,
+      lastGuidanceToastAt,
+      lastPoseAt: lastPoseAt.current,
+      metrics,
+      now,
+      phase,
+      setupHint: nextSetupHint,
+      showToast,
+    })
+
+    if (phase === "countdown" && !setup.valid) {
+      void stopSpeech()
+      readySince.current = null
+      setCountdown(3)
+      setPhase("positioning")
+      return
+    }
 
     if (!metrics) {
       readySince.current = null
+      if (phase === "active") {
+        counter.current = recordTrackingLoss(
+          counter.current,
+          Math.max(0, lastPoseAt.current - sessionStartedAt.current),
+          depthReached
+        )
+      }
       if (shouldAbandonAttempt(phase, now, lastPoseAt.current)) {
         counter.current = abandonActiveAttempt(counter.current)
       }
@@ -224,7 +318,7 @@ export function useSession({
     lastPoseAt.current = now
 
     if (phase === "positioning") {
-      if (!ready) {
+      if (!setup.valid) {
         readySince.current = null
         return
       }
@@ -240,15 +334,26 @@ export function useSession({
     }
 
     if (phase === "countdown") {
-      if (!ready) {
-        void Speech.stop()
-        readySince.current = null
-        setPhase("positioning")
-      }
       return
     }
 
-    handleActivePose(metrics, depthReached, now)
+    processActiveFrame({
+      counter,
+      depthReached,
+      metrics,
+      now,
+      onCompleted: (attempt, state) =>
+        handleCompletedAttempt({
+          attempt,
+          complete,
+          setValidReps,
+          showToast,
+          soundEnabled: plan.soundEnabled,
+          state,
+          targetReps,
+        }),
+      sessionStartedAt: sessionStartedAt.current,
+    })
   }
 
   useEffect(() => {
@@ -259,6 +364,17 @@ export function useSession({
     let current = 3
     void speak(String(current), plan.soundEnabled)
     const interval = setInterval(() => {
+      if (
+        readySince.current === null ||
+        Date.now() - lastPoseAt.current > COUNTDOWN_TRACKING_GRACE_MS
+      ) {
+        clearInterval(interval)
+        void stopSpeech()
+        setCountdown(3)
+        setPhase("positioning")
+        return
+      }
+
       current -= 1
       if (current > 0) {
         setCountdown(current)
@@ -269,6 +385,8 @@ export function useSession({
       clearInterval(interval)
       void speak("Go", plan.soundEnabled)
       counter.current = createCounterState()
+      debugFrames.current = []
+      lastSessionDebugAt.current = 0
       sessionStartedAt.current = Date.now()
       setPhase("active")
     }, 1000)
@@ -279,17 +397,11 @@ export function useSession({
   useEffect(() => {
     return () => {
       if (!finished.current) {
-        void Speech.stop()
+        void stopSpeech()
       }
-      if (toastTimeout.current) {
-        clearTimeout(toastTimeout.current)
-      }
+      clearToastTimeout(toastTimeout)
     }
   }, [])
-
-  function stop() {
-    complete("stopped")
-  }
 
   return {
     countdown,
@@ -297,10 +409,9 @@ export function useSession({
     onCameraError: setError,
     onLandmarks,
     phase,
-    positionReady,
-    stop,
+    setupHint,
+    stop: () => complete("stopped"),
     toast,
-    trackingPose,
     validReps,
   }
 }

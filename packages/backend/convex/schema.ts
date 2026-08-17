@@ -4,7 +4,8 @@ import { v } from "convex/values"
 const failureReason = v.union(
   v.literal("body_misalignment"),
   v.literal("incomplete_lockout"),
-  v.literal("insufficient_depth")
+  v.literal("insufficient_depth"),
+  v.literal("tracking_lost")
 )
 
 export default defineSchema({
@@ -20,6 +21,10 @@ export default defineSchema({
     "sessionId",
     "startedAtOffsetMs",
   ]),
+  workoutSessionDebug: defineTable({
+    payload: v.string(),
+    sessionId: v.id("workoutSessions"),
+  }).index("by_session_id", ["sessionId"]),
   workoutSessions: defineTable({
     activeRepetitionTimeMs: v.number(),
     cameraPosition: v.optional(v.union(v.literal("back"), v.literal("front"))),

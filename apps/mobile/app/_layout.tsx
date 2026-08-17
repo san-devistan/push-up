@@ -1,7 +1,10 @@
+import {
+  PreferencesProvider,
+  usePreferences,
+} from "@/features/preferences/_hooks/use-preferences"
 import { PlanProvider } from "@/features/workout/_hooks/use-plan"
 import { syncPendingSessions } from "@/features/workout/_lib/sync"
 import globalCss from "@/global.css"
-import { useColorScheme } from "@/hooks/use-color-scheme"
 import { authClient, isAuthConfigured } from "@/lib/auth-client"
 import { mobileFonts } from "@/lib/fonts"
 import { configureMobileReanimatedLogger } from "@/lib/reanimated-logger"
@@ -16,6 +19,7 @@ import { Stack, ThemeProvider } from "expo-router"
 import * as ScreenOrientation from "expo-screen-orientation"
 import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
+import { colorScheme as nativeWindColorScheme } from "nativewind"
 import { useEffect, useRef, type ReactNode } from "react"
 import { View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
@@ -130,7 +134,6 @@ function AnonymousSession() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme() === "dark" ? "dark" : "light"
   const [fontsLoaded, fontLoadError] = useFonts(mobileFonts)
 
   useEffect(() => {
@@ -155,24 +158,38 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={rootStyle}>
-      <OptionalConvexProvider>
-        <PlanProvider>
-          <ThemeProvider value={NAV_THEME[colorScheme]}>
-            <View
-              className={
-                colorScheme === "dark"
-                  ? "dark flex-1 bg-background"
-                  : "flex-1 bg-background"
-              }
-            >
-              <RootStack />
-              <StatusBar {...statusBarProps} />
-              <PortalHost />
-            </View>
-          </ThemeProvider>
-        </PlanProvider>
-      </OptionalConvexProvider>
+      <PreferencesProvider>
+        <RootProviders />
+      </PreferencesProvider>
     </GestureHandlerRootView>
+  )
+}
+
+function RootProviders() {
+  const { colorScheme } = usePreferences()
+
+  useEffect(() => {
+    nativeWindColorScheme.set(colorScheme)
+  }, [colorScheme])
+
+  return (
+    <OptionalConvexProvider>
+      <PlanProvider>
+        <ThemeProvider value={NAV_THEME[colorScheme]}>
+          <View
+            className={
+              colorScheme === "dark"
+                ? "dark flex-1 bg-background"
+                : "flex-1 bg-background"
+            }
+          >
+            <RootStack />
+            <StatusBar {...statusBarProps} />
+            <PortalHost />
+          </View>
+        </ThemeProvider>
+      </PlanProvider>
+    </OptionalConvexProvider>
   )
 }
 
@@ -181,6 +198,7 @@ function RootStack() {
     <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="session" options={sessionScreenOptions} />
+      <Stack.Screen name="levels" />
     </Stack>
   )
 }

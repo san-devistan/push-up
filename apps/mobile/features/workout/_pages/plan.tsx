@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
+import { PreferencesSection } from "@/features/preferences/_components/section"
 import { Connect } from "@/features/workout/_components/connect"
 import { Overline, Slab } from "@/features/workout/_components/figures"
 import GoalSlider from "@/features/workout/_components/goal-slider"
@@ -26,6 +27,7 @@ import {
   TargetIcon,
   TriangleAlertIcon,
   Volume2Icon,
+  XIcon,
 } from "lucide-react-native"
 import { StyleSheet, View } from "react-native"
 import Animated from "react-native-reanimated"
@@ -38,14 +40,6 @@ const styles = StyleSheet.create({
     paddingBottom: 140,
     paddingHorizontal: 20,
     paddingTop: 8,
-  },
-  timeControls: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "flex-end",
-    maxWidth: 220,
   },
 })
 
@@ -173,14 +167,12 @@ function PermissionNotice({ state }: { state: ReminderState }) {
   )
 }
 
-function TimeChip({
-  canRemove,
+function TimeRow({
   index,
   onChange,
   onRemove,
   time,
 }: {
-  canRemove: boolean
   index: number
   onChange: (index: number, time: TrainingTime) => void
   onRemove: (index: number) => void
@@ -189,24 +181,19 @@ function TimeChip({
   const change = getTimeChange(index, onChange)
   const remove = getTimeRemove(index, onRemove)
 
-  if (!canRemove) {
-    return (
-      <TimeControl hour={time.hour} minute={time.minute} onChange={change} />
-    )
-  }
-
   return (
-    <Button
-      accessibilityLabel={`Remove the ${formatClock(time.hour, time.minute)} session`}
-      className="rounded-full"
-      onPress={remove}
-      size="sm"
-      variant="secondary"
-    >
-      <Text className="font-heading text-xl font-bold tabular-nums">
-        {formatClock(time.hour, time.minute)}
-      </Text>
-    </Button>
+    <View className="flex-row items-center gap-3">
+      <Button
+        accessibilityLabel={`Remove the ${formatClock(time.hour, time.minute)} session`}
+        onPress={remove}
+        size="icon-sm"
+        variant="ghost"
+      >
+        <Icon as={XIcon} className="text-muted-foreground" />
+      </Button>
+      <View className="flex-1" />
+      <TimeControl hour={time.hour} minute={time.minute} onChange={change} />
+    </View>
   )
 }
 
@@ -219,43 +206,57 @@ function TimesSection() {
   const changeTime = getChangeTime(times, updatePlan)
   const removeTime = getRemoveTime(times, updatePlan)
   const addTime = getAddTime(times, updatePlan)
+  const hasMultipleTimes = times.length > 1
 
   return (
-    <View className="flex-row items-start gap-4">
-      <Icon as={RepeatIcon} className="text-foreground" />
-      <View className="flex-1 gap-1">
-        <Text className="font-semibold">
-          {times.length > 1 ? "Training times" : "Training time"}
+    <View className="gap-3">
+      <View className="flex-row items-center gap-4">
+        <Icon as={RepeatIcon} className="text-foreground" />
+        <Text className="flex-1 font-semibold">
+          {hasMultipleTimes ? "Training times" : "Training time"}
         </Text>
-        {times.length > 1 ? (
-          <Text className="text-sm tabular-nums text-muted-foreground">
+        {hasMultipleTimes ? (
+          <Text className="shrink-0 text-sm tabular-nums text-muted-foreground">
             {perSession} reps each
           </Text>
-        ) : null}
+        ) : (
+          times.map((time, index) => (
+            <TimeControl
+              key={formatClock(time.hour, time.minute)}
+              hour={time.hour}
+              minute={time.minute}
+              onChange={getTimeChange(index, changeTime)}
+            />
+          ))
+        )}
       </View>
-      <View style={styles.timeControls}>
-        {times.map((time, index) => (
-          <TimeChip
-            key={formatClock(time.hour, time.minute)}
-            canRemove={times.length > 1}
-            index={index}
-            onChange={changeTime}
-            onRemove={removeTime}
-            time={time}
-          />
-        ))}
-        {canAdd ? (
+      {hasMultipleTimes ? (
+        <View className="gap-2">
+          {times.map((time, index) => (
+            <TimeRow
+              key={formatClock(time.hour, time.minute)}
+              index={index}
+              onChange={changeTime}
+              onRemove={removeTime}
+              time={time}
+            />
+          ))}
+        </View>
+      ) : null}
+      {canAdd ? (
+        <View className="items-center">
           <Button
-            accessibilityLabel="Split into another session"
-            className="rounded-full"
+            accessibilityLabel="Add new training session"
+            className="w-full rounded-full dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
             onPress={addTime}
-            size="icon-sm"
+            size="sm"
             variant="outline"
           >
             <Icon as={PlusIcon} />
+            <Text>Add new training session</Text>
           </Button>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -269,7 +270,7 @@ function NotificationRows() {
       <SettingRow
         checked={plan.reminderEnabled}
         icon={BellIcon}
-        label="Daily notification"
+        label="Notification"
         onCheckedChange={setEnabled}
       />
       {plan.reminderEnabled ? <PermissionNotice state={reminderState} /> : null}
@@ -303,10 +304,6 @@ export default function PlanPage() {
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
-        <Text className="py-2 font-heading text-base font-semibold">
-          Training plan
-        </Text>
-
         <Slab>
           <Overline>Training settings</Overline>
           <GoalFields />
@@ -316,6 +313,11 @@ export default function PlanPage() {
           <NotificationRows />
           <Divider />
           <SoundRow />
+        </Slab>
+
+        <Slab>
+          <Overline>Preferences</Overline>
+          <PreferencesSection />
         </Slab>
 
         <Connect />

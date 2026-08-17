@@ -14,7 +14,7 @@ import {
   nitroPoseExercises,
   type ExerciseConfig,
 } from "react-native-nitro-pose-exercises"
-import Svg, { Circle, Line, Text as SvgText } from "react-native-svg"
+import Svg, { Circle, Line, Rect, Text as SvgText } from "react-native-svg"
 import {
   Camera,
   useAsyncRunner,
@@ -60,6 +60,10 @@ const SKELETON_CONNECTIONS = [
   [26, 28],
 ] as const
 const PORTRAIT_VIEWBOX = `0 0 ${CAMERA_RESOLUTION.height} ${CAMERA_RESOLUTION.width}`
+const SETUP_ZONE_HEIGHT = CAMERA_RESOLUTION.width * 0.25
+const SETUP_LABEL_FONT_SIZE = 16
+const SETUP_LABEL_X = 52
+const SETUP_WRIST_LINE_Y = CAMERA_RESOLUTION.width - SETUP_ZONE_HEIGHT
 const styles = StyleSheet.create({
   cameraMessage: { color: "#ffffff" },
   cameraSurface: { backgroundColor: "#000000" },
@@ -74,14 +78,20 @@ function LandmarksOverlay({
   depthGuideY,
   depthReached,
   landmarks,
+  showDepthGuide,
+  showSetupGuides,
 }: {
   depthGuideY: number | null
   depthReached: boolean
   landmarks: readonly PoseLandmark[]
+  showDepthGuide: boolean
+  showSetupGuides: boolean
 }) {
   const guideColor = depthReached ? "#bef264" : "#ef4444"
   const guidePosition =
-    depthGuideY === null ? null : depthGuideY * CAMERA_RESOLUTION.width
+    showDepthGuide && depthGuideY !== null
+      ? depthGuideY * CAMERA_RESOLUTION.width
+      : null
 
   return (
     <Svg
@@ -90,6 +100,64 @@ function LandmarksOverlay({
       style={StyleSheet.absoluteFill}
       viewBox={PORTRAIT_VIEWBOX}
     >
+      {showSetupGuides ? (
+        <>
+          <Rect
+            fill="#bef264"
+            fillOpacity={0.12}
+            height={SETUP_ZONE_HEIGHT}
+            width={CAMERA_RESOLUTION.height}
+            x={0}
+            y={0}
+          />
+          <Line
+            stroke="#bef264"
+            strokeDasharray="8 8"
+            strokeOpacity={0.8}
+            strokeWidth={3}
+            x1={20}
+            x2={CAMERA_RESOLUTION.height - 20}
+            y1={SETUP_ZONE_HEIGHT}
+            y2={SETUP_ZONE_HEIGHT}
+          />
+          <SvgText
+            fill="#bef264"
+            fontSize={SETUP_LABEL_FONT_SIZE}
+            fontWeight="700"
+            x={SETUP_LABEL_X}
+            y={SETUP_ZONE_HEIGHT - 12}
+          >
+            HEAD ZONE
+          </SvgText>
+          <Rect
+            fill="#bef264"
+            fillOpacity={0.12}
+            height={SETUP_ZONE_HEIGHT}
+            width={CAMERA_RESOLUTION.height}
+            x={0}
+            y={SETUP_WRIST_LINE_Y}
+          />
+          <Line
+            stroke="#bef264"
+            strokeDasharray="8 8"
+            strokeOpacity={0.8}
+            strokeWidth={3}
+            x1={20}
+            x2={CAMERA_RESOLUTION.height - 20}
+            y1={SETUP_WRIST_LINE_Y}
+            y2={SETUP_WRIST_LINE_Y}
+          />
+          <SvgText
+            fill="#bef264"
+            fontSize={SETUP_LABEL_FONT_SIZE}
+            fontWeight="700"
+            x={SETUP_LABEL_X}
+            y={SETUP_WRIST_LINE_Y + SETUP_LABEL_FONT_SIZE + 12}
+          >
+            WRIST ZONE
+          </SvgText>
+        </>
+      ) : null}
       {guidePosition === null ? null : (
         <>
           <Line
@@ -167,6 +235,8 @@ export default function PoseCamera({
   isActive,
   onError,
   onLandmarks,
+  showDepthGuide = true,
+  showSetupGuides = false,
 }: PoseCameraProps) {
   "use no memo"
 
@@ -319,6 +389,8 @@ export default function PoseCamera({
         depthGuideY={overlay.depthGuideY}
         depthReached={overlay.depthReached}
         landmarks={overlay.landmarks}
+        showDepthGuide={showDepthGuide}
+        showSetupGuides={showSetupGuides}
       />
     </View>
   )

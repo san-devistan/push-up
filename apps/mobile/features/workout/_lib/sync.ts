@@ -9,6 +9,7 @@ type SyncSession = (args: {
   activeRepetitionTimeMs: number
   attempts: PendingSession["attempts"]
   clientSessionId: string
+  debugPayload: string | null
   endedAt: number
   localDate: string
   soundEnabled: boolean
@@ -28,6 +29,7 @@ export async function syncPendingSessions(syncSession: SyncSession) {
           activeRepetitionTimeMs: session.activeRepetitionTimeMs,
           attempts: session.attempts,
           clientSessionId: session.id,
+          debugPayload: session.debugPayload,
           endedAt: session.endedAt,
           localDate: session.localDate,
           soundEnabled: session.soundEnabled,

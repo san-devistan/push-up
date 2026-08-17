@@ -18,11 +18,3 @@ export function formatCompact(value: number) {
     ? `${Math.round(value / 1000).toLocaleString()}K`
     : value.toLocaleString()
 }
-
-export function formatDayLabel(date: Date) {
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    weekday: "long",
-  })
-}

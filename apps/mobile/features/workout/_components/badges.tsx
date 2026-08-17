@@ -10,13 +10,35 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 })
 
+function getMilestoneText(milestone: LevelMilestone) {
+  if (milestone.earned) {
+    return milestone.label
+  }
+
+  const progress = `${Math.min(milestone.value, milestone.target).toLocaleString()}/${milestone.target.toLocaleString()}`
+
+  if (milestone.id === "totalReps") {
+    return `${progress} total`
+  }
+
+  if (milestone.id === "streak") {
+    return `${progress} days streak`
+  }
+
+  return `${progress}/day average`
+}
+
 function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
+  const text = getMilestoneText(milestone)
+
   return (
     <Badge
-      accessibilityLabel={`${milestone.label}, ${milestone.earned ? "earned" : `${milestone.value} of ${milestone.target}`}`}
+      accessibilityLabel={`${text}, ${milestone.earned ? "earned" : "in progress"}`}
       className={cn(
-        "h-auto gap-2 px-3 py-2",
-        milestone.earned ? "bg-primary/15" : "bg-muted"
+        "h-auto flex-row items-center gap-2 px-3 py-2",
+        milestone.earned
+          ? "bg-primary/25 dark:bg-primary/15"
+          : "border-border bg-background dark:bg-muted"
       )}
       variant="secondary"
     >
@@ -30,7 +52,7 @@ function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
           milestone.earned ? "text-foreground" : "text-muted-foreground"
         )}
       >
-        {milestone.label}
+        {text}
       </Text>
     </Badge>
   )
