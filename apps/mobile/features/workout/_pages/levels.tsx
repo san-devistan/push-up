@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { Overline, Slab } from "@/features/workout/_components/figures"
+import { Slab } from "@/features/workout/_components/figures"
 import { useActivity } from "@/features/workout/_hooks/use-activity"
 import { formatCompact } from "@/features/workout/_lib/format"
 import {
@@ -64,7 +64,7 @@ function RequirementText({
 }) {
   const parts = [
     `${formatCompact(requirement.totalReps)} total`,
-    `${requirement.streak}d streak`,
+    requirement.streak > 0 ? `${requirement.streak}d streak` : null,
     requirement.recentDailyAverage > 0
       ? `${requirement.recentDailyAverage}/day`
       : null,
@@ -136,11 +136,17 @@ export default function LevelsPage() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={SCREEN_EDGES}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
-        <View className="items-start">
+        <View className="flex-row items-center">
           <BackButton onPress={getBack(router)} />
+          <Text
+            accessibilityRole="header"
+            className="flex-1 text-center font-heading text-lg font-bold tracking-[2px]"
+          >
+            LEVELS
+          </Text>
+          <View className="size-10" />
         </View>
         <Slab>
-          <Overline>Milestones</Overline>
           <View>
             {REQUIREMENTS.map((requirement) => (
               <LevelRow

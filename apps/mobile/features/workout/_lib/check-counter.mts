@@ -13,16 +13,11 @@ import {
   type PoseLandmark,
   type PoseMetrics,
 } from "./counter.ts"
-import {
-  appendSessionDebugFrame,
-  MAX_SESSION_DEBUG_FRAMES,
-  serializeSessionDebugFrames,
-  type SessionDebugFrame,
-} from "./session-debug.ts"
 
-const pose = (elbowAngle: number): PoseMetrics => ({
+const pose = (elbowAngle: number, shoulderY = 0.3): PoseMetrics => ({
   confidence: 0.9,
   elbowAngle,
+  shoulderY,
 })
 
 const landmarks = () =>
@@ -68,6 +63,7 @@ frontLandmarks[27] = { visibility: 0.15, x: 0.35, y: 0.55 }
 const detectedFrontPose = getPoseMetrics(frontLandmarks)
 assert.ok(detectedFrontPose)
 assert.equal(isReadyPosition(detectedFrontPose), true)
+assert.equal(detectedFrontPose.shoulderY, 0.35)
 const depthGuideY = getDepthGuideY(frontLandmarks)
 assert.ok(Math.abs((depthGuideY ?? 0) - 0.47) < 0.000_001)
 assert.equal(isDepthReached(frontLandmarks, depthGuideY), false)
@@ -123,47 +119,54 @@ lostState = recordTrackingLoss(lostState, 400, false)
 lostState = processPoseMetrics(lostState, pose(165), 1200, false).state
 assert.deepEqual(lostState.attempts[0]?.failureReasons, ["tracking_lost"])
 
-const debugFrame = (elapsedMs: number): SessionDebugFrame => ({
-  counter: {
-    active: true,
-    attempts: 0,
-    maxTrackingGapMs: 0,
-    minElbowAngle: 120,
-    reachedBottom: false,
-    validReps: 0,
-  },
-  depth: {
-    deltaY: -0.01,
-    guideY: 0.5,
-    reached: false,
-    shoulderY: 0.49,
-  },
-  elapsedMs,
-  metrics: { confidence: 0.9, elbowAngle: 120 },
-  pose: {
-    bestArmConfidence: 0.9,
-    handsY: 0.8,
-    headY: 0.2,
-    leftShoulderVisibility: 0.9,
-    rightShoulderVisibility: 0.9,
-    shoulderGap: 0.2,
-    shoulderY: 0.49,
-    wristY: 0.8,
-  },
-  ready: false,
-  setupHint: "Start from top position",
-  trackingGapMs: 0,
-})
-const debugFrames: SessionDebugFrame[] = []
-for (let elapsedMs = 0; elapsedMs <= MAX_SESSION_DEBUG_FRAMES; elapsedMs += 1) {
-  appendSessionDebugFrame(debugFrames, debugFrame(elapsedMs))
+// The first rep of `state` was sampled at 100/500/900ms, all past the 80ms
+// interval, so the trace is the whole descent and lockout.
+assert.deepEqual(state.attempts[0]?.trace, [140, 120, 165])
+// Frames closer together than the sample interval are dropped, but the closing
+// lockout is always kept.
+let denseState = createCounterState()
+denseState = processPoseMetrics(denseState, pose(140), 20, false).state
+denseState = processPoseMetrics(denseState, pose(130), 60, false).state
+denseState = processPoseMetrics(denseState, pose(100), 400, true).state
+denseState = processPoseMetrics(denseState, pose(95), 440, true).state
+denseState = processPoseMetrics(denseState, pose(165), 800, false).state
+assert.deepEqual(denseState.attempts[0]?.trace, [140, 100, 165])
+
+let depthState = createCounterState()
+depthState = processPoseMetrics(
+  depthState,
+  pose(140, 0.3),
+  100,
+  false,
+  -0.17
+).state
+depthState = processPoseMetrics(
+  depthState,
+  pose(100, 0.48),
+  500,
+  true,
+  0.01
+).state
+depthState = processPoseMetrics(
+  depthState,
+  pose(165, 0.3),
+  900,
+  false,
+  -0.17
+).state
+assert.deepEqual(depthState.attempts[0]?.depthTrace, [-0.17, 0.01, -0.17])
+
+let cappedState = createCounterState()
+cappedState = processPoseMetrics(cappedState, pose(150), 0, true).state
+for (let index = 1; index <= 200; index += 1) {
+  cappedState = processPoseMetrics(
+    cappedState,
+    pose(100),
+    index * 100,
+    true
+  ).state
 }
-assert.equal(debugFrames.length, MAX_SESSION_DEBUG_FRAMES)
-assert.equal(debugFrames[0]?.elapsedMs, 1)
-const serializedDebugFrames = serializeSessionDebugFrames(debugFrames)
-assert.ok(serializedDebugFrames)
-const parsedDebugFrames: unknown = JSON.parse(serializedDebugFrames)
-assert.ok(Array.isArray(parsedDebugFrames))
-assert.equal(parsedDebugFrames.length, MAX_SESSION_DEBUG_FRAMES)
+cappedState = processPoseMetrics(cappedState, pose(165), 20_100, true).state
+assert.equal(cappedState.attempts[0]?.trace?.length, 48)
 
 console.log("push-up counter check passed")

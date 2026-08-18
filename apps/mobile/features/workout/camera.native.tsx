@@ -183,7 +183,7 @@ function LandmarksOverlay({
             fill={guideColor}
             fontSize={14}
             fontWeight="700"
-            x={24}
+            x={SETUP_LABEL_X}
             y={guidePosition - 10}
           >
             {depthReached ? "DEPTH REACHED" : "TARGET DEPTH"}

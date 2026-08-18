@@ -20,12 +20,6 @@ import {
   stopSpeech,
 } from "@/features/workout/_lib/feedback"
 import {
-  appendSessionDebugFrame,
-  logSessionFrame,
-  serializeSessionDebugFrames,
-  type SessionDebugFrame,
-} from "@/features/workout/_lib/session-debug"
-import {
   createWorkoutSession,
   saveSession,
   type TrainingPlan,
@@ -54,6 +48,15 @@ function calibrateDepthGuide(
   return setupValid
     ? (getDepthGuideY(landmarks) ?? currentDepthGuideY)
     : currentDepthGuideY
+}
+
+function getDepthOffset(
+  metrics: PoseMetrics | null,
+  depthGuideY: number | null
+) {
+  return metrics && depthGuideY !== null
+    ? metrics.shoulderY - depthGuideY
+    : null
 }
 
 function shouldAbandonAttempt(
@@ -148,26 +151,9 @@ function handleTrackingGuidance({
   }
 }
 
-function captureDebugFrame({
-  debugFrames,
-  lastSessionDebugAt,
-  ...input
-}: Omit<Parameters<typeof logSessionFrame>[0], "lastLoggedAt"> & {
-  debugFrames: { current: SessionDebugFrame[] }
-  lastSessionDebugAt: { current: number }
-}) {
-  const debug = logSessionFrame({
-    ...input,
-    lastLoggedAt: lastSessionDebugAt.current,
-  })
-  lastSessionDebugAt.current = debug.lastLoggedAt
-  if (debug.frame) {
-    appendSessionDebugFrame(debugFrames.current, debug.frame)
-  }
-}
-
 function processActiveFrame({
   counter,
+  depthOffset,
   depthReached,
   metrics,
   now,
@@ -175,6 +161,7 @@ function processActiveFrame({
   sessionStartedAt,
 }: {
   counter: { current: CounterState }
+  depthOffset: number | null
   depthReached: boolean
   metrics: PoseMetrics
   now: number
@@ -185,7 +172,8 @@ function processActiveFrame({
     counter.current,
     metrics,
     now - sessionStartedAt,
-    depthReached
+    depthReached,
+    depthOffset
   )
   counter.current = result.state
 
@@ -211,12 +199,10 @@ export function useSession({
   const [toast, setToast] = useState<string | null>(null)
   const [validReps, setValidReps] = useState(0)
   const counter = useRef(INITIAL_COUNTER_STATE)
-  const debugFrames = useRef<SessionDebugFrame[]>([])
   const depthGuideY = useRef<number | null>(null)
   const finished = useRef(false)
   const lastGuidanceToast = useRef<string | null>(null)
   const lastGuidanceToastAt = useRef(0)
-  const lastSessionDebugAt = useRef(0)
   const lastPoseAt = useRef(0)
   const readySince = useRef<number | null>(null)
   const sessionStartedAt = useRef(0)
@@ -230,7 +216,6 @@ export function useSession({
     const startedAt = sessionStartedAt.current || endedAt
     const session = createWorkoutSession({
       counterState: counterState ?? counter.current,
-      debugPayload: serializeSessionDebugFrames(debugFrames.current),
       endedAt,
       plan,
       startedAt,
@@ -263,22 +248,8 @@ export function useSession({
     )
 
     const depthReached = isDepthReached(landmarks, depthGuideY.current)
+    const depthOffset = getDepthOffset(metrics, depthGuideY.current)
     const nextSetupHint = setup.hint
-    captureDebugFrame({
-      counterState: counter.current,
-      debugFrames,
-      depthGuideY: depthGuideY.current,
-      depthReached,
-      landmarks,
-      lastSessionDebugAt,
-      metrics,
-      now,
-      phase,
-      ready,
-      sessionStartedAt: sessionStartedAt.current,
-      setupHint: nextSetupHint,
-      trackingGapMs: lastPoseAt.current === 0 ? 0 : now - lastPoseAt.current,
-    })
 
     setSetupHint(nextSetupHint)
     handleTrackingGuidance({
@@ -339,6 +310,7 @@ export function useSession({
 
     processActiveFrame({
       counter,
+      depthOffset,
       depthReached,
       metrics,
       now,
@@ -385,8 +357,6 @@ export function useSession({
       clearInterval(interval)
       void speak("Go", plan.soundEnabled)
       counter.current = createCounterState()
-      debugFrames.current = []
-      lastSessionDebugAt.current = 0
       sessionStartedAt.current = Date.now()
       setPhase("active")
     }, 1000)

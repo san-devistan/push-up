@@ -14,7 +14,7 @@ export function formatClock(hour: number, minute: number) {
 }
 
 export function formatCompact(value: number) {
-  return value >= 10_000
-    ? `${Math.round(value / 1000).toLocaleString()}K`
-    : value.toLocaleString()
+  return Math.abs(value) < 1000
+    ? value.toString()
+    : `${Number((value / 1000).toFixed(2))}k`
 }

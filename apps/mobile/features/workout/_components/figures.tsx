@@ -35,6 +35,27 @@ const styles = StyleSheet.create({
   statListValue: { maxWidth: "58%" },
 })
 
+const HERO_SURFACE = {
+  dark: styles.heroSurfaceDark,
+  light: styles.heroSurfaceLight,
+}
+
+export function HeroSurface({
+  children,
+  className,
+  tone,
+}: {
+  children: ViewProps["children"]
+  className?: string
+  tone: "dark" | "light"
+}) {
+  return (
+    <View className={className} style={HERO_SURFACE[tone]}>
+      {children}
+    </View>
+  )
+}
+
 export function Overline({
   children,
   tone = "muted",
@@ -72,10 +93,7 @@ export function Hero({
   const isLight = tone === "light"
 
   return (
-    <View
-      className="gap-4 p-6"
-      style={isLight ? styles.heroSurfaceLight : styles.heroSurfaceDark}
-    >
+    <HeroSurface className="gap-4 p-6" tone={tone}>
       <Text
         className="font-heading text-xs uppercase tracking-[3px]"
         style={isLight ? styles.heroLabelLight : styles.heroLabelDark}
@@ -104,7 +122,7 @@ export function Hero({
           {caption}
         </Text>
       ) : null}
-    </View>
+    </HeroSurface>
   )
 }
 

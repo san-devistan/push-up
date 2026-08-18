@@ -2,7 +2,6 @@ import type {
   CounterState,
   WorkoutAttempt,
 } from "@/features/workout/_lib/counter"
-import { logSessionAttempt } from "@/features/workout/_lib/session-debug"
 import type { WorkoutStatus } from "@/features/workout/_lib/storage"
 import * as Haptics from "expo-haptics"
 import * as Speech from "expo-speech"
@@ -51,8 +50,6 @@ export function handleCompletedAttempt({
   state: CounterState
   targetReps: number
 }) {
-  logSessionAttempt({ attempt, validReps: state.validReps })
-
   if (!attempt.valid) {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
     showToast("Did not count")

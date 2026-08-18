@@ -1,3 +1,4 @@
+import type { WorkoutAttempt } from "@/features/workout/_lib/counter"
 import {
   listPendingSessions,
   markSessionSynced,
@@ -5,11 +6,23 @@ import {
 
 type PendingSession = ReturnType<typeof listPendingSessions>[number]
 
+// The pose trace stays on device: the Convex attempt validator is a strict
+// object, so an extra field would make every sync fail.
+function toSyncedAttempt(attempt: WorkoutAttempt) {
+  return {
+    durationMs: attempt.durationMs,
+    failureReasons: attempt.failureReasons,
+    minBodyAngle: attempt.minBodyAngle,
+    minElbowAngle: attempt.minElbowAngle,
+    startedAtOffsetMs: attempt.startedAtOffsetMs,
+    valid: attempt.valid,
+  }
+}
+
 type SyncSession = (args: {
   activeRepetitionTimeMs: number
-  attempts: PendingSession["attempts"]
+  attempts: ReturnType<typeof toSyncedAttempt>[]
   clientSessionId: string
-  debugPayload: string | null
   endedAt: number
   localDate: string
   soundEnabled: boolean
@@ -27,9 +40,8 @@ export async function syncPendingSessions(syncSession: SyncSession) {
       try {
         await syncSession({
           activeRepetitionTimeMs: session.activeRepetitionTimeMs,
-          attempts: session.attempts,
+          attempts: session.attempts.map(toSyncedAttempt),
           clientSessionId: session.id,
-          debugPayload: session.debugPayload,
           endedAt: session.endedAt,
           localDate: session.localDate,
           soundEnabled: session.soundEnabled,

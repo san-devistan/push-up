@@ -2,12 +2,14 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import {
-  Hero,
-  Meter,
   StatsDivider,
   StatsList,
   StatsListRow,
 } from "@/features/workout/_components/figures"
+import {
+  PerformanceCard,
+  useSharePerformance,
+} from "@/features/workout/_components/share"
 import {
   formatCalories,
   getEstimatedCalories,
@@ -15,15 +17,24 @@ import {
 import type { FailureReason } from "@/features/workout/_lib/counter"
 import { formatDuration, formatSeconds } from "@/features/workout/_lib/format"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
+import { useColorScheme } from "@/hooks/use-color-scheme"
+import { GLASS_THEME } from "@/lib/glass"
+import { BlurView } from "expo-blur"
 import {
   ClockIcon,
   HouseIcon,
+  Share2Icon,
   TimerIcon,
   TrendingUpIcon,
   XCircleIcon,
   ZapIcon,
 } from "lucide-react-native"
-import { ScrollView, StyleSheet, View } from "react-native"
+import {
+  ScrollView,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 const FAILURE_REASONS = [
@@ -40,15 +51,42 @@ const FAILURE_LABELS = {
   tracking_lost: "tracking",
 } satisfies Record<FailureReason, string>
 const styles = StyleSheet.create({
+  actionBar: {
+    bottom: 0,
+    flexDirection: "row",
+    gap: 12,
+    left: 0,
+    overflow: "hidden",
+    paddingBottom: 28,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    position: "absolute",
+    right: 0,
+  },
   content: {
     flexGrow: 1,
     gap: 16,
-    paddingBottom: 32,
+    paddingBottom: 120,
     paddingHorizontal: 20,
     paddingTop: 12,
   },
-  primaryAction: { borderCurve: "continuous", borderRadius: 18, height: 60 },
+  homeAction: {
+    borderCurve: "continuous",
+    borderRadius: 18,
+    height: 60,
+    width: 60,
+  },
+  shareAction: {
+    borderCurve: "continuous",
+    borderRadius: 18,
+    flex: 1,
+    height: 60,
+  },
 })
+
+function getActionBarStyle(backgroundColor: string): StyleProp<ViewStyle> {
+  return [styles.actionBar, { backgroundColor }]
+}
 
 function getSessionStats(session: WorkoutSession) {
   const successRate = session.attempts.length
@@ -111,9 +149,10 @@ export default function SummaryScreen({
 }) {
   const { averageRepMs, failedReps, failureCounts, successRate } =
     getSessionStats(session)
-  const completed = session.status === "completed"
   const failedRepSummary = formatFailedReps({ failedReps, failureCounts })
   const calories = formatCalories(getEstimatedCalories(session.attempts.length))
+  const { cardRef, share, sharing } = useSharePerformance(session, successRate)
+  const colorScheme = useColorScheme()
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={SCREEN_EDGES}>
@@ -122,17 +161,12 @@ export default function SummaryScreen({
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Hero
-          label={completed ? "Goal complete" : "Session stopped"}
-          suffix={`/${session.targetReps}`}
-          value={String(session.validReps)}
-        >
-          <Meter
-            percent={
-              (session.validReps / Math.max(1, session.targetReps)) * 100
-            }
-          />
-        </Hero>
+        <PerformanceCard
+          calories={calories}
+          cardRef={cardRef}
+          session={session}
+          successRate={successRate}
+        />
 
         <StatsList>
           <StatsListRow
@@ -161,13 +195,35 @@ export default function SummaryScreen({
           <StatsDivider />
           <StatsListRow icon={ZapIcon} label="Calories" value={calories} />
         </StatsList>
-
-        <View className="flex-1" />
-        <Button onPress={onDone} style={styles.primaryAction}>
-          <Icon as={HouseIcon} />
-          <Text className="font-heading text-lg font-bold">Back to today</Text>
-        </Button>
       </ScrollView>
+
+      <BlurView
+        intensity={24}
+        style={getActionBarStyle(GLASS_THEME[colorScheme].glassTint)}
+        tint={colorScheme}
+      >
+        <Button
+          accessibilityLabel="Back to today"
+          className="bg-muted dark:bg-card"
+          onPress={onDone}
+          size="icon-lg"
+          style={styles.homeAction}
+          variant="ghost"
+        >
+          <Icon as={HouseIcon} className="text-muted-foreground" size={24} />
+        </Button>
+        <Button
+          disabled={sharing}
+          onPress={share}
+          style={styles.shareAction}
+          variant="default"
+        >
+          <Icon as={Share2Icon} size={22} />
+          <Text className="font-heading text-lg font-bold">
+            {sharing ? "Preparing…" : "Share performance"}
+          </Text>
+        </Button>
+      </BlurView>
     </SafeAreaView>
   )
 }

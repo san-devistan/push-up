@@ -44,7 +44,6 @@ function validateSession(args: {
     startedAtOffsetMs: number
   }>
   clientSessionId: string
-  debugPayload: string | null
   endedAt: number
   localDate: string
   startedAt: number
@@ -89,20 +88,6 @@ function validateSession(args: {
     throw new ConvexError("Invalid workout session metadata")
   }
 
-  if (args.debugPayload !== null) {
-    if (args.debugPayload.length > 500_000) {
-      throw new ConvexError("Workout debug payload is too large")
-    }
-
-    try {
-      if (!Array.isArray(JSON.parse(args.debugPayload))) {
-        throw new Error("Expected an array")
-      }
-    } catch {
-      throw new ConvexError("Workout debug payload is invalid")
-    }
-  }
-
   assertFiniteRange(
     args.timezoneOffsetMinutes,
     -24 * 60,
@@ -128,7 +113,6 @@ export const sync = mutation({
     activeRepetitionTimeMs: v.number(),
     attempts: v.array(attempt),
     clientSessionId: v.string(),
-    debugPayload: v.union(v.string(), v.null()),
     endedAt: v.number(),
     localDate: v.string(),
     soundEnabled: v.boolean(),
@@ -179,13 +163,6 @@ export const sync = mutation({
       validReps: args.validReps,
     })
 
-    if (args.debugPayload !== null) {
-      await ctx.db.insert("workoutSessionDebug", {
-        payload: args.debugPayload,
-        sessionId,
-      })
-    }
-
     await Promise.all(
       args.attempts.map((item) => {
         return ctx.db.insert("workoutAttempts", { ...item, sessionId })
@@ -213,17 +190,6 @@ export const clear = mutation({
       .withIndex("by_owner_id_and_started_at", (index) =>
         index.eq("ownerId", authUser._id)
       )) {
-      const debug = await ctx.db
-        .query("workoutSessionDebug")
-        .withIndex("by_session_id", (index) =>
-          index.eq("sessionId", session._id)
-        )
-        .unique()
-
-      if (debug) {
-        await ctx.db.delete(debug._id)
-      }
-
       for await (const row of ctx.db
         .query("workoutAttempts")
         .withIndex("by_session_id_and_started_at_offset_ms", (index) =>

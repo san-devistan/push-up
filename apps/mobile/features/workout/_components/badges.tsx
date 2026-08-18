@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { formatCompact } from "@/features/workout/_lib/format"
 import type { LevelMilestone } from "@/features/workout/_lib/gamification"
 import { cn } from "@/lib/utils"
 import { CheckIcon, LockIcon } from "lucide-react-native"
@@ -15,17 +16,21 @@ function getMilestoneText(milestone: LevelMilestone) {
     return milestone.label
   }
 
-  const progress = `${Math.min(milestone.value, milestone.target).toLocaleString()}/${milestone.target.toLocaleString()}`
+  const value = Math.min(milestone.value, milestone.target)
+  const progress =
+    milestone.id === "totalReps"
+      ? `${formatCompact(value)}/${formatCompact(milestone.target)}`
+      : `${value.toLocaleString()}/${milestone.target.toLocaleString()}`
 
   if (milestone.id === "totalReps") {
     return `${progress} total`
   }
 
   if (milestone.id === "streak") {
-    return `${progress} days streak`
+    return `${progress}d streak`
   }
 
-  return `${progress}/day average`
+  return `${progress}/day`
 }
 
 function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {

@@ -247,6 +247,7 @@ export function Connect() {
             </Button>
           ) : null}
           <Button
+            className="dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
             disabled={disabled}
             onPress={withGoogle}
             style={styles.provider}
@@ -257,7 +258,7 @@ export function Connect() {
           </Button>
         </View>
       ) : null}
-      <View className="gap-3 border-t border-border pt-3">
+      <View className="gap-3 border-t border-border pt-3 dark:border-foreground/20">
         {isConnected ? (
           <Button disabled={disabled} onPress={signOut} variant="outline">
             <Icon as={LogOutIcon} />

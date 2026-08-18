@@ -20,7 +20,6 @@ export type TrainingPlan = {
 export type WorkoutSession = {
   activeRepetitionTimeMs: number
   attempts: WorkoutAttempt[]
-  debugPayload: string | null
   endedAt: number
   id: string
   localDate: string
@@ -123,28 +122,33 @@ function isFailureReason(value: unknown) {
   )
 }
 
+function isTrace(value: unknown) {
+  return (
+    value === undefined ||
+    (Array.isArray(value) && value.every((item) => typeof item === "number"))
+  )
+}
+
 function isAttempt(value: unknown): value is WorkoutAttempt {
   return (
     isRecord(value) &&
+    isTrace(value.depthTrace) &&
     typeof value.durationMs === "number" &&
     Array.isArray(value.failureReasons) &&
     value.failureReasons.every(isFailureReason) &&
     typeof value.minBodyAngle === "number" &&
     typeof value.minElbowAngle === "number" &&
     typeof value.startedAtOffsetMs === "number" &&
+    isTrace(value.trace) &&
     typeof value.valid === "boolean"
   )
-}
-
-type StoredSession = Omit<WorkoutSession, "debugPayload"> & {
-  debugPayload?: unknown
 }
 
 function hasSessionNumbers(
   value: Record<string, unknown>
 ): value is Record<string, unknown> &
   Pick<
-    StoredSession,
+    WorkoutSession,
     | "activeRepetitionTimeMs"
     | "endedAt"
     | "startedAt"
@@ -166,7 +170,7 @@ function hasSessionMetadata(
   value: Record<string, unknown>
 ): value is Record<string, unknown> &
   Pick<
-    StoredSession,
+    WorkoutSession,
     "id" | "localDate" | "soundEnabled" | "status" | "timezoneOffsetMinutes"
   > {
   return (
@@ -180,11 +184,11 @@ function hasSessionMetadata(
 
 function hasSessionAttempts(
   value: Record<string, unknown>
-): value is Record<string, unknown> & Pick<StoredSession, "attempts"> {
+): value is Record<string, unknown> & Pick<WorkoutSession, "attempts"> {
   return Array.isArray(value.attempts) && value.attempts.every(isAttempt)
 }
 
-function isStoredSession(value: unknown): value is StoredSession {
+function isStoredSession(value: unknown): value is WorkoutSession {
   return (
     isRecord(value) &&
     hasSessionNumbers(value) &&
@@ -210,8 +214,6 @@ function parseSession(value: unknown): WorkoutSession | null {
   return {
     activeRepetitionTimeMs: value.activeRepetitionTimeMs,
     attempts: value.attempts,
-    debugPayload:
-      typeof value.debugPayload === "string" ? value.debugPayload : null,
     endedAt: value.endedAt,
     id: value.id,
     localDate: value.localDate,
@@ -235,7 +237,6 @@ export function createSessionId() {
 
 export function createWorkoutSession({
   counterState,
-  debugPayload,
   endedAt,
   plan,
   startedAt,
@@ -243,7 +244,6 @@ export function createWorkoutSession({
   targetReps,
 }: {
   counterState: CounterState
-  debugPayload: string | null
   endedAt: number
   plan: TrainingPlan
   startedAt: number
@@ -261,7 +261,6 @@ export function createWorkoutSession({
       0
     ),
     attempts: finalState.attempts,
-    debugPayload,
     endedAt,
     id: createSessionId(),
     localDate: getLocalDate(startedAt),

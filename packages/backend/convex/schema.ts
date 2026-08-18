@@ -21,13 +21,8 @@ export default defineSchema({
     "sessionId",
     "startedAtOffsetMs",
   ]),
-  workoutSessionDebug: defineTable({
-    payload: v.string(),
-    sessionId: v.id("workoutSessions"),
-  }).index("by_session_id", ["sessionId"]),
   workoutSessions: defineTable({
     activeRepetitionTimeMs: v.number(),
-    cameraPosition: v.optional(v.union(v.literal("back"), v.literal("front"))),
     clientSessionId: v.string(),
     endedAt: v.number(),
     invalidReps: v.number(),

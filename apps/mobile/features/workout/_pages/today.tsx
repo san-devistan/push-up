@@ -22,7 +22,7 @@ import {
   formatCalories,
   getEstimatedCalories,
 } from "@/features/workout/_lib/calories"
-import { formatCompact, formatSeconds } from "@/features/workout/_lib/format"
+import { formatSeconds } from "@/features/workout/_lib/format"
 import { getLevel } from "@/features/workout/_lib/gamification"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useMinimizeOnScroll } from "expo-glass-tabs"
@@ -126,7 +126,7 @@ function TotalHero({ activity }: { activity: Activity | undefined }) {
     <Hero
       label="Total push-ups"
       tone={colorScheme === "dark" ? "light" : "dark"}
-      value={activity ? formatCompact(activity.totalPushups) : "-"}
+      value={activity ? activity.totalPushups.toLocaleString() : "-"}
     />
   )
 }
@@ -171,7 +171,7 @@ function LevelInfoButton() {
       <Pressable
         accessibilityLabel="Open level milestones"
         accessibilityRole="button"
-        className="size-9 items-center justify-center rounded-full bg-muted active:opacity-70"
+        className="size-9 items-center justify-center rounded-full bg-background active:opacity-70 dark:bg-muted"
       >
         <Icon as={InfoIcon} className="text-muted-foreground" />
       </Pressable>

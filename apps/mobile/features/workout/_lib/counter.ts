@@ -1,3 +1,7 @@
+// Relative so `pnpm check:counter` can run this file under bare node, which
+// does not resolve the "@/" alias.
+import { closeTrace, sampleTrace, startTrace, type PoseTrace } from "./trace.ts"
+
 export const PUSHUP_THRESHOLDS = {
   depthTolerance: 0.01,
   leaveTop: 150,
@@ -23,18 +27,25 @@ export type PoseLandmark = {
 export type PoseMetrics = {
   confidence: number
   elbowAngle: number
+  shoulderY: number
 }
 
 export type WorkoutAttempt = {
+  // Shoulder distance from the calibrated depth guide, sampled through the
+  // rep. Zero is the actual target shown by the camera overlay.
+  depthTrace?: number[]
   durationMs: number
   failureReasons: FailureReason[]
   minBodyAngle: number
   minElbowAngle: number
   startedAtOffsetMs: number
+  // Elbow angles sampled through the rep, oldest first — the motion curve the
+  // summary graphs. Absent on sessions recorded before tracing existed.
+  trace?: number[]
   valid: boolean
 }
 
-type ActiveAttempt = {
+type ActiveAttempt = PoseTrace & {
   maxTrackingGapMs: number
   minElbowAngle: number
   reachedBottom: boolean
@@ -148,6 +159,7 @@ export function getPoseMetrics(
   return {
     confidence,
     elbowAngle: angle(arm.points.shoulder, arm.points.elbow, arm.points.wrist),
+    shoulderY: (leftShoulder.y + rightShoulder.y) / 2,
   }
 }
 
@@ -326,7 +338,8 @@ export function processPoseMetrics(
   state: CounterState,
   metrics: PoseMetrics,
   elapsedMs: number,
-  depthReached: boolean
+  depthReached: boolean,
+  depthOffset: number | null = null
 ): { event: CounterEvent; state: CounterState } {
   if (!state.activeAttempt) {
     if (metrics.elbowAngle >= PUSHUP_THRESHOLDS.leaveTop) {
@@ -343,12 +356,17 @@ export function processPoseMetrics(
           reachedBottom: depthReached,
           startedAtOffsetMs: elapsedMs,
           trackingLostAtOffsetMs: null,
+          ...startTrace(metrics.elbowAngle, depthOffset, elapsedMs),
         },
       },
     }
   }
 
-  const trackedAttempt = closeTrackingGap(state.activeAttempt, elapsedMs)
+  const gapClosed = closeTrackingGap(state.activeAttempt, elapsedMs)
+  const trackedAttempt = {
+    ...gapClosed,
+    ...sampleTrace(gapClosed, metrics.elbowAngle, depthOffset, elapsedMs),
+  }
   const observedAttempt = {
     ...trackedAttempt,
     minElbowAngle: Math.min(trackedAttempt.minElbowAngle, metrics.elbowAngle),
@@ -385,6 +403,7 @@ export function processPoseMetrics(
     minBodyAngle: LEGACY_FRONT_BODY_ANGLE,
     minElbowAngle: activeAttempt.minElbowAngle,
     startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
+    ...closeTrace(activeAttempt, metrics.elbowAngle, depthOffset, elapsedMs),
     valid: failureReasons.length === 0,
   } satisfies WorkoutAttempt
 
@@ -427,9 +446,11 @@ export function finishActiveAttempt(
       {
         durationMs: Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs),
         failureReasons,
+        depthTrace: activeAttempt.depthTrace,
         minBodyAngle: LEGACY_FRONT_BODY_ANGLE,
         minElbowAngle: activeAttempt.minElbowAngle,
         startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
+        trace: activeAttempt.trace,
         valid: false,
       },
     ],
