@@ -1,5 +1,6 @@
 import { repsPerSession } from "@/features/workout/_lib/goal"
 import type { TrainingPlan } from "@/features/workout/_lib/storage"
+import { translate, type Language } from "@/lib/i18n"
 import * as Notifications from "expo-notifications"
 import { Platform } from "react-native"
 
@@ -19,14 +20,14 @@ Notifications.setNotificationHandler({
     }),
 })
 
-async function ensureChannel() {
+async function ensureChannel(language: Language) {
   if (Platform.OS !== "android") {
     return
   }
 
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     importance: Notifications.AndroidImportance.HIGH,
-    name: "Daily training",
+    name: translate(language, "reminder.channel"),
   })
 }
 
@@ -52,6 +53,7 @@ async function permission(prompt: boolean) {
 
 async function reschedule(
   plan: TrainingPlan,
+  language: Language,
   prompt: boolean
 ): Promise<ReminderState> {
   if (!isSupported) {
@@ -70,15 +72,15 @@ async function reschedule(
     return granted
   }
 
-  await ensureChannel()
+  await ensureChannel(language)
   const reps = repsPerSession(plan.targetReps, plan.reminderTimes.length)
 
   await Promise.all(
     plan.reminderTimes.map((time) =>
       Notifications.scheduleNotificationAsync({
         content: {
-          body: `${reps} push-ups. Keep the streak alive.`,
-          title: "Time to train",
+          body: translate(language, "reminder.body", { count: reps }),
+          title: translate(language, "reminder.title"),
         },
         trigger: {
           channelId: CHANNEL_ID,
@@ -95,10 +97,14 @@ async function reschedule(
 
 let pending: Promise<ReminderState> = Promise.resolve("off")
 
-export function syncDailyReminder(plan: TrainingPlan, prompt = false) {
+export function syncDailyReminder(
+  plan: TrainingPlan,
+  language: Language,
+  prompt = false
+) {
   pending = pending
     .catch(() => "off" as const)
-    .then(() => reschedule(plan, prompt))
+    .then(() => reschedule(plan, language, prompt))
 
   return pending
 }

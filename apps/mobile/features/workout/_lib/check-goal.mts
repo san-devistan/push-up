@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 
+import { formatClock } from "./format.ts"
 import {
   goalAtIndex,
   GOAL_STEPS,
@@ -7,6 +8,7 @@ import {
   MAX_TARGET_REPS,
   MIN_TARGET_REPS,
   nearestGoalIndex,
+  normalizeTargetReps,
   repsPerSession,
 } from "./goal.ts"
 
@@ -24,17 +26,20 @@ assert.deepEqual(GOAL_STEPS.slice(0, 10), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 assert.deepEqual(GOAL_STEPS.slice(10, 13), [15, 20, 25])
 assert.equal(GOAL_STEPS.includes(100), true)
 assert.deepEqual(GOAL_STEPS.slice(28, 31), [125, 150, 175])
+assert.equal(normalizeTargetReps(-5), 1)
+assert.equal(normalizeTargetReps(75), 75)
+assert.equal(normalizeTargetReps(500), 200)
 
 assert.equal(GOAL_STEPS[nearestGoalIndex(1)], 1)
 assert.equal(GOAL_STEPS[nearestGoalIndex(10)], 10)
 assert.equal(GOAL_STEPS[nearestGoalIndex(12)], 10)
 assert.equal(GOAL_STEPS[nearestGoalIndex(13)], 15)
-assert.equal(GOAL_STEPS[nearestGoalIndex(487)], 475)
-assert.equal(GOAL_STEPS[nearestGoalIndex(9999)], 500)
+assert.equal(GOAL_STEPS[nearestGoalIndex(187)], 175)
+assert.equal(GOAL_STEPS[nearestGoalIndex(9999)], 200)
 assert.equal(GOAL_STEPS[nearestGoalIndex(-5)], 1)
 
 assert.equal(goalAtIndex(-1), 1)
-assert.equal(goalAtIndex(LAST_GOAL_INDEX + 5), 500)
+assert.equal(goalAtIndex(LAST_GOAL_INDEX + 5), 200)
 
 assert.equal(repsPerSession(30, 1), 30)
 assert.equal(repsPerSession(30, 2), 15)
@@ -42,8 +47,10 @@ assert.equal(repsPerSession(30, 4), 8)
 assert.equal(repsPerSession(10, 3), 4)
 assert.equal(repsPerSession(1, 3), 1)
 assert.equal(repsPerSession(30, 0), 30)
+assert.equal(formatClock(19, 30, "en-US", "12"), "7:30 PM")
+assert.equal(formatClock(19, 30, "en-US", "24"), "19:30")
 
-for (const total of [1, 7, 10, 45, 500]) {
+for (const total of [1, 7, 10, 45, 200]) {
   for (const sessions of [1, 2, 3, 4, 5, 6]) {
     const each = repsPerSession(total, sessions)
     assert.ok(each >= 1, `${total}/${sessions} must ask for at least one rep`)

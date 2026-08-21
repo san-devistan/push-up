@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button"
-import { Text } from "@/components/ui/text"
+import { LandmarksOverlay } from "@/features/workout/_components/camera-overlay"
 import {
   getDepthGuideY,
   getPoseMetrics,
@@ -8,13 +7,15 @@ import {
   type PoseLandmark,
 } from "@/features/workout/_lib/counter"
 import type { PoseCameraProps } from "@/features/workout/camera.types"
+import { useI18n } from "@/hooks/use-i18n"
+import { translate } from "@/lib/i18n"
+import { Button, Text } from "panelui-native"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import {
   nitroPoseExercises,
   type ExerciseConfig,
 } from "react-native-nitro-pose-exercises"
-import Svg, { Circle, Line, Rect, Text as SvgText } from "react-native-svg"
 import {
   Camera,
   useAsyncRunner,
@@ -37,33 +38,7 @@ const DETECTION_CONFIG = {
 } satisfies ExerciseConfig
 
 const CAMERA_RESOLUTION = { height: 360, width: 640 } as const
-const LANDMARK_KEYS =
-  "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33".split(
-    " "
-  )
-const SKELETON_CONNECTIONS = [
-  [0, 2],
-  [0, 5],
-  [2, 7],
-  [5, 8],
-  [11, 12],
-  [11, 13],
-  [13, 15],
-  [12, 14],
-  [14, 16],
-  [11, 23],
-  [12, 24],
-  [23, 24],
-  [23, 25],
-  [25, 27],
-  [24, 26],
-  [26, 28],
-] as const
-const PORTRAIT_VIEWBOX = `0 0 ${CAMERA_RESOLUTION.height} ${CAMERA_RESOLUTION.width}`
-const SETUP_ZONE_HEIGHT = CAMERA_RESOLUTION.width * 0.25
-const SETUP_LABEL_FONT_SIZE = 16
-const SETUP_LABEL_X = 52
-const SETUP_WRIST_LINE_Y = CAMERA_RESOLUTION.width - SETUP_ZONE_HEIGHT
+
 const styles = StyleSheet.create({
   cameraMessage: { color: "#ffffff" },
   cameraSurface: { backgroundColor: "#000000" },
@@ -72,163 +47,6 @@ type PoseOverlay = {
   depthGuideY: number | null
   depthReached: boolean
   landmarks: readonly PoseLandmark[]
-}
-
-function LandmarksOverlay({
-  depthGuideY,
-  depthReached,
-  landmarks,
-  showDepthGuide,
-  showSetupGuides,
-}: {
-  depthGuideY: number | null
-  depthReached: boolean
-  landmarks: readonly PoseLandmark[]
-  showDepthGuide: boolean
-  showSetupGuides: boolean
-}) {
-  const guideColor = depthReached ? "#bef264" : "#ef4444"
-  const guidePosition =
-    showDepthGuide && depthGuideY !== null
-      ? depthGuideY * CAMERA_RESOLUTION.width
-      : null
-
-  return (
-    <Svg
-      pointerEvents="none"
-      preserveAspectRatio="xMidYMid slice"
-      style={StyleSheet.absoluteFill}
-      viewBox={PORTRAIT_VIEWBOX}
-    >
-      {showSetupGuides ? (
-        <>
-          <Rect
-            fill="#bef264"
-            fillOpacity={0.12}
-            height={SETUP_ZONE_HEIGHT}
-            width={CAMERA_RESOLUTION.height}
-            x={0}
-            y={0}
-          />
-          <Line
-            stroke="#bef264"
-            strokeDasharray="8 8"
-            strokeOpacity={0.8}
-            strokeWidth={3}
-            x1={20}
-            x2={CAMERA_RESOLUTION.height - 20}
-            y1={SETUP_ZONE_HEIGHT}
-            y2={SETUP_ZONE_HEIGHT}
-          />
-          <SvgText
-            fill="#bef264"
-            fontSize={SETUP_LABEL_FONT_SIZE}
-            fontWeight="700"
-            x={SETUP_LABEL_X}
-            y={SETUP_ZONE_HEIGHT - 12}
-          >
-            HEAD ZONE
-          </SvgText>
-          <Rect
-            fill="#bef264"
-            fillOpacity={0.12}
-            height={SETUP_ZONE_HEIGHT}
-            width={CAMERA_RESOLUTION.height}
-            x={0}
-            y={SETUP_WRIST_LINE_Y}
-          />
-          <Line
-            stroke="#bef264"
-            strokeDasharray="8 8"
-            strokeOpacity={0.8}
-            strokeWidth={3}
-            x1={20}
-            x2={CAMERA_RESOLUTION.height - 20}
-            y1={SETUP_WRIST_LINE_Y}
-            y2={SETUP_WRIST_LINE_Y}
-          />
-          <SvgText
-            fill="#bef264"
-            fontSize={SETUP_LABEL_FONT_SIZE}
-            fontWeight="700"
-            x={SETUP_LABEL_X}
-            y={SETUP_WRIST_LINE_Y + SETUP_LABEL_FONT_SIZE + 12}
-          >
-            WRIST ZONE
-          </SvgText>
-        </>
-      ) : null}
-      {guidePosition === null ? null : (
-        <>
-          <Line
-            stroke="#0a0a0a"
-            strokeLinecap="round"
-            strokeOpacity={0.7}
-            strokeWidth={12}
-            x1={24}
-            x2={CAMERA_RESOLUTION.height - 24}
-            y1={guidePosition}
-            y2={guidePosition}
-          />
-          <Line
-            stroke={guideColor}
-            strokeLinecap="round"
-            strokeWidth={7}
-            x1={24}
-            x2={CAMERA_RESOLUTION.height - 24}
-            y1={guidePosition}
-            y2={guidePosition}
-          />
-          <SvgText
-            fill={guideColor}
-            fontSize={14}
-            fontWeight="700"
-            x={SETUP_LABEL_X}
-            y={guidePosition - 10}
-          >
-            {depthReached ? "DEPTH REACHED" : "TARGET DEPTH"}
-          </SvgText>
-        </>
-      )}
-      {SKELETON_CONNECTIONS.map(([startIndex, endIndex]) => {
-        const start = landmarks[startIndex]
-        const end = landmarks[endIndex]
-
-        return start &&
-          end &&
-          start.visibility >= PUSHUP_THRESHOLDS.visibility &&
-          end.visibility >= PUSHUP_THRESHOLDS.visibility ? (
-          <Line
-            key={`${startIndex}-${endIndex}`}
-            stroke="#bef264"
-            strokeLinecap="round"
-            strokeOpacity={0.85}
-            strokeWidth={4}
-            x1={start.x * CAMERA_RESOLUTION.height}
-            x2={end.x * CAMERA_RESOLUTION.height}
-            y1={start.y * CAMERA_RESOLUTION.width}
-            y2={end.y * CAMERA_RESOLUTION.width}
-          />
-        ) : null
-      })}
-      {LANDMARK_KEYS.map((landmarkKey, index) => {
-        const landmark = landmarks[index]
-
-        return landmark &&
-          landmark.visibility >= PUSHUP_THRESHOLDS.visibility ? (
-          <Circle
-            key={landmarkKey}
-            cx={landmark.x * CAMERA_RESOLUTION.height}
-            cy={landmark.y * CAMERA_RESOLUTION.width}
-            fill="#bef264"
-            r={5}
-            stroke="#0a0a0a"
-            strokeWidth={2}
-          />
-        ) : null
-      })}
-    </Svg>
-  )
 }
 
 export default function PoseCamera({
@@ -240,9 +58,11 @@ export default function PoseCamera({
 }: PoseCameraProps) {
   "use no memo"
 
+  const { language, t } = useI18n()
   const { hasPermission, requestPermission } = useCameraPermission()
   const device = useCameraDevice("front")
   const asyncRunner = useAsyncRunner()
+  const errorCallback = useRef(onError)
   const landmarksCallback = useRef(onLandmarks)
   const [initialized, setInitialized] = useState(false)
   const [overlay, setOverlay] = useState<PoseOverlay>({
@@ -251,6 +71,10 @@ export default function PoseCamera({
     landmarks: [],
   })
   const isIos = process.env.EXPO_OS === "ios"
+
+  useEffect(() => {
+    errorCallback.current = onError
+  }, [onError])
 
   useEffect(() => {
     landmarksCallback.current = onLandmarks
@@ -277,13 +101,15 @@ export default function PoseCamera({
         setInitialized(true)
         return true
       })
-      .catch(() => onError("Pose detection could not start."))
+      .catch(() =>
+        errorCallback.current(translate(language, "camera.poseStartError"))
+      )
 
     return () => {
       mounted = false
       nitroPoseExercises.release()
     }
-  }, [onError])
+  }, [language])
 
   useEffect(() => {
     if (!initialized) {
@@ -352,11 +178,9 @@ export default function PoseCamera({
         style={styles.cameraSurface}
       >
         <Text className="text-center" style={styles.cameraMessage}>
-          Camera access is required to count push-ups locally.
+          {t("camera.accessRequired")}
         </Text>
-        <Button onPress={requestCameraPermission}>
-          <Text>Allow camera</Text>
-        </Button>
+        <Button onPress={requestCameraPermission}>{t("camera.allow")}</Button>
       </View>
     )
   }
@@ -368,7 +192,7 @@ export default function PoseCamera({
         style={styles.cameraSurface}
       >
         <Text className="text-center" style={styles.cameraMessage}>
-          Camera unavailable.
+          {t("camera.unavailable")}
         </Text>
       </View>
     )

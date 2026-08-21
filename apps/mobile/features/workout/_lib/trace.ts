@@ -17,6 +17,15 @@ function roundDepth(depthOffset: number) {
   return Math.round(depthOffset * 1000) / 1000
 }
 
+export function connectTrace(
+  values: readonly number[],
+  previousEnd: number | undefined
+) {
+  const anchor = previousEnd ?? values.at(-1)
+
+  return anchor === undefined ? [] : [anchor, ...values]
+}
+
 export function startTrace(
   elbowAngle: number,
   depthOffset: number | null,

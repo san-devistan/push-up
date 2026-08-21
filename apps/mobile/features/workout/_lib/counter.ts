@@ -1,3 +1,4 @@
+import type { SetupState } from "./setup.ts"
 // Relative so `pnpm check:counter` can run this file under bare node, which
 // does not resolve the "@/" alias.
 import { closeTrace, sampleTrace, startTrace, type PoseTrace } from "./trace.ts"
@@ -10,6 +11,11 @@ export const PUSHUP_THRESHOLDS = {
   recoveryMinAttemptMs: 700,
   top: 160,
   visibility: 0.1,
+} as const
+
+export const SETUP_ZONES = {
+  head: { max: 0.3, min: 0.1 },
+  wrist: { max: 0.85, min: 0.65 },
 } as const
 
 export type FailureReason =
@@ -70,11 +76,7 @@ const ARM_LANDMARKS = [
 
 const BODY_LANDMARKS = [11, 12, 13, 14, 15, 16, 23, 24] as const
 const DEPTH_GUIDE_TRAVEL_RATIO = 0.4
-const HAND_TARGET_MIN_Y = 0.75
-const HAND_TOO_LOW_Y = 0.96
 const HEAD_LANDMARKS = [0, 2, 5, 7, 8] as const
-const HEAD_TARGET_MAX_Y = 0.25
-const HEAD_TOO_HIGH_Y = 0.04
 const LEGACY_FRONT_BODY_ANGLE = 180
 
 function angle(
@@ -242,41 +244,49 @@ export function getSetupState(
   landmarks: readonly PoseLandmark[],
   metrics: PoseMetrics | null,
   ready: boolean
-) {
+): SetupState {
   if (!hasVisibleBody(landmarks)) {
-    return { hint: "Fit body in frame", valid: false }
+    return { framing: "unknown", hint: "fitBody", valid: false }
   }
 
   const headY = averageVisibleY(landmarks, HEAD_LANDMARKS)
   const handsY = averageVisibleY(landmarks, [15, 16])
 
   if (headY === null || handsY === null) {
-    return { hint: "Show head and hands", valid: false }
+    return { framing: "unknown", hint: "showHeadHands", valid: false }
   }
 
-  if (headY < HEAD_TOO_HIGH_Y || handsY > HAND_TOO_LOW_Y) {
-    return { hint: "Move back a little", valid: false }
+  if (headY < SETUP_ZONES.head.min || handsY > SETUP_ZONES.wrist.max) {
+    return { framing: "close", hint: "moveBack", valid: false }
   }
 
-  if (headY > HEAD_TARGET_MAX_Y && handsY < HAND_TARGET_MIN_Y) {
-    return { hint: "Move closer to camera", valid: false }
+  if (headY > SETUP_ZONES.head.max && handsY < SETUP_ZONES.wrist.min) {
+    return { framing: "far", hint: "moveCloser", valid: false }
   }
 
-  if (headY > HEAD_TARGET_MAX_Y) {
-    return { hint: "Raise phone toward head", valid: false }
+  if (headY > SETUP_ZONES.head.max) {
+    return {
+      framing: "off-center",
+      hint: "raisePhone",
+      valid: false,
+    }
   }
 
-  if (handsY < HAND_TARGET_MIN_Y) {
-    return { hint: "Lower phone toward hands", valid: false }
+  if (handsY < SETUP_ZONES.wrist.min) {
+    return {
+      framing: "off-center",
+      hint: "lowerPhone",
+      valid: false,
+    }
   }
 
   if (!metrics) {
-    return { hint: "Face camera", valid: false }
+    return { framing: "ready", hint: "faceCamera", valid: false }
   }
 
   return ready
-    ? { hint: "Hold still", valid: true }
-    : { hint: "Start from top position", valid: false }
+    ? { framing: "ready", hint: "holdStill", valid: true }
+    : { framing: "ready", hint: "startTop", valid: false }
 }
 
 export function createCounterState(): CounterState {

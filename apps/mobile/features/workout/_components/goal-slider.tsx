@@ -5,6 +5,8 @@ import {
   MIN_TARGET_REPS,
   nearestGoalIndex,
 } from "@/features/workout/_lib/goal"
+import { useI18n } from "@/hooks/use-i18n"
+import { hapticHard } from "@/lib/haptics"
 import { useState, type Dispatch, type SetStateAction } from "react"
 import {
   StyleSheet,
@@ -69,8 +71,12 @@ function getGesture(commit: (x: number) => void) {
 }
 
 function getSelect(onChange: (value: number) => void, value: number) {
+  let selected = value
+
   return (next: number | undefined) => {
-    if (next !== undefined && next !== value) {
+    if (next !== undefined && next !== selected) {
+      selected = next
+      hapticHard()
       onChange(next)
     }
   }
@@ -110,6 +116,7 @@ export default function GoalSlider({
   onChange: (value: number) => void
   value: number
 }) {
+  const { t } = useI18n()
   const [width, setWidth] = useState(0)
   const index = nearestGoalIndex(value)
   const travel = Math.max(0, width - THUMB)
@@ -128,7 +135,7 @@ export default function GoalSlider({
       <View
         accessible
         accessibilityActions={ADJUST_ACTIONS}
-        accessibilityLabel="Daily push-up goal"
+        accessibilityLabel={t("accessibility.dailyGoal")}
         accessibilityRole="adjustable"
         accessibilityValue={accessibilityValue}
         onAccessibilityAction={adjust}

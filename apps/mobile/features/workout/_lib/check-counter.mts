@@ -13,6 +13,11 @@ import {
   type PoseLandmark,
   type PoseMetrics,
 } from "./counter.ts"
+import {
+  getPhoneInclinationDegrees,
+  requireUprightPhone,
+} from "./inclination.ts"
+import { connectTrace } from "./trace.ts"
 
 const pose = (elbowAngle: number, shoulderY = 0.3): PoseMetrics => ({
   confidence: 0.9,
@@ -82,23 +87,64 @@ assert.equal(frontState.validReps, 1)
 assert.equal(frontState.attempts[0]?.minBodyAngle, 180)
 
 assert.deepEqual(getSetupState(landmarks(), null, false), {
-  hint: "Fit body in frame",
+  framing: "unknown",
+  hint: "fitBody",
   valid: false,
 })
 frontLandmarks[0] = { visibility: 0.15, x: 0.5, y: 0.1 }
-frontLandmarks[15] = { visibility: 0.15, x: 0.25, y: 0.85 }
-frontLandmarks[16] = { visibility: 0.15, x: 0.75, y: 0.85 }
-assert.deepEqual(getSetupState(frontLandmarks, pose(170), true), {
-  hint: "Hold still",
+frontLandmarks[15] = { visibility: 0.15, x: 0.25, y: 0.7 }
+frontLandmarks[16] = { visibility: 0.15, x: 0.75, y: 0.7 }
+const validSetup = getSetupState(frontLandmarks, pose(170), true)
+assert.deepEqual(validSetup, {
+  framing: "ready",
+  hint: "holdStill",
   valid: true,
 })
-frontLandmarks[0] = { visibility: 0.15, x: 0.5, y: 0.35 }
-frontLandmarks[15] = { visibility: 0.15, x: 0.25, y: 0.65 }
-frontLandmarks[16] = { visibility: 0.15, x: 0.75, y: 0.65 }
-assert.deepEqual(getSetupState(frontLandmarks, pose(170), true), {
-  hint: "Move closer to camera",
+assert.deepEqual(requireUprightPhone(validSetup, false), {
+  framing: "ready",
+  hint: "tiltPhone",
   valid: false,
 })
+assert.deepEqual(
+  requireUprightPhone(
+    { framing: "far", hint: "moveCloser", valid: false },
+    false
+  ),
+  { framing: "far", hint: "moveCloser", valid: false }
+)
+frontLandmarks[0] = { visibility: 0.15, x: 0.5, y: 0.09 }
+assert.deepEqual(getSetupState(frontLandmarks, pose(170), true), {
+  framing: "close",
+  hint: "moveBack",
+  valid: false,
+})
+frontLandmarks[0] = { visibility: 0.15, x: 0.5, y: 0.2 }
+frontLandmarks[15] = { visibility: 0.15, x: 0.25, y: 0.86 }
+frontLandmarks[16] = { visibility: 0.15, x: 0.75, y: 0.86 }
+assert.deepEqual(getSetupState(frontLandmarks, pose(170), true), {
+  framing: "close",
+  hint: "moveBack",
+  valid: false,
+})
+frontLandmarks[0] = { visibility: 0.15, x: 0.5, y: 0.35 }
+frontLandmarks[15] = { visibility: 0.15, x: 0.25, y: 0.55 }
+frontLandmarks[16] = { visibility: 0.15, x: 0.75, y: 0.55 }
+assert.deepEqual(getSetupState(frontLandmarks, pose(170), true), {
+  framing: "far",
+  hint: "moveCloser",
+  valid: false,
+})
+
+assert.equal(getPhoneInclinationDegrees({ x: 0, y: 0, z: 0 }), null)
+assert.equal(getPhoneInclinationDegrees({ x: 0, y: -1, z: 0 }), 0)
+assert.equal(getPhoneInclinationDegrees({ x: 0, y: 0, z: 1 }), 90)
+assert.equal(getPhoneInclinationDegrees({ x: 0, y: 1, z: 0 }), 180)
+const thirtyDegrees = getPhoneInclinationDegrees({
+  x: 0,
+  y: -Math.cos(Math.PI / 6),
+  z: Math.sin(Math.PI / 6),
+})
+assert.ok(Math.abs((thirtyDegrees ?? 0) - 30) < 0.000_001)
 
 let recoveredState = createCounterState()
 recoveredState = processPoseMetrics(recoveredState, pose(140), 100, false).state
@@ -155,6 +201,11 @@ depthState = processPoseMetrics(
   -0.17
 ).state
 assert.deepEqual(depthState.attempts[0]?.depthTrace, [-0.17, 0.01, -0.17])
+assert.deepEqual(connectTrace([0.01, -0.17], undefined), [-0.17, 0.01, -0.17])
+assert.deepEqual(
+  connectTrace([-0.1, 0.02, -0.2], -0.17),
+  [-0.17, -0.1, 0.02, -0.2]
+)
 
 let cappedState = createCounterState()
 cappedState = processPoseMetrics(cappedState, pose(150), 0, true).state

@@ -151,6 +151,12 @@ function buildMobileColors(colors) {
   )
 }
 
+function buildMobileColorVars(colors) {
+  return Object.fromEntries(
+    COLOR_TOKENS.map((token) => [`color-${token}`, `hsl(${colors[token]})`])
+  )
+}
+
 function buildCssVars(vars, indent = 4) {
   const spaces = " ".repeat(indent)
 
@@ -178,7 +184,37 @@ function buildRadiusVars(radius) {
 function buildFontVars(fonts) {
   return {
     "font-heading": fonts.web.heading,
+    "font-mono": fonts.web.mono,
     "font-sans": fonts.web.sans,
+  }
+}
+
+function buildMobileFontVars(fonts) {
+  return {
+    "font-bold": fonts.mobile.bold,
+    "font-extrabold": fonts.mobile.extrabold,
+    "font-heading": fonts.mobile.heading,
+    "font-medium": fonts.mobile.medium,
+    "font-mono": fonts.mobile.mono,
+    "font-normal": fonts.mobile.regular,
+    "font-sans": fonts.mobile.sans,
+    "font-semibold": fonts.mobile.semibold,
+  }
+}
+
+function buildMobileRadiusVars(radius) {
+  const base = Number.parseFloat(radius.base) * 16
+
+  return {
+    "radius-xs": `${formatNumber(base * 0.4)}px`,
+    ...Object.fromEntries(
+      Object.entries(radius.scale).map(([name, value]) => {
+        const factor = value.match(/\*\s*([\d.]+)\)/u)?.[1]
+        const pixels = value === "var(--radius)" ? base : base * Number(factor)
+
+        return [`radius-${name}`, `${formatNumber(pixels)}px`]
+      })
+    ),
   }
 }
 
@@ -240,16 +276,28 @@ function buildWebFontImports(fonts) {
   return Object.values(fonts.web)
     .map((font) => font.match(/["']([^"']+)["']/)?.[1])
     .filter(Boolean)
-    .map((font) => font.replace(/\s+Variable$/, ""))
-    .map((font) =>
-      font
+    .map((font) => ({
+      family: font.replace(/\s+Variable$/, ""),
+      variable: font.endsWith(" Variable"),
+    }))
+    .map(({ family, variable }) => ({
+      packageName: family
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "")
-    )
+        .replace(/^-|-$/g, ""),
+      variable,
+    }))
     .filter(Boolean)
-    .filter((font, index, fontNames) => fontNames.indexOf(font) === index)
-    .map((font) => `@import "@fontsource-variable/${font}";`)
+    .filter(
+      (font, index, fontEntries) =>
+        fontEntries.findIndex(
+          (candidate) => candidate.packageName === font.packageName
+        ) === index
+    )
+    .map(
+      ({ packageName, variable }) =>
+        `@import "@fontsource${variable ? "-variable" : ""}/${packageName}";`
+    )
     .join("\n")
 }
 
@@ -301,26 +349,36 @@ ${buildCssVars(buildColorVars(tokens.colors.dark), 2)}
 }
 
 function buildMobileCss(tokens, lightTheme, darkTheme) {
-  const rootVars = {
-    ...lightTheme,
-    ...buildRadiusVars(tokens.radius),
-    ...buildFontVars(tokens.fonts),
-    ...buildMotionVars(tokens.motion),
-    ...buildShadowVars(tokens.shadow),
-    ...buildTypographyVars(tokens.typography),
-  }
+  const themeVars = buildMobileFontVars(tokens.fonts)
+  const radiusVars = buildMobileRadiusVars(tokens.radius)
 
-  return `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+  return `@import "tailwindcss";
+@import "uniwind";
+@import "panelui-native/theme.css";
 
-@layer base {
+@source "./app/**/*.{ts,tsx}";
+@source "./components/**/*.{ts,tsx}";
+@source "./features/**/*.{ts,tsx}";
+@source "./hooks/**/*.{ts,tsx}";
+@source "./lib/**/*.{ts,tsx}";
+@source "./node_modules/panelui-native/src";
+
+@theme {
+${buildCssVars(themeVars, 2)}
+  --radius-4xl: unset;
+}
+
+@layer theme {
   :root {
-${buildCssVars(rootVars)}
-  }
+    @variant light {
+${buildCssVars(buildMobileColorVars(lightTheme), 6)}
+${buildCssVars(radiusVars, 6)}
+    }
 
-  .dark {
-${buildCssVars(darkTheme)}
+    @variant dark {
+${buildCssVars(buildMobileColorVars(darkTheme), 6)}
+${buildCssVars(radiusVars, 6)}
+    }
   }
 }
 `
@@ -335,32 +393,10 @@ function buildThemeObject(theme, radius) {
   ].join("\n")
 }
 
-function buildTypographyTs(typography) {
-  const lines = ["{"]
-
-  for (const [name, token] of Object.entries(typography)) {
-    lines.push(`  ${formatPropertyName(name)}: {`)
-    lines.push(`    fontSize: ${token.fontSize},`)
-    lines.push(`    lineHeight: ${token.lineHeight},`)
-    lines.push(`    fontFamily: FONT_FAMILY.${token.font},`)
-    lines.push("  },")
-  }
-
-  lines.push("}")
-
-  return lines.join("\n")
-}
-
 function buildThemeTs(tokens, lightTheme, darkTheme) {
   return `import { DarkTheme, DefaultTheme, type Theme } from "expo-router"
 
 export const FONT_FAMILY = ${formatTsValue(tokens.fonts.mobile)} as const
-
-export const TYPOGRAPHY = ${buildTypographyTs(tokens.typography)} as const
-
-export const MOTION = ${formatTsValue(tokens.motion)} as const
-
-export const COMPONENT_TOKENS = ${formatTsValue(tokens.components)} as const
 
 export const THEME = {
   light: {
@@ -425,3 +461,10 @@ const darkTheme = buildMobileColors(tokens.colors.dark)
 await writeFile(WEB_CSS, buildWebCss(tokens))
 await writeFile(MOBILE_CSS, buildMobileCss(tokens, lightTheme, darkTheme))
 await writeFile(MOBILE_THEME, buildThemeTs(tokens, lightTheme, darkTheme))
+await execFileAsync(
+  "pnpm",
+  ["exec", "oxfmt", WEB_CSS, MOBILE_CSS, MOBILE_THEME],
+  {
+    cwd: ROOT,
+  }
+)

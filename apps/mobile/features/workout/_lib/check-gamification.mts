@@ -10,7 +10,12 @@ import {
 const days = (reps: number, count = 30) =>
   Array.from({ length: count }, () => ({ reps }))
 
-const empty = getLevel({ bestStreak: 0, recentDays: [], totalReps: 0 })
+const empty = getLevel({
+  bestStreak: 0,
+  dailyGoal: 0,
+  recentDays: [],
+  totalReps: 0,
+})
 assert.equal(empty.level, 0)
 assert.equal(empty.nextLevel, 1)
 assert.deepEqual(
@@ -65,18 +70,25 @@ assert.equal(formatCompact(7250), "7.25k")
 assert.equal(formatCompact(9750), "9.75k")
 assert.equal(formatCompact(10_000), "10k")
 
-const repsAlone = getLevel({ bestStreak: 0, recentDays: [], totalReps: 50 })
+const repsAlone = getLevel({
+  bestStreak: 0,
+  dailyGoal: 0,
+  recentDays: [],
+  totalReps: 50,
+})
 assert.equal(repsAlone.level, 0)
 
 const level1 = getLevel({
   bestStreak: 1,
-  recentDays: days(3),
+  dailyGoal: 10,
+  recentDays: [],
   totalReps: 10,
 })
 assert.equal(level1.level, 1)
 
 const level10 = getLevel({
   bestStreak: 10,
+  dailyGoal: 0,
   recentDays: days(5),
   totalReps: 100,
 })
@@ -85,6 +97,7 @@ assert.equal(level10.nextLevel, 11)
 
 const level79 = getLevel({
   bestStreak: 120,
+  dailyGoal: 0,
   recentDays: days(39),
   totalReps: 5000,
 })
@@ -96,6 +109,7 @@ assert.equal(formatMilestoneRemaining(paceMilestone), "1/day average")
 
 const level80 = getLevel({
   bestStreak: 120,
+  dailyGoal: 0,
   recentDays: days(40),
   totalReps: 5000,
 })
@@ -103,6 +117,7 @@ assert.equal(level80.level, 80)
 
 const level100 = getLevel({
   bestStreak: 365,
+  dailyGoal: 0,
   recentDays: days(100),
   totalReps: 50_000,
 })
@@ -113,6 +128,7 @@ assert.deepEqual(level100.milestones, [])
 
 const negative = getLevel({
   bestStreak: -10,
+  dailyGoal: -10,
   recentDays: days(-10),
   totalReps: -10,
 })

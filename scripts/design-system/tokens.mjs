@@ -109,10 +109,12 @@ export function validateTokens(tokens) {
   const webFonts = expectRecord(fonts.web, "fonts.web")
   const mobileFonts = expectRecord(fonts.mobile, "fonts.mobile")
 
-  for (const token of ["sans", "heading"]) {
+  for (const token of ["sans", "heading", "mono"]) {
     expectString(webFonts[token], `fonts.web.${token}`)
     expectString(mobileFonts[token], `fonts.mobile.${token}`)
   }
+
+  expectString(mobileFonts.monoMedium, "fonts.mobile.monoMedium")
 
   for (const token of Object.keys(FONT_WEIGHT)) {
     expectString(mobileFonts[token], `fonts.mobile.${token}`)

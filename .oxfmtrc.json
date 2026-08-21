@@ -43,7 +43,7 @@
       "files": ["apps/mobile/**/*.ts", "apps/mobile/**/*.tsx"],
       "options": {
         "sortTailwindcss": {
-          "config": "apps/mobile/tailwind.config.js",
+          "stylesheet": "apps/mobile/global.css",
           "functions": ["cn", "cva"]
         }
       }

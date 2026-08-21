@@ -7,6 +7,7 @@ type ActivityDay = { reps: number }
 
 export type LevelInput = {
   bestStreak: number
+  dailyGoal: number
   recentDays: readonly ActivityDay[]
   totalReps: number
 }
@@ -29,6 +30,12 @@ export type LevelMilestone = {
   label: string
   target: number
   value: number
+}
+
+type LevelStats = {
+  dailyPace: number
+  streak: number
+  totalReps: number
 }
 
 const LEVEL_ANCHORS = [
@@ -191,20 +198,20 @@ function getRecentDailyAverage(days: readonly ActivityDay[]) {
 
 function getStats(input: LevelInput) {
   return {
-    recentDailyAverage: getRecentDailyAverage(input.recentDays),
+    dailyPace: Math.max(
+      getRecentDailyAverage(input.recentDays),
+      clean(input.dailyGoal)
+    ),
     streak: clean(input.bestStreak),
     totalReps: clean(input.totalReps),
   }
 }
 
-function meetsRequirement(
-  stats: Omit<LevelRequirement, "level">,
-  requirement: LevelRequirement
-) {
+function meetsRequirement(stats: LevelStats, requirement: LevelRequirement) {
   return (
     stats.totalReps >= requirement.totalReps &&
     stats.streak >= requirement.streak &&
-    stats.recentDailyAverage >= requirement.recentDailyAverage
+    stats.dailyPace >= requirement.recentDailyAverage
   )
 }
 
@@ -217,7 +224,7 @@ function getMilestonePercent(milestone: LevelMilestone) {
 }
 
 function getMilestones(
-  stats: Omit<LevelRequirement, "level">,
+  stats: LevelStats,
   requirement: LevelRequirement
 ): LevelMilestone[] {
   const milestones: LevelMilestone[] = [
@@ -242,11 +249,11 @@ function getMilestones(
 
   if (requirement.recentDailyAverage > 0) {
     milestones.push({
-      earned: stats.recentDailyAverage >= requirement.recentDailyAverage,
+      earned: stats.dailyPace >= requirement.recentDailyAverage,
       id: "recentDailyAverage",
       label: `${requirement.recentDailyAverage}/day`,
       target: requirement.recentDailyAverage,
-      value: stats.recentDailyAverage,
+      value: stats.dailyPace,
     })
   }
 

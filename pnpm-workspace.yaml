@@ -8,10 +8,16 @@ peerDependencyRules:
   allowedVersions:
     tailwindcss: ">=3.0.0"
 
+overrides:
+  "@expo/cli": 57.0.16
+  "@expo/dom-webview": 57.0.1
+  "@expo/local-build-cache-provider": 57.0.6
+  "@expo/metro-runtime": 57.0.11
+  expo: 57.0.14
+
 allowBuilds:
   esbuild: true
   msw: false
 
 patchedDependencies:
-  expo-glass-tabs@0.1.1: patches/expo-glass-tabs@0.1.1.patch
   react-native-nitro-pose-exercises@1.1.19: patches/react-native-nitro-pose-exercises@1.1.19.patch

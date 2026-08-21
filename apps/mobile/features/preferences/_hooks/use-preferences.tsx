@@ -2,6 +2,7 @@ import {
   loadPreferences,
   savePreferences,
   type AppearancePreference,
+  type ClockFormatPreference,
   type LanguagePreference,
   type Preferences,
 } from "@/features/preferences/_lib/storage"
@@ -13,6 +14,7 @@ type ResolvedColorScheme = "light" | "dark"
 type PreferencesContextValue = Preferences & {
   colorScheme: ResolvedColorScheme
   setAppearance: (appearance: AppearancePreference) => void
+  setClockFormat: (clockFormat: ClockFormatPreference) => void
   setLanguage: (language: LanguagePreference) => void
 }
 
@@ -49,6 +51,17 @@ function setLanguagePreference(
   })
 }
 
+function setClockFormatPreference(
+  clockFormat: ClockFormatPreference,
+  setPreferences: React.Dispatch<React.SetStateAction<Preferences>>
+) {
+  setPreferences((current) => {
+    const next = { ...current, clockFormat }
+    savePreferences(next)
+    return next
+  })
+}
+
 function getSetAppearance(
   setPreferences: React.Dispatch<React.SetStateAction<Preferences>>
 ) {
@@ -63,13 +76,27 @@ function getSetLanguage(
     setLanguagePreference(language, setPreferences)
 }
 
+function getSetClockFormat(
+  setPreferences: React.Dispatch<React.SetStateAction<Preferences>>
+) {
+  return (clockFormat: ClockFormatPreference) =>
+    setClockFormatPreference(clockFormat, setPreferences)
+}
+
 function getPreferencesContextValue(
   preferences: Preferences,
   colorScheme: ResolvedColorScheme,
   setAppearance: (appearance: AppearancePreference) => void,
+  setClockFormat: (clockFormat: ClockFormatPreference) => void,
   setLanguage: (language: LanguagePreference) => void
 ) {
-  return { ...preferences, colorScheme, setAppearance, setLanguage }
+  return {
+    ...preferences,
+    colorScheme,
+    setAppearance,
+    setClockFormat,
+    setLanguage,
+  }
 }
 
 export function PreferencesProvider({
@@ -81,11 +108,13 @@ export function PreferencesProvider({
   const systemScheme = useSystemColorScheme() === "dark" ? "dark" : "light"
   const colorScheme = resolveColorScheme(preferences.appearance, systemScheme)
   const setAppearance = getSetAppearance(setPreferences)
+  const setClockFormat = getSetClockFormat(setPreferences)
   const setLanguage = getSetLanguage(setPreferences)
   const value = getPreferencesContextValue(
     preferences,
     colorScheme,
     setAppearance,
+    setClockFormat,
     setLanguage
   )
 

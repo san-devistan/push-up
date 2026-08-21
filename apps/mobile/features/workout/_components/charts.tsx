@@ -1,253 +1,167 @@
-import { Text } from "@/components/ui/text"
-import { cn } from "@/lib/utils"
-import { useState } from "react"
+/* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes chart props. */
+
 import {
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native"
+  formatActivityDate,
+  getActivityDaysAgo,
+} from "@/features/workout/_lib/activity-window"
+import { useI18n } from "@/hooks/use-i18n"
+import {
+  BarChart,
+  HeatmapChart,
+  buildHeatmapCalendar,
+  type BarChartDatum,
+  type HeatmapCell,
+  type HeatmapColumn,
+} from "panelui-native"
+import { useEffect, useRef } from "react"
+import { ScrollView, View } from "react-native"
 
-const HEATMAP_WEEKS = 16
+const HEATMAP_WEEK_START = 1
+const EMPTY_HEATMAP_DATA: HeatmapColumn[] = []
 
-const styles = StyleSheet.create({
-  baseline: { height: StyleSheet.hairlineWidth },
-  cell: { aspectRatio: 1, borderCurve: "continuous", borderRadius: 3 },
-  columnCap: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  columnLabel: { height: 18 },
-  heatmapTooltip: {
-    alignSelf: "center",
-    bottom: "130%",
-    minWidth: 72,
-    position: "absolute",
-    zIndex: 20,
-  },
-  legendSwatch: { borderRadius: 2, height: 10, width: 10 },
-  plot: { height: 124 },
-  selectedCell: { zIndex: 10 },
-})
+type ActivityDay = { date: string; reps: number }
 
-const RAMP = ["bg-primary/25", "bg-primary/45", "bg-primary/70", "bg-primary"]
-
-function rampClass(reps: number) {
-  if (reps >= 50) {
-    return RAMP[3]
-  }
-  if (reps >= 25) {
-    return RAMP[2]
-  }
-  if (reps >= 10) {
-    return RAMP[1]
-  }
-  if (reps > 0) {
-    return RAMP[0]
-  }
-  return "bg-muted"
+function parseActivityDate(date: string) {
+  return new Date(`${date}T00:00:00`)
 }
 
-function Cell({
-  date,
-  isSelected,
-  onSelect,
-  reps,
-}: {
-  date: string
-  isSelected: boolean
-  onSelect: (date: string | null) => void
-  reps: number
-}) {
-  const isPlaceholder = date.startsWith("placeholder-")
-  const select = selectDate(onSelect, date)
-
-  return (
-    <Pressable
-      accessible={!isPlaceholder}
-      accessibilityLabel={isPlaceholder ? undefined : `${date}: ${reps} reps`}
-      accessibilityRole={isPlaceholder ? undefined : "button"}
-      className={rampClass(reps)}
-      disabled={isPlaceholder}
-      onPress={select}
-      style={StyleSheet.compose(styles.cell, isSelected && styles.selectedCell)}
-    >
-      {isSelected ? (
-        <View
-          className="rounded-full bg-popover px-2 py-1 shadow-sm"
-          style={styles.heatmapTooltip}
-        >
-          <Text
-            className="text-center text-xs font-bold tabular-nums text-popover-foreground"
-            numberOfLines={1}
-          >
-            {reps} reps
-          </Text>
-        </View>
-      ) : null}
-    </Pressable>
-  )
-}
-
-function LegendSwatch({ className }: { className: string }) {
-  return <View className={className} style={styles.legendSwatch} />
-}
-
-function getColumnStyle(percent: number): StyleProp<ViewStyle> {
-  return StyleSheet.compose(styles.columnCap, {
-    height: `${percent}%`,
+function getShortDay(date: string, locale: string) {
+  return parseActivityDate(date).toLocaleDateString(locale, {
+    weekday: "short",
   })
 }
 
-export function ActivityHeatmap({
-  days,
-  showLegend = true,
-}: {
-  days: ReadonlyArray<{ date: string; reps: number }>
-  showLegend?: boolean
-}) {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const weekCount = Math.max(
-    1,
-    Math.min(HEATMAP_WEEKS, Math.ceil(days.length / 7))
-  )
-  const weeks = Array.from({ length: weekCount }, (_, index) =>
-    days.slice(index * 7, index * 7 + 7)
-  )
+function getDateLabel(
+  date: Date,
+  today: number,
+  locale: string,
+  formatNumber: (value: number) => string,
+  t: ReturnType<typeof useI18n>["t"]
+) {
+  const dateKey = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-")
+  const daysAgo = getActivityDaysAgo(dateKey, today)
 
-  return (
-    <View className="gap-3">
-      <View className="flex-row gap-1">
-        {weeks.map((week) => (
-          <View className="flex-1 gap-1" key={week[0]?.date}>
-            {week.map((day) => (
-              <Cell
-                date={day.date}
-                isSelected={day.date === selectedDate}
-                key={day.date}
-                onSelect={setSelectedDate}
-                reps={day.reps}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
-      {showLegend ? (
-        <View className="flex-row items-center justify-end gap-1.5">
-          <Text className="text-xs text-muted-foreground">Less</Text>
-          <LegendSwatch className="bg-muted" />
-          {RAMP.map((className) => (
-            <LegendSwatch className={className} key={className} />
-          ))}
-          <Text className="text-xs text-muted-foreground">More</Text>
-        </View>
-      ) : null}
-    </View>
-  )
-}
-
-function getShortDay(date: string) {
-  if (date.startsWith("placeholder-")) {
-    return ""
+  if (daysAgo === 0) return t("date.today")
+  if (daysAgo === 1) return t("date.yesterday")
+  if (daysAgo <= 7) {
+    return t("date.daysAgo", { count: formatNumber(daysAgo) })
   }
 
-  const timestamp = Date.parse(`${date}T00:00:00.000Z`)
-
-  return Number.isFinite(timestamp)
-    ? new Date(timestamp).toLocaleDateString(undefined, { weekday: "short" })
-    : ""
+  return formatActivityDate(dateKey, locale)
 }
 
-function getPeakDate(days: ReadonlyArray<{ date: string; reps: number }>) {
-  return days.reduce(
-    (peak, day) => (day.reps >= peak.reps ? day : peak),
-    days[0] ?? { date: "", reps: 0 }
-  ).date
-}
+export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
+  const { formatNumber, locale, t } = useI18n()
+  const data = days.map((day) => ({
+    date: day.date,
+    label: getShortDay(day.date, locale),
+    reps: day.reps,
+  }))
 
-function selectDate(onSelect: (date: string | null) => void, date: string) {
-  return () => onSelect(date)
-}
+  const labelDatum = (datum: BarChartDatum) => {
+    const reps = Number(datum.reps ?? 0)
+    const repLabel = t(reps === 1 ? "common.rep" : "common.reps")
 
-function clearDate(onSelect: (date: string | null) => void) {
-  return () => onSelect(null)
-}
-
-function DailyColumn({
-  day,
-  isSelected,
-  onSelect,
-  peak,
-}: {
-  day: { date: string; reps: number }
-  isSelected: boolean
-  onSelect: (date: string | null) => void
-  peak: number
-}) {
-  const select = selectDate(onSelect, day.date)
-  const clear = clearDate(onSelect)
-  const percent = peak > 0 ? Math.max(4, (day.reps / peak) * 100) : 4
+    return `${String(datum.label ?? "")}: ${formatNumber(reps)} ${repLabel}`
+  }
 
   return (
-    <Pressable
-      accessible={!day.date.startsWith("placeholder-")}
-      accessibilityLabel={`${day.date}: ${day.reps} reps`}
-      className="h-full flex-1 items-center"
-      onHoverIn={select}
-      onHoverOut={clear}
-      onPress={select}
+    <BarChart
+      accessibilityLabel={t("today.activity")}
+      accessibilityLabelForDatum={labelDatum}
+      aspectRatio={2.5}
+      data={data}
+      minBarLength={2}
+      xDataKey="label"
     >
-      <View className="justify-center" style={styles.columnLabel}>
-        {isSelected ? (
-          <Text className="font-heading text-xs font-bold tabular-nums">
-            {day.reps}
-          </Text>
-        ) : null}
-      </View>
-      <View className="w-full flex-1 justify-end">
-        <View
-          className={cn(
-            "w-full",
-            day.reps > 0 ? "bg-primary" : "bg-muted",
-            isSelected ? "" : "opacity-70"
-          )}
-          style={getColumnStyle(percent)}
-        />
-      </View>
-      <Text className="pt-1 text-xs text-muted-foreground">
-        {getShortDay(day.date)}
-      </Text>
-    </Pressable>
+      <BarChart.Grid opacity={0.45} rows={3} />
+      <BarChart.Bar colorIndex={3} dataKey="reps" />
+      <BarChart.XAxis />
+      <BarChart.Tooltip
+        formatValue={(value) =>
+          `${formatNumber(value)} ${t(
+            value === 1 ? "common.rep" : "common.reps"
+          )}`
+        }
+      />
+    </BarChart>
   )
 }
 
-export function DailyColumns({
-  days,
+export function ActivityHeatmap({
+  recentDays,
+  today,
 }: {
-  days: ReadonlyArray<{ date: string; reps: number }>
+  recentDays: readonly ActivityDay[]
+  today: number
 }) {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const peakDate = getPeakDate(days)
-  const activeDate = days.some((day) => day.date === selectedDate)
-    ? selectedDate
-    : peakDate
-  const peak = Math.max(0, ...days.map((day) => day.reps))
+  const { formatNumber, locale, t } = useI18n()
+  const scrollView = useRef<ScrollView>(null)
+  const entries = recentDays.map((day) => ({
+    count: day.reps,
+    date: parseActivityDate(day.date),
+  }))
+  const weeks = buildHeatmapCalendar(entries, {
+    end: new Date(today),
+    start: entries[0]?.date,
+    weekStartDay: HEATMAP_WEEK_START,
+  })
+  const weekdayLabels = Array.from({ length: 7 }, (_, index) =>
+    new Date(2024, 0, index + 1).toLocaleDateString(locale, {
+      weekday: "short",
+    })
+  )
+
+  useEffect(() => {
+    scrollView.current?.scrollToEnd({ animated: false })
+  }, [weeks.length])
+
+  const labelCell = (cell: HeatmapCell) => {
+    const repLabel = t(cell.count === 1 ? "common.rep" : "common.reps")
+    const value = `${formatNumber(cell.count)} ${repLabel}`
+
+    return cell.date
+      ? `${getDateLabel(cell.date, today, locale, formatNumber, t)}: ${value}`
+      : value
+  }
 
   return (
     <View className="gap-2">
-      <View
-        className="flex-row items-stretch justify-between gap-2"
-        style={styles.plot}
+      <ScrollView
+        horizontal
+        ref={scrollView}
+        showsHorizontalScrollIndicator={false}
       >
-        {days.map((day) => (
-          <DailyColumn
-            day={day}
-            isSelected={day.date === activeDate}
-            key={day.date}
-            onSelect={setSelectedDate}
-            peak={peak}
+        <HeatmapChart
+          accessibilityLabel={t("today.activity")}
+          accessibilityLabelForDatum={labelCell}
+          binSize={14}
+          color="--color-chart-3"
+          data={weeks}
+          gap={4}
+          weekStartDay={HEATMAP_WEEK_START}
+        >
+          <HeatmapChart.XAxis
+            formatLabel={(date) =>
+              date.toLocaleDateString(locale, { month: "short" })
+            }
           />
-        ))}
-      </View>
-      <View className="bg-border" style={styles.baseline} />
+          <HeatmapChart.YAxis labels={weekdayLabels} width={28} />
+          <HeatmapChart.Cells cornerRadius={3} />
+          <HeatmapChart.Tooltip formatLabel={labelCell} />
+        </HeatmapChart>
+      </ScrollView>
+      <HeatmapChart data={EMPTY_HEATMAP_DATA}>
+        <HeatmapChart.Legend
+          lessLabel={t("charts.less")}
+          moreLabel={t("charts.more")}
+          swatchSize={10}
+        />
+      </HeatmapChart>
     </View>
   )
 }

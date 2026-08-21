@@ -1,15 +1,14 @@
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Text } from "@/components/ui/text"
 import { Slab } from "@/features/workout/_components/figures"
 import { clearWorkoutData } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
+import { useI18n } from "@/hooks/use-i18n"
 import { authClient } from "@/lib/auth-client"
+import { translate, type Language } from "@/lib/i18n"
 import { api } from "@workspace/backend/api"
 import { useMutation } from "convex/react"
 import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
-import { LogOutIcon, Trash2Icon } from "lucide-react-native"
+import { ArrowUpRightIcon, Button, Text, TrashIcon } from "panelui-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
 import { Alert, StyleSheet, View } from "react-native"
 import Svg, { Path } from "react-native-svg"
@@ -74,7 +73,7 @@ function errorCode(error: unknown) {
     : null
 }
 
-async function connectApple() {
+async function connectApple(language: Language) {
   try {
     const nonce = Crypto.randomUUID()
     const credential = await AppleAuthentication.signInAsync({
@@ -86,7 +85,7 @@ async function connectApple() {
     })
 
     if (!credential.identityToken) {
-      return "Apple did not return an identity token"
+      return translate(language, "connect.appleToken")
     }
 
     const { error } = await authClient.signIn.social({
@@ -110,11 +109,11 @@ async function connectApple() {
   } catch (caught) {
     return errorCode(caught) === "ERR_REQUEST_CANCELED"
       ? null
-      : "Apple sign-in is unavailable. Check the server credentials."
+      : translate(language, "connect.appleUnavailable")
   }
 }
 
-async function connectGoogle() {
+async function connectGoogle(language: Language) {
   try {
     const { error } = await authClient.signIn.social({
       callbackURL: "pushup://",
@@ -123,7 +122,7 @@ async function connectGoogle() {
 
     return error?.message ?? null
   } catch {
-    return "Google sign-in is unavailable. Check the server credentials."
+    return translate(language, "connect.googleUnavailable")
   }
 }
 
@@ -143,6 +142,7 @@ function getConnectAction(
 }
 
 function getSignOutAction(
+  errorMessage: string,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>
 ) {
@@ -152,42 +152,44 @@ function getSignOutAction(
     void authClient
       .signOut()
       .then(({ error }) => setError(error?.message ?? null))
-      .catch(() => setError("Could not sign out."))
+      .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
 }
 
 function getDeleteDataAction(
   clearRemoteData: () => Promise<unknown>,
+  messages: {
+    body: string
+    cancel: string
+    confirm: string
+    error: string
+    title: string
+  },
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>
 ) {
   return () => {
-    Alert.alert(
-      "Delete workout data?",
-      "This removes your reps, streaks and levels from this profile.",
-      [
-        { style: "cancel", text: "Cancel" },
-        {
-          onPress: () => {
-            setError(null)
-            setPending("delete")
-            void clearRemoteData()
-              .then(() => clearWorkoutData())
-              .catch(() => setError("Could not delete workout data."))
-              .finally(() => setPending(null))
-          },
-          style: "destructive",
-          text: "Delete",
+    Alert.alert(messages.title, messages.body, [
+      { style: "cancel", text: messages.cancel },
+      {
+        onPress: () => {
+          setError(null)
+          setPending("delete")
+          void clearRemoteData()
+            .then(() => clearWorkoutData())
+            .catch(() => setError(messages.error))
+            .finally(() => setPending(null))
         },
-      ]
-    )
+        style: "destructive",
+        text: messages.confirm,
+      },
+    ])
   }
 }
 
-export function Connect() {
-  const { data: authSession } = authClient.useSession()
-  const clearRemoteData = useMutation(api.workoutSessions.clear)
+export function ConnectProviders() {
+  const { language } = useI18n()
   const isDark = useColorScheme() === "dark"
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -197,21 +199,71 @@ export function Connect() {
     void AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
   }, [])
 
-  const withApple = getConnectAction(
-    setError,
-    setPending,
-    "apple",
-    connectApple
+  const withApple = getConnectAction(setError, setPending, "apple", () =>
+    connectApple(language)
   )
-  const withGoogle = getConnectAction(
-    setError,
-    setPending,
-    "google",
-    connectGoogle
+  const withGoogle = getConnectAction(setError, setPending, "google", () =>
+    connectGoogle(language)
   )
-  const signOut = getSignOutAction(setError, setPending)
+  const disabled = pending !== null
+
+  return (
+    <View className="gap-3">
+      {appleAvailable ? (
+        <Button
+          disabled={disabled}
+          onPress={withApple}
+          style={isDark ? styles.appleDark : styles.appleLight}
+        >
+          <AppleMark color={isDark ? "#09090b" : "#ffffff"} />
+          <Text
+            className="font-semibold"
+            style={isDark ? styles.appleLabelDark : styles.appleLabelLight}
+          >
+            Apple
+          </Text>
+        </Button>
+      ) : null}
+      <Button
+        className="dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
+        disabled={disabled}
+        onPress={withGoogle}
+        style={styles.provider}
+        variant="outline"
+      >
+        <GoogleMark />
+        Google
+      </Button>
+      {error ? (
+        <Text selectable className="text-destructive">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+export function Connect() {
+  const { t } = useI18n()
+  const { data: authSession } = authClient.useSession()
+  const clearRemoteData = useMutation(api.workoutSessions.clear)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingAction>(null)
+
+  const signOut = getSignOutAction(
+    t("connect.couldNotSignOut"),
+    setError,
+    setPending
+  )
   const deleteData = getDeleteDataAction(
     () => clearRemoteData({}),
+    {
+      body: t("connect.deleteBody"),
+      cancel: t("common.cancel"),
+      confirm: t("common.delete"),
+      error: t("connect.couldNotDelete"),
+      title: t("connect.deleteTitle"),
+    },
     setError,
     setPending
   )
@@ -226,48 +278,18 @@ export function Connect() {
 
   return (
     <Slab>
-      <Text className="font-heading text-base font-semibold">
-        Connect & Sync
-      </Text>
-      {isAnonymous ? (
-        <View className="gap-3">
-          {appleAvailable ? (
-            <Button
-              disabled={disabled}
-              onPress={withApple}
-              style={isDark ? styles.appleDark : styles.appleLight}
-            >
-              <AppleMark color={isDark ? "#09090b" : "#ffffff"} />
-              <Text
-                className="font-semibold"
-                style={isDark ? styles.appleLabelDark : styles.appleLabelLight}
-              >
-                Apple
-              </Text>
-            </Button>
-          ) : null}
-          <Button
-            className="dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
-            disabled={disabled}
-            onPress={withGoogle}
-            style={styles.provider}
-            variant="outline"
-          >
-            <GoogleMark />
-            <Text className="font-semibold">Google</Text>
-          </Button>
-        </View>
-      ) : null}
+      <Text className="font-bold text-base">{t("connect.sync")}</Text>
+      {isAnonymous ? <ConnectProviders /> : null}
       <View className="gap-3 border-t border-border pt-3 dark:border-foreground/20">
         {isConnected ? (
           <Button disabled={disabled} onPress={signOut} variant="outline">
-            <Icon as={LogOutIcon} />
-            <Text className="font-semibold">Sign out</Text>
+            <ArrowUpRightIcon />
+            {t("connect.signOut")}
           </Button>
         ) : null}
         <Button disabled={disabled} onPress={deleteData} variant="destructive">
-          <Icon as={Trash2Icon} />
-          <Text className="font-semibold">Delete data</Text>
+          <TrashIcon />
+          {t("connect.deleteData")}
         </Button>
       </View>
       {error ? (

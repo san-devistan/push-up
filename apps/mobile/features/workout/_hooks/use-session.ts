@@ -1,3 +1,4 @@
+import { usePhoneInclination } from "@/features/workout/_hooks/use-phone-inclination"
 import {
   abandonActiveAttempt,
   createCounterState,
@@ -19,6 +20,8 @@ import {
   speak,
   stopSpeech,
 } from "@/features/workout/_lib/feedback"
+import { requireUprightPhone } from "@/features/workout/_lib/inclination"
+import type { SetupFraming, SetupHint } from "@/features/workout/_lib/setup"
 import {
   createWorkoutSession,
   saveSession,
@@ -27,6 +30,8 @@ import {
   type WorkoutStatus,
 } from "@/features/workout/_lib/storage"
 import { syncPendingSessions } from "@/features/workout/_lib/sync"
+import { useI18n } from "@/hooks/use-i18n"
+import { translate, type TranslationKey } from "@/lib/i18n"
 import { api } from "@workspace/backend/api"
 import { useMutation } from "convex/react"
 import { useEffect, useRef, useState } from "react"
@@ -39,6 +44,18 @@ const GUIDANCE_TOAST_INTERVAL_MS = 1800
 const TRACKING_LOSS_GRACE_MS = 1500
 const TRACKING_TOAST_GRACE_MS = 2200
 const TOAST_DURATION_MS = 1200
+const SETUP_HINT_KEYS = {
+  faceCamera: "hint.faceCamera",
+  fitBody: "hint.fitBody",
+  holdStill: "hint.holdStill",
+  lowerPhone: "hint.lowerPhone",
+  moveBack: "hint.moveBack",
+  moveCloser: "hint.moveCloser",
+  raisePhone: "hint.raisePhone",
+  showHeadHands: "hint.showHeadHands",
+  startTop: "hint.startTop",
+  tiltPhone: "hint.tiltPhone",
+} as const satisfies Record<SetupHint, TranslationKey>
 
 function calibrateDepthGuide(
   currentDepthGuideY: number | null,
@@ -191,13 +208,15 @@ export function useSession({
   plan: TrainingPlan
   targetReps: number
 }) {
+  const { language, locale, t } = useI18n()
   const syncSession = useMutation(api.workoutSessions.sync)
   const [countdown, setCountdown] = useState(3)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<SessionPhase>("positioning")
-  const [setupHint, setSetupHint] = useState("Fit body in frame")
+  const [setupFraming, setSetupFraming] = useState<SetupFraming>("unknown")
   const [toast, setToast] = useState<string | null>(null)
   const [validReps, setValidReps] = useState(0)
+  const phoneInclination = usePhoneInclination(phase !== "active")
   const counter = useRef(INITIAL_COUNTER_STATE)
   const depthGuideY = useRef<number | null>(null)
   const finished = useRef(false)
@@ -223,7 +242,12 @@ export function useSession({
       targetReps,
     })
 
-    notifySessionEnd(status, plan.soundEnabled)
+    notifySessionEnd(
+      status,
+      plan.soundEnabled,
+      t("feedback.goalComplete"),
+      locale
+    )
     saveSession(session)
     void syncPendingSessions(syncSession)
     onComplete(session)
@@ -240,7 +264,8 @@ export function useSession({
 
     const metrics = getPoseMetrics(landmarks)
     const ready = isReadyPosition(metrics)
-    const setup = getSetupState(landmarks, metrics, ready)
+    const cvSetup = getSetupState(landmarks, metrics, ready)
+    const setup = requireUprightPhone(cvSetup, phoneInclination.upright.current)
     depthGuideY.current = calibrateDepthGuide(
       depthGuideY.current,
       landmarks,
@@ -249,9 +274,9 @@ export function useSession({
 
     const depthReached = isDepthReached(landmarks, depthGuideY.current)
     const depthOffset = getDepthOffset(metrics, depthGuideY.current)
-    const nextSetupHint = setup.hint
+    const nextSetupHint = t(SETUP_HINT_KEYS[setup.hint])
 
-    setSetupHint(nextSetupHint)
+    setSetupFraming(cvSetup.framing)
     handleTrackingGuidance({
       lastGuidanceToast,
       lastGuidanceToastAt,
@@ -318,9 +343,11 @@ export function useSession({
         handleCompletedAttempt({
           attempt,
           complete,
+          didNotCount: t("feedback.didNotCount"),
           setValidReps,
           showToast,
           soundEnabled: plan.soundEnabled,
+          speechLanguage: locale,
           state,
           targetReps,
         }),
@@ -334,7 +361,7 @@ export function useSession({
     }
 
     let current = 3
-    void speak(String(current), plan.soundEnabled)
+    void speak(String(current), plan.soundEnabled, locale)
     const interval = setInterval(() => {
       if (
         readySince.current === null ||
@@ -350,19 +377,19 @@ export function useSession({
       current -= 1
       if (current > 0) {
         setCountdown(current)
-        void speak(String(current), plan.soundEnabled)
+        void speak(String(current), plan.soundEnabled, locale)
         return
       }
 
       clearInterval(interval)
-      void speak("Go", plan.soundEnabled)
+      void speak(translate(language, "feedback.go"), plan.soundEnabled, locale)
       counter.current = createCounterState()
       sessionStartedAt.current = Date.now()
       setPhase("active")
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [phase, plan.soundEnabled])
+  }, [language, locale, phase, plan.soundEnabled])
 
   useEffect(() => {
     return () => {
@@ -379,7 +406,8 @@ export function useSession({
     onCameraError: setError,
     onLandmarks,
     phase,
-    setupHint,
+    phoneInclination: phoneInclination.display,
+    setupFraming,
     stop: () => complete("stopped"),
     toast,
     validReps,

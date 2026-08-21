@@ -3,6 +3,7 @@ import {
   type CounterState,
   type WorkoutAttempt,
 } from "@/features/workout/_lib/counter"
+import { normalizeTargetReps } from "@/features/workout/_lib/goal"
 import * as Crypto from "expo-crypto"
 import { Storage } from "expo-sqlite/kv-store"
 
@@ -276,12 +277,9 @@ export function createWorkoutSession({
 
 export function loadPlan(): TrainingPlan {
   const value = readJson(KEYS.plan)
+  const plan = isPlan(value) ? value : (migratePlan(value) ?? DEFAULT_PLAN)
 
-  if (isPlan(value)) {
-    return value
-  }
-
-  return migratePlan(value) ?? DEFAULT_PLAN
+  return normalizeTrainingPlan(plan)
 }
 
 export function normalizeTrainingTimes(
@@ -308,8 +306,16 @@ export function normalizeTrainingTimes(
   return unique.length > 0 ? unique : DEFAULT_PLAN.reminderTimes
 }
 
+export function normalizeTrainingPlan(plan: TrainingPlan): TrainingPlan {
+  return {
+    ...plan,
+    reminderTimes: normalizeTrainingTimes(plan.reminderTimes),
+    targetReps: normalizeTargetReps(plan.targetReps),
+  }
+}
+
 export function savePlan(plan: TrainingPlan) {
-  writeJson(KEYS.plan, plan)
+  writeJson(KEYS.plan, normalizeTrainingPlan(plan))
 }
 
 function parseSessions(value: unknown) {

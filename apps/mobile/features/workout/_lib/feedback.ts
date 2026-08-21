@@ -3,16 +3,21 @@ import type {
   WorkoutAttempt,
 } from "@/features/workout/_lib/counter"
 import type { WorkoutStatus } from "@/features/workout/_lib/storage"
-import * as Haptics from "expo-haptics"
+import { hapticFailure, hapticHard, hapticSuccess } from "@/lib/haptics"
 import * as Speech from "expo-speech"
 
-export async function speak(value: string, enabled: boolean) {
+export async function speak(
+  value: string,
+  enabled: boolean,
+  language?: string
+) {
   if (!enabled) {
     return
   }
 
   await Speech.stop()
   Speech.speak(value, {
+    language,
     rate: 1.05,
     useApplicationAudioSession: false,
     volume: 1,
@@ -23,40 +28,49 @@ export function stopSpeech() {
   return Speech.stop()
 }
 
-export function notifySessionEnd(status: WorkoutStatus, soundEnabled: boolean) {
+export function notifySessionEnd(
+  status: WorkoutStatus,
+  soundEnabled: boolean,
+  message: string,
+  language: string
+) {
   if (status !== "completed") {
     void stopSpeech()
     return
   }
 
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-  void speak("Goal complete", soundEnabled)
+  hapticSuccess()
+  void speak(message, soundEnabled, language)
 }
 
 export function handleCompletedAttempt({
   attempt,
   complete,
+  didNotCount,
   setValidReps,
   showToast,
   soundEnabled,
+  speechLanguage,
   state,
   targetReps,
 }: {
   attempt: WorkoutAttempt
   complete: (status: WorkoutStatus, counterState?: CounterState) => void
+  didNotCount: string
   setValidReps: (reps: number) => void
   showToast: (message: string) => void
   soundEnabled: boolean
+  speechLanguage: string
   state: CounterState
   targetReps: number
 }) {
   if (!attempt.valid) {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-    showToast("Did not count")
+    hapticFailure()
+    showToast(didNotCount)
     return
   }
 
-  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+  hapticHard()
   setValidReps(state.validReps)
 
   if (state.validReps >= targetReps) {
@@ -64,5 +78,5 @@ export function handleCompletedAttempt({
     return
   }
 
-  void speak(String(state.validReps), soundEnabled)
+  void speak(String(state.validReps), soundEnabled, speechLanguage)
 }

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Pushup",
+    "name": "PUMPRS",
     "slug": "pushup",
     "version": "1.0.0",
     "orientation": "default",
@@ -11,14 +11,14 @@
       "usesAppleSignIn": true,
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Pushup uses the camera to count repetitions locally on your device."
+        "NSCameraUsageDescription": "PUMPRS uses the camera to count repetitions locally on your device."
       },
       "bundleIdentifier": "com.anonymous.pushup"
     },
     "android": {
       "permissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -41,7 +41,7 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#ffffff"
           }
         }
       ],
@@ -58,6 +58,20 @@
         }
       ],
       "expo-font",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow PUMPRS to use device motion to help position your phone."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Allow PUMPRS to save transparent performance PNGs.",
+          "granularPermissions": ["photo"]
+        }
+      ],
       "expo-web-browser",
       "expo-secure-store",
       "expo-apple-authentication",

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <g
+    fill="#09090b"
+    font-family="Anton, Impact, sans-serif"
+    font-size="260"
+    font-weight="400"
+    letter-spacing="8"
+    text-anchor="middle"
+  >
+    <text x="512" y="468">PUM</text>
+    <text x="346" y="748">P</text>
+    <text x="520" y="748">R</text>
+    <text fill="#319f5b" x="680" y="748">S</text>
+    <text fill="#319f5b" x="760" y="748">.</text>
+  </g>
+</svg>

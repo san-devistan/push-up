@@ -1,11 +1,21 @@
-import { Text } from "@/components/ui/text"
+import { NumericText } from "@/components/numeric-text"
 import { HeroSurface } from "@/features/workout/_components/figures"
 import { RepMotionChart } from "@/features/workout/_components/rep-motion"
+import {
+  ShareDuration,
+  SharePercent,
+  ShareScore,
+  ShareStat,
+} from "@/features/workout/_components/share-metrics"
 import { formatDuration } from "@/features/workout/_lib/format"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
+import { useI18n } from "@/hooks/use-i18n"
+import { formatNumber, translate, type Language } from "@/lib/i18n"
 import { THEME } from "@/lib/theme"
+import * as MediaLibrary from "expo-media-library"
 import * as Sharing from "expo-sharing"
+import { Text } from "panelui-native"
 import { useRef, useState } from "react"
 import {
   Alert,
@@ -43,6 +53,7 @@ function createCardStyles(ink: (typeof INK)["onDark"]) {
   }
 
   return StyleSheet.create({
+    goalDone: { color: THEME.dark.primary, ...glyphShadow },
     label: { color: ink.muted, ...glyphShadow },
     rule: { backgroundColor: ink.line, height: 1 },
     scoreNumber: {
@@ -58,21 +69,14 @@ function createCardStyles(ink: (typeof INK)["onDark"]) {
   })
 }
 
-// Keyed by surface tone, matching the Hero on the training tab: the app's dark
+// Keyed by surface tone: the app's dark
 // scheme gets the light surface, so the ink flips with it.
 const CARD_STYLES = {
   dark: createCardStyles(INK.onDark),
   light: createCardStyles(INK.onLight),
 }
 
-type CardStyles = ReturnType<typeof createCardStyles>
-
 const styles = StyleSheet.create({
-  accentBar: {
-    backgroundColor: THEME.dark.primary,
-    borderRadius: 3,
-    width: 5,
-  },
   // Padding keeps the glyph shadows inside the capture bounds.
   card: { padding: 14 },
   trackFill: {
@@ -86,89 +90,60 @@ function getTrackFillStyle(percent: number): StyleProp<ViewStyle> {
   return StyleSheet.compose(styles.trackFill, { width: `${percent}%` })
 }
 
-function ShareStat({
-  cardStyles,
-  label,
-  value,
-}: {
-  cardStyles: CardStyles
-  label: string
-  value: string
-}) {
-  return (
-    <View className="flex-1 gap-1">
-      <Text
-        className="font-heading text-[10px] uppercase tracking-[1.5px]"
-        style={cardStyles.label}
-      >
-        {label}
-      </Text>
-      <Text
-        className="font-heading text-base font-bold tabular-nums"
-        style={cardStyles.statValue}
-      >
-        {value}
-      </Text>
-    </View>
-  )
+function getShareMessage(
+  session: WorkoutSession,
+  successRate: number,
+  language: Language
+) {
+  const reps = `${formatNumber(language, session.validReps)}/${formatNumber(
+    language,
+    session.targetReps
+  )}`
+  const success = formatNumber(language, successRate / 100, {
+    maximumFractionDigits: 0,
+    style: "percent",
+  })
+
+  return `${reps} ${translate(language, "share.pushups")} · ${success} ${translate(language, "common.success")} · ${formatDuration(session.totalDurationMs)} · PUMPRS`
 }
 
-function Score({
-  cardStyles,
-  reps,
-  targetReps,
-}: {
-  cardStyles: CardStyles
-  reps: number
-  targetReps: number
-}) {
-  return (
-    <View className="-mb-3 flex-row items-baseline justify-between">
-      <Text
-        selectable
-        className="font-heading font-extrabold"
-        style={cardStyles.scoreNumber}
-      >
-        {reps}
-      </Text>
-      <Text
-        selectable
-        className="text-right font-heading text-[10px] font-bold uppercase tracking-[2px]"
-        style={cardStyles.label}
-      >
-        {`of ${targetReps} reps`}
-      </Text>
-    </View>
-  )
-}
+async function capturePerformanceCard(
+  card: View | null,
+  session: WorkoutSession,
+  suffix: string,
+  language: Language
+) {
+  if (!card) {
+    throw new Error(translate(language, "share.cardUnavailable"))
+  }
 
-function getShareMessage(session: WorkoutSession, successRate: number) {
-  return `${session.validReps}/${session.targetReps} push-ups · ${successRate}% success · ${formatDuration(session.totalDurationMs)}`
+  return captureRef(card, {
+    fileName: `pumprs-${session.localDate}${suffix}`,
+    format: "png",
+    result: "tmpfile",
+  })
 }
 
 async function sharePerformanceCard(
   card: View | null,
   session: WorkoutSession,
-  successRate: number
+  successRate: number,
+  language: Language
 ) {
   if (!card || !(await Sharing.isAvailableAsync())) {
     await NativeShare.share({
-      message: getShareMessage(session, successRate),
-      title: "Push-up performance",
+      message: getShareMessage(session, successRate, language),
+      title: `PUMPRS — ${translate(language, "share.share")}`,
     })
     return
   }
 
-  const captureUri = await captureRef(card, {
-    fileName: `pushup-${session.localDate}`,
-    format: "png",
-    result: "tmpfile",
-  })
+  const captureUri = await capturePerformanceCard(card, session, "", language)
 
   try {
     await Sharing.shareAsync(captureUri, {
       UTI: "public.png",
-      dialogTitle: "Share your performance",
+      dialogTitle: translate(language, "share.share"),
       mimeType: "image/png",
     })
   } finally {
@@ -176,40 +151,110 @@ async function sharePerformanceCard(
   }
 }
 
+async function saveTransparentPerformanceCard(
+  card: View | null,
+  session: WorkoutSession,
+  language: Language
+) {
+  const permission = await MediaLibrary.requestPermissionsAsync(true, ["photo"])
+
+  if (!permission.granted) {
+    Alert.alert(
+      translate(language, "share.photosTitle"),
+      translate(language, "share.photosBody")
+    )
+    return
+  }
+
+  const captureUri = await capturePerformanceCard(
+    card,
+    session,
+    "-transparent",
+    language
+  )
+
+  try {
+    await MediaLibrary.Asset.create(captureUri)
+  } finally {
+    releaseCapture(captureUri)
+  }
+
+  Alert.alert(
+    translate(language, "share.pngTitle"),
+    translate(language, "share.pngBody")
+  )
+}
+
 export function useSharePerformance(
   session: WorkoutSession,
   successRate: number
 ) {
-  const cardRef = useRef<View>(null)
+  const { language, t } = useI18n()
+  const backgroundRef = useRef<View>(null)
   const [sharing, setSharing] = useState(false)
+  const transparentRef = useRef<View>(null)
+
+  function run(action: () => Promise<void>, errorTitle: string) {
+    if (sharing) return
+
+    setSharing(true)
+    void action()
+      .catch(() => Alert.alert(errorTitle, t("share.tryAgain")))
+      .finally(() => setSharing(false))
+  }
 
   function share() {
     if (sharing) return
 
-    setSharing(true)
-    void sharePerformanceCard(cardRef.current, session, successRate).then(
-      () => setSharing(false),
-      () => {
-        Alert.alert("Couldn't share performance", "Please try again.")
-        setSharing(false)
-      }
-    )
+    Alert.alert(t("share.share"), t("share.choose"), [
+      {
+        onPress: () =>
+          run(
+            () =>
+              sharePerformanceCard(
+                backgroundRef.current,
+                session,
+                successRate,
+                language
+              ),
+            t("share.couldNotShare")
+          ),
+        text: t("share.shareBackground"),
+      },
+      {
+        onPress: () =>
+          run(
+            () =>
+              saveTransparentPerformanceCard(
+                transparentRef.current,
+                session,
+                language
+              ),
+            t("share.couldNotSave")
+          ),
+        text: t("share.saveTransparent"),
+      },
+      { style: "cancel", text: t("common.cancel") },
+    ])
   }
 
-  return { cardRef, share, sharing }
+  return { backgroundRef, share, sharing, transparentRef }
 }
 
 export function PerformanceCard({
+  backgroundRef,
   calories,
-  cardRef,
   session,
   successRate,
+  transparentRef,
 }: {
-  calories: string
-  cardRef: React.RefObject<View | null>
+  backgroundRef: React.RefObject<View | null>
+  calories: number
   session: WorkoutSession
   successRate: number
+  transparentRef: React.RefObject<View | null>
 }) {
+  const { t } = useI18n()
   const tone = useColorScheme() === "dark" ? "light" : "dark"
   const cardStyles = CARD_STYLES[tone]
   const percent = Math.min(
@@ -218,24 +263,29 @@ export function PerformanceCard({
   )
 
   return (
-    <HeroSurface className="p-2" tone={tone}>
+    <HeroSurface className="p-2" ref={backgroundRef} tone={tone}>
       <View
         className="gap-5"
         collapsable={false}
-        ref={cardRef}
+        ref={transparentRef}
         style={styles.card}
       >
-        <View className="flex-row items-stretch gap-4">
-          <View style={styles.accentBar} />
-          <View className="flex-1">
-            <Score
-              cardStyles={cardStyles}
-              reps={session.validReps}
-              targetReps={session.targetReps}
-            />
-            <View style={cardStyles.track}>
-              <View style={getTrackFillStyle(percent)} />
-            </View>
+        <View>
+          <View className="-mb-1 flex-row justify-end">
+            <Text
+              className="font-heading text-[11px]"
+              style={cardStyles.statValue}
+            >
+              pumpr.
+            </Text>
+          </View>
+          <ShareScore
+            cardStyles={cardStyles}
+            percent={percent}
+            reps={session.validReps}
+          />
+          <View style={cardStyles.track}>
+            <View style={getTrackFillStyle(percent)} />
           </View>
         </View>
 
@@ -245,10 +295,10 @@ export function PerformanceCard({
           <>
             <View className="gap-2">
               <Text
-                className="font-heading text-[10px] uppercase tracking-[2px]"
+                className="font-mono text-[10px] tracking-[2px] uppercase"
                 style={cardStyles.label}
               >
-                Rep motion
+                {t("share.repMotion")}
               </Text>
               <RepMotionChart attempts={session.attempts} />
             </View>
@@ -257,23 +307,32 @@ export function PerformanceCard({
         ) : null}
 
         <View className="flex-row gap-4">
-          <ShareStat
-            cardStyles={cardStyles}
-            label="Duration"
-            value={formatDuration(session.totalDurationMs)}
-          />
+          <ShareStat cardStyles={cardStyles} label={t("common.duration")}>
+            <ShareDuration
+              cardStyles={cardStyles}
+              durationMs={session.totalDurationMs}
+            />
+          </ShareStat>
           <View style={cardStyles.statDivider} />
-          <ShareStat
-            cardStyles={cardStyles}
-            label="Success"
-            value={`${successRate}%`}
-          />
+          <ShareStat cardStyles={cardStyles} label={t("common.success")}>
+            <SharePercent cardStyles={cardStyles} value={successRate / 100} />
+          </ShareStat>
           <View style={cardStyles.statDivider} />
-          <ShareStat
-            cardStyles={cardStyles}
-            label="Calories"
-            value={calories}
-          />
+          <ShareStat cardStyles={cardStyles} label={t("common.calories")}>
+            <NumericText
+              className="text-base"
+              maximumFractionDigits={1}
+              minimumFractionDigits={calories < 10 ? 1 : 0}
+              style={cardStyles.statValue}
+              value={calories}
+            />
+            <Text
+              className="font-heading text-base"
+              style={cardStyles.statValue}
+            >
+              {" kcal"}
+            </Text>
+          </ShareStat>
         </View>
       </View>
     </HeroSurface>

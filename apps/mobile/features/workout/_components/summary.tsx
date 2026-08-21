@@ -1,7 +1,5 @@
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Text } from "@/components/ui/text"
 import {
+  StatNumber,
   StatsDivider,
   StatsList,
   StatsListRow,
@@ -10,25 +8,26 @@ import {
   PerformanceCard,
   useSharePerformance,
 } from "@/features/workout/_components/share"
-import {
-  formatCalories,
-  getEstimatedCalories,
-} from "@/features/workout/_lib/calories"
+import { getEstimatedCalories } from "@/features/workout/_lib/calories"
 import type { FailureReason } from "@/features/workout/_lib/counter"
-import { formatDuration, formatSeconds } from "@/features/workout/_lib/format"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
-import { GLASS_THEME } from "@/lib/glass"
+import { useI18n } from "@/hooks/use-i18n"
+import { GLASS_TINT } from "@/lib/glass"
+import type { TranslationKey } from "@/lib/i18n"
 import { BlurView } from "expo-blur"
 import {
+  ArrowUpRightIcon,
+  Button,
+  CalendarIcon,
+  ChevronLeftIcon,
   ClockIcon,
-  HouseIcon,
-  Share2Icon,
-  TimerIcon,
-  TrendingUpIcon,
-  XCircleIcon,
-  ZapIcon,
-} from "lucide-react-native"
+  ShareNodesIcon,
+  SparklesIcon,
+  Text,
+  XIcon,
+} from "panelui-native"
+import { Fragment } from "react"
 import {
   ScrollView,
   StyleSheet,
@@ -44,12 +43,14 @@ const FAILURE_REASONS = [
   "tracking_lost",
 ] as const satisfies readonly FailureReason[]
 const SCREEN_EDGES = ["top", "bottom"] as const
-const FAILURE_LABELS = {
-  body_misalignment: "align",
-  incomplete_lockout: "lockout",
-  insufficient_depth: "depth",
-  tracking_lost: "tracking",
-} satisfies Record<FailureReason, string>
+const FAILURE_LABEL_KEYS = {
+  body_misalignment: "summary.failureAlign",
+  incomplete_lockout: "summary.failureLockout",
+  insufficient_depth: "summary.failureDepth",
+  tracking_lost: "summary.failureTracking",
+} satisfies Record<FailureReason, TranslationKey>
+const PERCENT_FORMAT = { maximumFractionDigits: 0, style: "percent" } as const
+const TWO_DIGIT_FORMAT = { minimumIntegerDigits: 2 } as const
 const styles = StyleSheet.create({
   actionBar: {
     bottom: 0,
@@ -82,6 +83,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 60,
   },
+  screen: { flex: 1 },
 })
 
 function getActionBarStyle(backgroundColor: string): StyleProp<ViewStyle> {
@@ -112,32 +114,55 @@ function getSessionStats(session: WorkoutSession) {
   return { averageRepMs, failedReps, failureCounts, successRate }
 }
 
-function formatFailedReps({
+function FailedRepSummary({
   failedReps,
   failureCounts,
 }: {
   failedReps: number
   failureCounts: Record<FailureReason, number>
 }) {
-  if (failedReps === 0) {
-    return "0"
-  }
-
+  const { t } = useI18n()
   const failures = FAILURE_REASONS.filter((reason) => failureCounts[reason] > 0)
 
   if (failures.length === 0) {
-    return String(failedReps)
+    return <StatNumber value={failedReps} />
   }
 
-  const reasons = failures
-    .map((reason) => {
-      const count = failureCounts[reason]
-      const label = FAILURE_LABELS[reason]
-      return count === 1 ? label : `${label} x${count}`
-    })
-    .join(", ")
+  return (
+    <>
+      <StatNumber value={failedReps} />
+      <Text className="font-heading text-base"> (</Text>
+      {failures.map((reason, index) => (
+        <Fragment key={reason}>
+          {index > 0 ? (
+            <Text className="font-heading text-base">, </Text>
+          ) : null}
+          <Text className="font-heading text-base">
+            {t(FAILURE_LABEL_KEYS[reason])}
+          </Text>
+          {failureCounts[reason] > 1 ? (
+            <>
+              <Text className="font-heading text-base"> x</Text>
+              <StatNumber value={failureCounts[reason]} />
+            </>
+          ) : null}
+        </Fragment>
+      ))}
+      <Text className="font-heading text-base">)</Text>
+    </>
+  )
+}
 
-  return `${failedReps} (${reasons})`
+function DurationNumber({ durationMs }: { durationMs: number }) {
+  const totalSeconds = Math.round(durationMs / 1000)
+
+  return (
+    <>
+      <StatNumber value={Math.floor(totalSeconds / 60)} />
+      <Text className="font-heading text-base">:</Text>
+      <StatNumber format={TWO_DIGIT_FORMAT} value={totalSeconds % 60} />
+    </>
+  )
 }
 
 export default function SummaryScreen({
@@ -147,81 +172,91 @@ export default function SummaryScreen({
   onDone: () => void
   session: WorkoutSession
 }) {
+  const { t } = useI18n()
   const { averageRepMs, failedReps, failureCounts, successRate } =
     getSessionStats(session)
-  const failedRepSummary = formatFailedReps({ failedReps, failureCounts })
-  const calories = formatCalories(getEstimatedCalories(session.attempts.length))
-  const { cardRef, share, sharing } = useSharePerformance(session, successRate)
+  const estimatedCalories = getEstimatedCalories(session.attempts.length)
+  const { backgroundRef, share, sharing, transparentRef } = useSharePerformance(
+    session,
+    successRate
+  )
   const colorScheme = useColorScheme()
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={SCREEN_EDGES}>
+    <SafeAreaView edges={SCREEN_EDGES} style={styles.screen}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
       >
         <PerformanceCard
-          calories={calories}
-          cardRef={cardRef}
+          backgroundRef={backgroundRef}
+          calories={estimatedCalories}
           session={session}
           successRate={successRate}
+          transparentRef={transparentRef}
         />
 
         <StatsList>
-          <StatsListRow
-            icon={TrendingUpIcon}
-            label="Success rate"
-            value={`${successRate}%`}
-          />
+          <StatsListRow icon={ArrowUpRightIcon} label={t("common.successRate")}>
+            <StatNumber format={PERCENT_FORMAT} value={successRate / 100} />
+          </StatsListRow>
           <StatsDivider />
-          <StatsListRow
-            icon={XCircleIcon}
-            label="Failed reps"
-            value={failedRepSummary}
-          />
+          <StatsListRow icon={XIcon} label={t("common.failedReps")}>
+            <FailedRepSummary
+              failedReps={failedReps}
+              failureCounts={failureCounts}
+            />
+          </StatsListRow>
           <StatsDivider />
-          <StatsListRow
-            icon={TimerIcon}
-            label="Avg rep"
-            value={formatSeconds(averageRepMs)}
-          />
+          <StatsListRow icon={ClockIcon} label={t("common.avgRep")}>
+            <StatNumber
+              maximumFractionDigits={1}
+              minimumFractionDigits={1}
+              suffix={t("time.secondsShort")}
+              value={averageRepMs / 1000}
+            />
+          </StatsListRow>
           <StatsDivider />
-          <StatsListRow
-            icon={ClockIcon}
-            label="Duration"
-            value={formatDuration(session.totalDurationMs)}
-          />
+          <StatsListRow icon={CalendarIcon} label={t("common.duration")}>
+            <DurationNumber durationMs={session.totalDurationMs} />
+          </StatsListRow>
           <StatsDivider />
-          <StatsListRow icon={ZapIcon} label="Calories" value={calories} />
+          <StatsListRow icon={SparklesIcon} label={t("common.calories")}>
+            <StatNumber
+              maximumFractionDigits={1}
+              minimumFractionDigits={estimatedCalories < 10 ? 1 : 0}
+              suffix=" kcal"
+              value={estimatedCalories}
+            />
+          </StatsListRow>
         </StatsList>
       </ScrollView>
 
       <BlurView
         intensity={24}
-        style={getActionBarStyle(GLASS_THEME[colorScheme].glassTint)}
+        style={getActionBarStyle(GLASS_TINT[colorScheme])}
         tint={colorScheme}
       >
         <Button
-          accessibilityLabel="Back to today"
+          accessibilityLabel={t("session.backToday")}
           className="bg-muted dark:bg-card"
           onPress={onDone}
-          size="icon-lg"
+          size="icon"
           style={styles.homeAction}
           variant="ghost"
         >
-          <Icon as={HouseIcon} className="text-muted-foreground" size={24} />
+          <ChevronLeftIcon size={24} />
         </Button>
         <Button
           disabled={sharing}
+          labelClassName="font-bold text-lg"
           onPress={share}
           style={styles.shareAction}
-          variant="default"
+          variant="primary"
         >
-          <Icon as={Share2Icon} size={22} />
-          <Text className="font-heading text-lg font-bold">
-            {sharing ? "Preparing…" : "Share performance"}
-          </Text>
+          <ShareNodesIcon size={22} />
+          {sharing ? t("session.preparing") : t("session.sharePerformance")}
         </Button>
       </BlurView>
     </SafeAreaView>

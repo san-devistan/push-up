@@ -1,3 +1,4 @@
+import { isOnboardingComplete } from "@/features/onboarding/storage"
 import {
   PreferencesProvider,
   usePreferences,
@@ -10,7 +11,6 @@ import { mobileFonts } from "@/lib/fonts"
 import { configureMobileReanimatedLogger } from "@/lib/reanimated-logger"
 import { NAV_THEME } from "@/lib/theme"
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react"
-import { PortalHost } from "@rn-primitives/portal"
 import { api } from "@workspace/backend/api"
 import { ConvexReactClient, useMutation } from "convex/react"
 import { useFonts } from "expo-font"
@@ -19,10 +19,9 @@ import { Stack, ThemeProvider } from "expo-router"
 import * as ScreenOrientation from "expo-screen-orientation"
 import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
-import { colorScheme as nativeWindColorScheme } from "nativewind"
+import { IconColorProvider, PanelUIProvider } from "panelui-native"
 import { useEffect, useRef, type ReactNode } from "react"
-import { View } from "react-native"
-import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { Uniwind, useCSSVariable } from "uniwind"
 
 void globalCss
 configureMobileReanimatedLogger()
@@ -67,13 +66,12 @@ if (!convex) {
 }
 
 const stackScreenOptions = { headerShown: false } as const
+const homeScreenOptions = { freezeOnBlur: true } as const
+const initialRouteName = isOnboardingComplete() ? "(tabs)" : "onboarding"
 const sessionScreenOptions = {
   animation: "fade",
   gestureEnabled: false,
 } as const
-const rootStyle = { flex: 1 } as const
-const statusBarProps = { style: "auto" } as const
-
 function OptionalConvexProvider({ children }: { children: ReactNode }) {
   if (!convex) {
     return <>{children}</>
@@ -157,48 +155,49 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={rootStyle}>
-      <PreferencesProvider>
-        <RootProviders />
-      </PreferencesProvider>
-    </GestureHandlerRootView>
+    <PreferencesProvider>
+      <RootProviders />
+    </PreferencesProvider>
   )
 }
 
 function RootProviders() {
   const { colorScheme } = usePreferences()
+  const foreground = useCSSVariable("--color-foreground")
 
   useEffect(() => {
-    nativeWindColorScheme.set(colorScheme)
+    Uniwind.setTheme(colorScheme)
   }, [colorScheme])
 
   return (
-    <OptionalConvexProvider>
-      <PlanProvider>
-        <ThemeProvider value={NAV_THEME[colorScheme]}>
-          <View
-            className={
-              colorScheme === "dark"
-                ? "dark flex-1 bg-background"
-                : "flex-1 bg-background"
-            }
-          >
-            <RootStack />
-            <StatusBar {...statusBarProps} />
-            <PortalHost />
-          </View>
-        </ThemeProvider>
-      </PlanProvider>
-    </OptionalConvexProvider>
+    <PanelUIProvider>
+      <IconColorProvider
+        color={typeof foreground === "string" ? foreground : undefined}
+      >
+        <OptionalConvexProvider>
+          <PlanProvider>
+            <ThemeProvider value={NAV_THEME[colorScheme]}>
+              <RootStack />
+              <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+            </ThemeProvider>
+          </PlanProvider>
+        </OptionalConvexProvider>
+      </IconColorProvider>
+    </PanelUIProvider>
   )
 }
 
 function RootStack() {
   return (
-    <Stack screenOptions={stackScreenOptions}>
-      <Stack.Screen name="(tabs)" />
+    <Stack
+      initialRouteName={initialRouteName}
+      screenOptions={stackScreenOptions}
+    >
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(tabs)" options={homeScreenOptions} />
       <Stack.Screen name="session" options={sessionScreenOptions} />
       <Stack.Screen name="levels" />
+      <Stack.Screen name="settings" />
     </Stack>
   )
 }

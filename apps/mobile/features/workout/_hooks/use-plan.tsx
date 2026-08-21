@@ -1,13 +1,15 @@
+import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import {
   syncDailyReminder,
   type ReminderState,
 } from "@/features/workout/_lib/reminders"
 import {
   loadPlan,
-  normalizeTrainingTimes,
+  normalizeTrainingPlan,
   savePlan,
   type TrainingPlan,
 } from "@/features/workout/_lib/storage"
+import type { Language } from "@/lib/i18n"
 import * as React from "react"
 
 type PlanContextValue = {
@@ -21,21 +23,20 @@ const PlanContext = React.createContext<PlanContextValue | null>(null)
 
 function applyPlan(
   patched: TrainingPlan,
+  language: Language,
   prompt: boolean,
   setPlan: React.Dispatch<React.SetStateAction<TrainingPlan>>,
   setReminderState: React.Dispatch<React.SetStateAction<ReminderState>>
 ) {
-  const next = {
-    ...patched,
-    reminderTimes: normalizeTrainingTimes(patched.reminderTimes),
-  }
+  const next = normalizeTrainingPlan(patched)
 
   setPlan(next)
   savePlan(next)
-  void syncDailyReminder(next, prompt).then(setReminderState)
+  void syncDailyReminder(next, language, prompt).then(setReminderState)
 }
 
 function getEnableReminders(
+  language: Language,
   plan: TrainingPlan,
   setPlan: React.Dispatch<React.SetStateAction<TrainingPlan>>,
   setReminderState: React.Dispatch<React.SetStateAction<ReminderState>>
@@ -43,6 +44,7 @@ function getEnableReminders(
   return () =>
     applyPlan(
       { ...plan, reminderEnabled: true },
+      language,
       true,
       setPlan,
       setReminderState
@@ -50,6 +52,7 @@ function getEnableReminders(
 }
 
 function getUpdatePlan(
+  language: Language,
   plan: TrainingPlan,
   setPlan: React.Dispatch<React.SetStateAction<TrainingPlan>>,
   setReminderState: React.Dispatch<React.SetStateAction<ReminderState>>
@@ -57,6 +60,7 @@ function getUpdatePlan(
   return (patch: Partial<TrainingPlan>) =>
     applyPlan(
       { ...plan, ...patch },
+      language,
       patch.reminderEnabled === true,
       setPlan,
       setReminderState
@@ -73,16 +77,22 @@ function getPlanContextValue(
 }
 
 export function PlanProvider({ children }: { children: React.ReactNode }) {
+  const { language } = usePreferences()
   const [plan, setPlan] = React.useState(loadPlan)
   const [reminderState, setReminderState] =
     React.useState<ReminderState>("denied")
 
   React.useEffect(() => {
-    void syncDailyReminder(loadPlan()).then(setReminderState)
-  }, [])
+    void syncDailyReminder(loadPlan(), language).then(setReminderState)
+  }, [language])
 
-  const enableReminders = getEnableReminders(plan, setPlan, setReminderState)
-  const updatePlan = getUpdatePlan(plan, setPlan, setReminderState)
+  const enableReminders = getEnableReminders(
+    language,
+    plan,
+    setPlan,
+    setReminderState
+  )
+  const updatePlan = getUpdatePlan(language, plan, setPlan, setReminderState)
   const value = getPlanContextValue(
     enableReminders,
     plan,

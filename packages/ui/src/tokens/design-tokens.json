@@ -7,8 +7,8 @@
       "card-foreground": "oklch(0.145 0 0)",
       "popover": "oklch(1 0 0)",
       "popover-foreground": "oklch(0.145 0 0)",
-      "primary": "oklch(0.841 0.238 128.85)",
-      "primary-foreground": "oklch(0.405 0.101 131.063)",
+      "primary": "oklch(0.624 0.142 152.19)",
+      "primary-foreground": "oklch(0.145 0 0)",
       "secondary": "oklch(0.967 0.001 286.375)",
       "secondary-foreground": "oklch(0.21 0.006 285.885)",
       "muted": "oklch(0.97 0 0)",
@@ -20,15 +20,15 @@
       "border": "oklch(0.922 0 0)",
       "input": "oklch(0.922 0 0)",
       "ring": "oklch(0.708 0 0)",
-      "chart-1": "oklch(0.897 0.196 126.665)",
-      "chart-2": "oklch(0.768 0.233 130.85)",
-      "chart-3": "oklch(0.648 0.2 131.684)",
-      "chart-4": "oklch(0.532 0.157 131.589)",
-      "chart-5": "oklch(0.453 0.124 130.933)",
+      "chart-1": "oklch(0.952 0.017 162.746)",
+      "chart-2": "oklch(0.799 0.078 157.606)",
+      "chart-3": "oklch(0.624 0.142 152.19)",
+      "chart-4": "oklch(0.563 0.128 152.007)",
+      "chart-5": "oklch(0.463 0.105 151.789)",
       "sidebar": "oklch(0.985 0 0)",
       "sidebar-foreground": "oklch(0.145 0 0)",
-      "sidebar-primary": "oklch(0.648 0.2 131.684)",
-      "sidebar-primary-foreground": "oklch(0.986 0.031 120.757)",
+      "sidebar-primary": "oklch(0.624 0.142 152.19)",
+      "sidebar-primary-foreground": "oklch(0.145 0 0)",
       "sidebar-accent": "oklch(0.97 0 0)",
       "sidebar-accent-foreground": "oklch(0.205 0 0)",
       "sidebar-border": "oklch(0.922 0 0)",
@@ -41,8 +41,8 @@
       "card-foreground": "oklch(0.985 0 0)",
       "popover": "oklch(0.205 0 0)",
       "popover-foreground": "oklch(0.985 0 0)",
-      "primary": "oklch(0.768 0.233 130.85)",
-      "primary-foreground": "oklch(0.405 0.101 131.063)",
+      "primary": "oklch(0.624 0.142 152.19)",
+      "primary-foreground": "oklch(0.145 0 0)",
       "secondary": "oklch(0.274 0.006 286.033)",
       "secondary-foreground": "oklch(0.985 0 0)",
       "muted": "oklch(0.269 0 0)",
@@ -54,15 +54,15 @@
       "border": "oklch(1 0 0 / 10%)",
       "input": "oklch(1 0 0 / 15%)",
       "ring": "oklch(0.556 0 0)",
-      "chart-1": "oklch(0.897 0.196 126.665)",
-      "chart-2": "oklch(0.768 0.233 130.85)",
-      "chart-3": "oklch(0.648 0.2 131.684)",
-      "chart-4": "oklch(0.532 0.157 131.589)",
-      "chart-5": "oklch(0.453 0.124 130.933)",
+      "chart-1": "oklch(0.952 0.017 162.746)",
+      "chart-2": "oklch(0.799 0.078 157.606)",
+      "chart-3": "oklch(0.624 0.142 152.19)",
+      "chart-4": "oklch(0.563 0.128 152.007)",
+      "chart-5": "oklch(0.463 0.105 151.789)",
       "sidebar": "oklch(0.205 0 0)",
       "sidebar-foreground": "oklch(0.985 0 0)",
-      "sidebar-primary": "oklch(0.768 0.233 130.85)",
-      "sidebar-primary-foreground": "oklch(0.274 0.072 132.109)",
+      "sidebar-primary": "oklch(0.624 0.142 152.19)",
+      "sidebar-primary-foreground": "oklch(0.145 0 0)",
       "sidebar-accent": "oklch(0.269 0 0)",
       "sidebar-accent-foreground": "oklch(0.985 0 0)",
       "sidebar-border": "oklch(1 0 0 / 10%)",
@@ -83,55 +83,58 @@
   },
   "fonts": {
     "web": {
-      "sans": "'Oxanium Variable', sans-serif",
-      "heading": "'JetBrains Mono Variable', monospace"
+      "sans": "'Inter Tight Variable', sans-serif",
+      "heading": "'Anton', sans-serif",
+      "mono": "'JetBrains Mono Variable', monospace"
     },
     "mobile": {
-      "regular": "Oxanium_400Regular",
-      "regularItalic": "JetBrainsMono_400Regular_Italic",
-      "medium": "Oxanium_500Medium",
-      "semibold": "Oxanium_600SemiBold",
-      "bold": "Oxanium_700Bold",
-      "extrabold": "Oxanium_800ExtraBold",
-      "sans": "Oxanium_400Regular",
-      "heading": "JetBrainsMono_400Regular",
-      "headingItalic": "JetBrainsMono_400Regular_Italic",
-      "headingMedium": "JetBrainsMono_500Medium",
-      "headingSemibold": "JetBrainsMono_600SemiBold",
-      "headingBold": "JetBrainsMono_700Bold",
-      "headingExtrabold": "JetBrainsMono_800ExtraBold"
+      "regular": "InterTight_400Regular",
+      "regularItalic": "InterTight_400Regular_Italic",
+      "medium": "InterTight_500Medium",
+      "semibold": "InterTight_600SemiBold",
+      "bold": "InterTight_700Bold",
+      "extrabold": "InterTight_700Bold",
+      "sans": "InterTight_400Regular",
+      "heading": "Anton_400Regular",
+      "headingItalic": "Anton_400Regular",
+      "headingMedium": "Anton_400Regular",
+      "headingSemibold": "Anton_400Regular",
+      "headingBold": "Anton_400Regular",
+      "headingExtrabold": "Anton_400Regular",
+      "mono": "JetBrainsMono_400Regular",
+      "monoMedium": "JetBrainsMono_500Medium"
     }
   },
   "typography": {
     "body": {
-      "fontSize": 17,
-      "lineHeight": 26,
+      "fontSize": 16,
+      "lineHeight": 25,
       "font": "regular"
     },
     "small": {
-      "fontSize": 15,
-      "lineHeight": 22,
+      "fontSize": 14,
+      "lineHeight": 20,
       "font": "regular"
     },
     "label": {
-      "fontSize": 15,
-      "lineHeight": 22,
-      "font": "medium"
+      "fontSize": 14,
+      "lineHeight": 20,
+      "font": "semibold"
     },
     "heading-sm": {
-      "fontSize": 20,
+      "fontSize": 24,
       "lineHeight": 26,
-      "font": "headingSemibold"
+      "font": "bold"
     },
     "heading-md": {
-      "fontSize": 28,
-      "lineHeight": 34,
-      "font": "headingSemibold"
+      "fontSize": 44,
+      "lineHeight": 48,
+      "font": "heading"
     },
     "heading-lg": {
-      "fontSize": 40,
-      "lineHeight": 44,
-      "font": "headingExtrabold"
+      "fontSize": 64,
+      "lineHeight": 60,
+      "font": "heading"
     }
   },
   "motion": {

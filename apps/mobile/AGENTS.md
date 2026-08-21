@@ -6,20 +6,22 @@ Connect automation.
 
 ## UI Boundaries
 
-Compose screens from `apps/mobile/components/ui` first. The mobile app does not
-import web React components from `packages/ui`; it mirrors the shared design
-language with native primitives and generated theme values.
+Import generic UI components and icons directly from `panelui-native`. Do not
+create a parallel `apps/mobile/components/ui` wrapper layer. App-specific
+components may live under `apps/mobile/components` or their owning feature.
+
+The mobile app does not import web React components from `packages/ui`; it
+shares the design language through the semantic tokens generated into
+`apps/mobile/global.css`. Use PanelUI props for component behavior and
+`className` only for layout or documented overrides.
 
 Shared token changes belong in `packages/ui/src/tokens/design-tokens.json`.
 Run `pnpm sync:design-system` after changing those tokens.
 
-Mobile UI components are native counterparts to shared design-system concepts,
-not wrappers around web components. When a web component is added or changed,
-add or update a mobile component only if a mobile workflow needs the same
-concept. Use React Native primitives, `@rn-primitives/*` where appropriate,
-NativeWind class names, and generated token names such as `bg-background`,
-`text-foreground`, `border-border`, `bg-primary`, and
-`text-primary-foreground`.
+Before writing a custom generic control, inspect PanelUI's installed types or
+documentation and use its existing component. Use Uniwind semantic classes
+such as `bg-background`, `text-foreground`, `border-border`, `bg-primary`, and
+`text-primary-foreground`; resolve dynamic colors with `useCSSVariable`.
 
 Do not hand-edit generated theme files:
 
@@ -38,7 +40,7 @@ only the narrow skill needed for the task.
 | `building-native-ui`         | Building Expo Router screens, native UI, navigation, styling, animations, tabs, search, forms, or media patterns |
 | `vercel-react-native-skills` | React Native performance, lists, animations, images, native APIs, monorepo native deps, or platform UI patterns  |
 | `native-data-fetching`       | Any network request, API call, data fetching, caching, offline behavior, React Query/SWR, or Expo Router loaders |
-| `expo-tailwind-setup`        | Setting up or fixing Tailwind CSS v4, `react-native-css`, or NativeWind v5 in Expo                               |
+| `expo-tailwind-setup`        | Setting up or fixing Tailwind CSS v4 or Uniwind in Expo                                                          |
 | `expo-ui`                    | Using `@expo/ui`, SwiftUI/Jetpack Compose hosts, native-feeling lists, menus, sheets, sliders, or pickers        |
 | `expo-module`                | Creating or editing Expo native modules/views, config plugins, native module APIs, Swift/Kotlin, or autolinking  |
 | `expo-dev-client`            | Building, installing, or distributing Expo development clients locally or via TestFlight                         |

@@ -59,6 +59,7 @@ function collectChanges(before, after) {
     "radius.base",
     "fonts.web.sans",
     "fonts.web.heading",
+    "fonts.web.mono",
   ]) {
     const beforeValue = getPath(before, pathName)
     const afterValue = getPath(after, pathName)
@@ -90,6 +91,10 @@ export function extractAppliedTokens(tokens, css) {
 
   if (themeVars["font-heading"]) {
     updated.fonts.web.heading = themeVars["font-heading"]
+  }
+
+  if (themeVars["font-mono"]) {
+    updated.fonts.web.mono = themeVars["font-mono"]
   }
 
   return {

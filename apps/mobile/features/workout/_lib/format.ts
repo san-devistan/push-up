@@ -5,16 +5,28 @@ export function formatDuration(durationMs: number) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`
 }
 
-export function formatSeconds(durationMs: number) {
-  return `${(durationMs / 1000).toFixed(1)}s`
-}
+export function formatClock(
+  hour: number,
+  minute: number,
+  locale: string,
+  clockFormat: "12" | "24"
+) {
+  const date = new Date(2000, 0, 1, hour, minute)
 
-export function formatClock(hour: number, minute: number) {
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+  return new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    hourCycle: clockFormat === "12" ? "h12" : "h23",
+    minute: "2-digit",
+  }).format(date)
 }
 
 export function formatCompact(value: number) {
+  const compact = getCompactNumber(value)
+  return `${compact.value}${compact.suffix}`
+}
+
+export function getCompactNumber(value: number) {
   return Math.abs(value) < 1000
-    ? value.toString()
-    : `${Number((value / 1000).toFixed(2))}k`
+    ? { suffix: "", value }
+    : { suffix: "k", value: Number((value / 1000).toFixed(2)) }
 }

@@ -1,4 +1,6 @@
 import { PUSHUP_THRESHOLDS } from "@/features/workout/_lib/counter"
+import { connectTrace } from "@/features/workout/_lib/trace"
+import { useI18n } from "@/hooks/use-i18n"
 import { THEME } from "@/lib/theme"
 import { useState } from "react"
 import {
@@ -78,18 +80,21 @@ function toRepLines(
   width: number,
   mapY: (value: number) => number
 ) {
-  const total = attempts.reduce((sum, item) => sum + item.values.length, 0)
+  const total = 1 + attempts.reduce((sum, item) => sum + item.values.length, 0)
   let offset = 0
+  let previousEnd: number | undefined
 
   return attempts.map((attempt) => {
+    const values = connectTrace(attempt.values, previousEnd)
     const key = `${attempt.startedAtOffsetMs}:${attempt.values.length}`
     const points = toPolyline({
       mapY,
       offset,
       total,
-      values: attempt.values,
+      values,
       width,
     })
+    previousEnd = values.at(-1)
     offset += attempt.values.length
 
     return { key, points, valid: attempt.valid }
@@ -140,6 +145,7 @@ function getBarStyle(angle: number): StyleProp<ViewStyle> {
 /** One motion stroke per rep. New sessions plot shoulder travel relative to
  * the calibrated target; older sessions fall back to their elbow-angle trace. */
 function RepPositionChart({ attempts }: { attempts: readonly Attempt[] }) {
+  const { t } = useI18n()
   const [width, setWidth] = useState(0)
   const depthTraces = getTracedAttempts(attempts, "depthTrace")
   const showsTargetDepth = depthTraces.length > 0
@@ -177,7 +183,7 @@ function RepPositionChart({ attempts }: { attempts: readonly Attempt[] }) {
               x={4}
               y={targetLabelY}
             >
-              TARGET DEPTH
+              {t("camera.targetDepth")}
             </SvgText>
           </>
         )}
@@ -200,6 +206,8 @@ function RepPositionChart({ attempts }: { attempts: readonly Attempt[] }) {
 /** Fallback for sessions recorded before the pose trace existed: only the
  * deepest point of each rep survived, so plot that one number per rep. */
 function RepDepthChart({ attempts }: { attempts: readonly Attempt[] }) {
+  const { formatNumber, t } = useI18n()
+
   if (attempts.length === 0) {
     return null
   }
@@ -208,7 +216,9 @@ function RepDepthChart({ attempts }: { attempts: readonly Attempt[] }) {
     <View className="flex-row items-stretch gap-1" style={styles.plot}>
       {attempts.map((attempt, index) => (
         <View
-          accessibilityLabel={`Rep ${index + 1}: ${Math.round(attempt.minElbowAngle)} degrees`}
+          accessibilityLabel={`${t("common.rep")} ${formatNumber(
+            index + 1
+          )}: ${formatNumber(Math.round(attempt.minElbowAngle))}°`}
           className="h-full flex-1 justify-end"
           key={attempt.startedAtOffsetMs}
         >

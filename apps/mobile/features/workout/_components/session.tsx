@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button"
-import { Text } from "@/components/ui/text"
+import { NumericText } from "@/components/numeric-text"
 import {
   useSession,
   type SessionPhase,
@@ -9,8 +8,12 @@ import type {
   WorkoutSession,
 } from "@/features/workout/_lib/storage"
 import PoseCamera from "@/features/workout/camera"
+import { useI18n } from "@/hooks/use-i18n"
+import { Button, Text } from "panelui-native"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+
+import SetupGuide from "./setup-guide"
 
 const TOP_EDGE = ["top"] as const
 const BOTTOM_EDGE = ["bottom"] as const
@@ -18,14 +21,12 @@ const styles = StyleSheet.create({
   activeCount: {
     color: "#ffffff",
     fontSize: 68,
-    fontVariant: ["tabular-nums"],
     lineHeight: 72,
   },
   activeTarget: { color: "rgba(255, 255, 255, 0.5)", fontSize: 28 },
   countdown: {
     color: "#ffffff",
     fontSize: 144,
-    fontVariant: ["tabular-nums"],
     lineHeight: 156,
   },
   countdownOverlay: {
@@ -57,7 +58,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   invalidToastLabel: { color: "#09090b" },
-  positioningTitle: { color: "#ffffff" },
   stopButton: {
     backgroundColor: "#e11d48",
     borderCurve: "continuous",
@@ -65,8 +65,19 @@ const styles = StyleSheet.create({
     height: 60,
     width: "100%",
   },
-  stopLabel: { color: "#ffffff" },
+  bottomSafeArea: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
   surface: { backgroundColor: "#000000" },
+  topSafeArea: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
 })
 
 function CenterOverlay({
@@ -82,12 +93,7 @@ function CenterOverlay({
 
   return (
     <View className="pointer-events-none" style={styles.countdownOverlay}>
-      <Text
-        className="font-heading font-extrabold text-white"
-        style={styles.countdown}
-      >
-        {countdown}
-      </Text>
+      <NumericText style={styles.countdown} value={countdown} />
     </View>
   )
 }
@@ -125,14 +131,23 @@ function ActiveScore({
 }) {
   return (
     <View className="gap-2 px-5 py-3" style={styles.hudPanel}>
-      <Text
-        selectable
-        className="font-heading font-extrabold text-white"
-        style={styles.activeCount}
+      <View
+        accessible
+        accessibilityLabel={`${validReps}/${targetReps}`}
+        className="flex-row items-end"
       >
-        {validReps}
-        <Text style={styles.activeTarget}>/{targetReps}</Text>
-      </Text>
+        <NumericText
+          accessible={false}
+          style={styles.activeCount}
+          value={validReps}
+        />
+        <Text style={styles.activeTarget}>/</Text>
+        <NumericText
+          accessible={false}
+          style={styles.activeTarget}
+          value={targetReps}
+        />
+      </View>
       <HudBar percent={(validReps / Math.max(1, targetReps)) * 100} />
     </View>
   )
@@ -157,6 +172,7 @@ export default function SessionScreen({
   plan: TrainingPlan
   targetReps: number
 }) {
+  const { t } = useI18n()
   const session = useSession({ onComplete, plan, targetReps })
 
   return (
@@ -169,7 +185,7 @@ export default function SessionScreen({
         showSetupGuides={session.phase !== "active"}
       />
 
-      <SafeAreaView className="absolute left-0 right-0 top-0" edges={TOP_EDGE}>
+      <SafeAreaView edges={TOP_EDGE} style={styles.topSafeArea}>
         <View
           className={
             session.phase === "active" ? "px-5 pt-3" : "items-end px-5 pt-3"
@@ -181,14 +197,10 @@ export default function SessionScreen({
               validReps={session.validReps}
             />
           ) : (
-            <View className="self-end px-5 py-3" style={styles.hudPanel}>
-              <Text
-                className="text-lg font-semibold leading-6"
-                style={styles.positioningTitle}
-              >
-                {session.setupHint}
-              </Text>
-            </View>
+            <SetupGuide
+              framing={session.setupFraming}
+              phone={session.phoneInclination}
+            />
           )}
         </View>
       </SafeAreaView>
@@ -196,23 +208,16 @@ export default function SessionScreen({
       <CenterOverlay countdown={session.countdown} phase={session.phase} />
       <ErrorBanner message={session.error} />
 
-      <SafeAreaView
-        className="absolute bottom-0 left-0 right-0"
-        edges={BOTTOM_EDGE}
-      >
+      <SafeAreaView edges={BOTTOM_EDGE} style={styles.bottomSafeArea}>
         <View className="items-center gap-3 px-5 pb-4">
           <InvalidToast message={session.toast} />
           <Button
             className="max-w-sm bg-destructive"
+            labelClassName="font-bold text-lg text-white"
             onPress={session.stop}
             style={styles.stopButton}
           >
-            <Text
-              className="font-heading text-lg font-bold"
-              style={styles.stopLabel}
-            >
-              Stop
-            </Text>
+            {t("session.stop")}
           </Button>
         </View>
       </SafeAreaView>

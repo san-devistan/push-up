@@ -1,5 +1,9 @@
 export const MIN_TARGET_REPS = 1
-export const MAX_TARGET_REPS = 500
+export const MAX_TARGET_REPS = 200
+
+export function normalizeTargetReps(value: number) {
+  return Math.min(MAX_TARGET_REPS, Math.max(MIN_TARGET_REPS, value))
+}
 
 function buildSteps() {
   const steps: number[] = []

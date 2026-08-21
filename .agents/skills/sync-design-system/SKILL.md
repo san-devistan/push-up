@@ -1,6 +1,6 @@
 ---
 name: sync-design-system
-description: Apply or finish a shadcn preset workflow in this monorepo, sync the shared design tokens into web and mobile generated theme files, and update native mobile UI counterparts from the shared web component source of truth. Use after shadcn apply preset, pnpm sync:design-system, design-token refreshes, web-to-mobile design-system parity reviews, or mobile NativeWind component updates caused by shared web UI changes.
+description: Apply or finish a shadcn preset workflow in this monorepo and sync shared design tokens into web and mobile generated theme files. Use after shadcn apply preset, pnpm sync:design-system, design-token refreshes, or web-to-mobile design-system reviews.
 ---
 
 # Sync Design System
@@ -8,9 +8,8 @@ description: Apply or finish a shadcn preset workflow in this monorepo, sync the
 ## Overview
 
 Use this workflow when a shadcn preset changes the shared web design system and
-mobile must follow. Token sync is deterministic; native mobile component parity
-is a required inspection and implementation task for changed shared web
-components with mobile counterparts.
+mobile must follow. Token sync is deterministic; mobile consumes generic UI
+directly from PanelUI and does not maintain native copies of web components.
 
 ## Workflow
 
@@ -57,55 +56,27 @@ components with mobile counterparts.
 4. Run the sync a second time after imports or manual changes. A clean second
    run confirms the generated files are stable.
 
-5. Reconcile native mobile counterparts for changed shared web components:
+5. Inspect affected mobile workflows only when the changed tokens or product
+   behavior should alter them:
 
    ```sh
    git diff --name-only -- packages/ui/src/components
-   find apps/mobile/components/ui -maxdepth 1 -type f
+   rg -n "from \"panelui-native\"" apps/mobile
    ```
 
-   Treat `packages/ui/src/components` as the source of truth for component
-   anatomy, variants, slots, state styling, interaction semantics, accessibility
-   behavior, spacing, radius, shadows, and icon choices. For each changed web
-   component that has a native counterpart in `apps/mobile/components/ui`,
-   update the native component so the user-facing behavior and visual anatomy
-   reproduce the shared web component as closely as React Native allows.
-
-## Mobile Component Parity
-
-Do not import or wrap web React components in mobile. Reproduce the shared web
-component with React Native primitives, NativeWind classes, generated token
-names, and `@rn-primitives/*` where the mobile component already uses them.
-
-Use this required parity rule:
-
-- Token-only changes with no changed `packages/ui/src/components/*`: no mobile
-  component edit.
-- Changed web component with a mobile counterpart in
-  `apps/mobile/components/ui`: inspect and update the native counterpart to
-  match the shared web component's user-facing anatomy and behavior.
-- Changed web component with no mobile counterpart and no mobile usage: no
-  mobile edit.
-- New or changed web component needed by mobile: add or update a native
-  component under `apps/mobile/components/ui` using mobile conventions.
-
-Parity means translating, not copying blindly. Preserve native-only behavior
-that makes the component work correctly on iOS and Android, such as hit slop,
-native animations, portal hosts, `react-native-reanimated` transitions, and
-platform-specific primitive requirements. When a web class has no native
-equivalent, choose the closest tokenized native expression and keep the same
-observable intent.
+   A changed web component does not require a mobile copy. If the same product
+   behavior is needed on mobile, compose the nearest PanelUI component directly
+   in the owning mobile feature.
 
 ## Native Implementation Rules
 
-Use React Native primitives, NativeWind classes, generated token names such as
-`bg-background`, `text-foreground`, `border-border`, `bg-primary`,
-`text-primary-foreground`, and `apps/mobile/lib/theme.ts` values when JS theme
-objects are needed. Use `@rn-primitives/*` where it already matches the mobile
-component pattern.
+Import generic native UI directly from `panelui-native`. Style it through the
+semantic tokens generated into `apps/mobile/global.css`, and use
+`apps/mobile/lib/theme.ts` values when JavaScript theme objects are needed.
+Resolve dynamic token colors with Uniwind's `useCSSVariable`.
 
-Keep mobile updates focused on changed counterparts that exist or are required
-by real mobile workflows. Do not blindly port every web-only component.
+Keep mobile updates focused on real mobile workflows. Do not add a
+`components/ui` compatibility layer or blindly port web-only components.
 
 ## Verification
 

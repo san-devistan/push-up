@@ -1,13 +1,14 @@
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Text } from "@/components/ui/text"
+import { NumericText } from "@/components/numeric-text"
+import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import type { TimeControlProps } from "@/features/workout/_components/time-control.types"
-import { ChevronDownIcon, ChevronUpIcon } from "lucide-react-native"
+import { useI18n } from "@/hooks/use-i18n"
+import { Button, ChevronDownIcon, ChevronUpIcon, Text } from "panelui-native"
 import { StyleSheet, View } from "react-native"
 
 const styles = StyleSheet.create({
   part: { minWidth: 44 },
 })
+const TWO_DIGIT_FORMAT = { minimumIntegerDigits: 2 } as const
 
 function getStep(
   onStep: (next: number) => void,
@@ -35,45 +36,58 @@ function getSetMinute(onChange: TimeControlProps["onChange"], hour: number) {
   return (next: number) => onChange(hour, next)
 }
 
+function getTogglePeriod(
+  onChange: TimeControlProps["onChange"],
+  hour: number,
+  minute: number
+) {
+  return () => onChange((hour + 12) % 24, minute)
+}
+
 function Part({
   label,
   onStep,
   step,
   value,
+  displayValue,
   wrap,
 }: {
+  displayValue?: number
   label: string
   onStep: (next: number) => void
   step: number
   value: number
   wrap: number
 }) {
+  const { t } = useI18n()
   const increment = getStep(onStep, value, step, wrap)
   const decrement = getReverseStep(onStep, value, step, wrap)
 
   return (
     <View className="items-center">
       <Button
-        accessibilityLabel={`Increase ${label}`}
+        accessibilityLabel={t("accessibility.increase", { label })}
+        className="h-9 w-9"
         onPress={increment}
-        size="icon-xs"
+        size="icon"
         variant="ghost"
       >
-        <Icon as={ChevronUpIcon} />
+        <ChevronUpIcon />
       </Button>
-      <Text
-        className="text-center font-heading text-2xl font-bold tabular-nums"
+      <NumericText
+        className="text-center text-2xl"
+        format={TWO_DIGIT_FORMAT}
         style={styles.part}
-      >
-        {String(value).padStart(2, "0")}
-      </Text>
+        value={displayValue ?? value}
+      />
       <Button
-        accessibilityLabel={`Decrease ${label}`}
+        accessibilityLabel={t("accessibility.decrease", { label })}
+        className="h-9 w-9"
         onPress={decrement}
-        size="icon-xs"
+        size="icon"
         variant="ghost"
       >
-        <Icon as={ChevronDownIcon} />
+        <ChevronDownIcon />
       </Button>
     </View>
   )
@@ -84,20 +98,41 @@ export default function TimeControl({
   minute,
   onChange,
 }: TimeControlProps) {
+  const { clockFormat } = usePreferences()
+  const { t } = useI18n()
   const setHour = getSetHour(onChange, minute)
   const setMinute = getSetMinute(onChange, hour)
+  const togglePeriod = getTogglePeriod(onChange, hour, minute)
 
   return (
     <View className="flex-row items-center">
-      <Part label="hour" onStep={setHour} step={1} value={hour} wrap={24} />
-      <Text className="font-heading text-2xl font-bold">:</Text>
       <Part
-        label="minutes"
+        label={t("time.hour")}
+        onStep={setHour}
+        step={1}
+        value={hour}
+        displayValue={clockFormat === "12" ? hour % 12 || 12 : undefined}
+        wrap={24}
+      />
+      <Text className="font-heading text-2xl">:</Text>
+      <Part
+        label={t("time.minutes")}
         onStep={setMinute}
         step={5}
         value={minute}
         wrap={60}
       />
+      {clockFormat === "12" ? (
+        <Button
+          accessibilityLabel={t("time.switchPeriod")}
+          className="ml-1 min-w-14"
+          onPress={togglePeriod}
+          size="sm"
+          variant="outline"
+        >
+          <Text className="font-bold">{hour < 12 ? "AM" : "PM"}</Text>
+        </Button>
+      ) : null}
     </View>
   )
 }
