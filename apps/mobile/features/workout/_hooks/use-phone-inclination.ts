@@ -1,7 +1,7 @@
 import { loadDeviceMotion } from "@/features/workout/_lib/device-motion"
 import {
   getPhoneInclinationDegrees,
-  MAX_PHONE_INCLINATION_DEGREES,
+  isPhoneFlat,
 } from "@/features/workout/_lib/inclination"
 import { useEffect, useRef, useState } from "react"
 
@@ -13,14 +13,14 @@ type SensorSubscription = { remove: () => void }
 export type PhoneInclinationDisplay =
   | { type: "checking" }
   | { type: "unavailable" }
-  | { degrees: number; type: "available"; upright: boolean }
+  | { degrees: number; flat: boolean; type: "available" }
 
 export function usePhoneInclination(enabled: boolean) {
   const [display, setDisplay] = useState<PhoneInclinationDisplay>({
     type: "checking",
   })
   const degrees = useRef<number | null>(null)
-  const upright = useRef(true)
+  const flat = useRef(true)
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -59,18 +59,18 @@ export function usePhoneInclination(enabled: boolean) {
               : smoothedDegrees +
                 (measuredDegrees - smoothedDegrees) * SMOOTHING_FACTOR
           degrees.current = smoothedDegrees
-          const nextUpright = smoothedDegrees <= MAX_PHONE_INCLINATION_DEGREES
-          upright.current = nextUpright
+          const nextFlat = isPhoneFlat(smoothedDegrees)
+          flat.current = nextFlat
           const roundedDegrees = Math.round(smoothedDegrees)
           setDisplay((current) =>
             current.type === "available" &&
             current.degrees === roundedDegrees &&
-            current.upright === nextUpright
+            current.flat === nextFlat
               ? current
               : {
                   degrees: roundedDegrees,
+                  flat: nextFlat,
                   type: "available",
-                  upright: nextUpright,
                 }
           )
         }
@@ -81,7 +81,7 @@ export function usePhoneInclination(enabled: boolean) {
       if (!active) return
 
       degrees.current = null
-      upright.current = true
+      flat.current = true
       setDisplay({ type: "unavailable" })
     })
 
@@ -89,9 +89,9 @@ export function usePhoneInclination(enabled: boolean) {
       active = false
       subscription?.remove()
       degrees.current = null
-      upright.current = true
+      flat.current = true
     }
   }, [enabled])
 
-  return { degrees, display, upright }
+  return { degrees, display, flat }
 }

@@ -12,7 +12,7 @@ overrides:
   expo: 57.0.14
 
 patchedDependencies:
-  react-native-nitro-pose-exercises@1.1.19: 11cac023db0f51274f9fa8304f39e44bfc170431decace4409ac79bfeed5e449
+  react-native-numeric-text@0.2.0: 62102e5c7d109a5871caf8fe04056838b1207f650b213ab794bcac3a1a84f4da
 
 importers:
 
@@ -159,15 +159,15 @@ importers:
       expo-status-bar:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
-      expo-symbols:
-        specifier: ~57.0.2
-        version: 57.0.2(expo-font@57.0.1)(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-system-ui:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.14)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
       expo-web-browser:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.14)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
+      lucide-react-native:
+        specifier: ^1.31.0
+        version: 1.31.0(react-native-svg@15.15.4(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       panelui-native:
         specifier: 0.75.1
         version: 0.75.1(d1c3030765843a104fd939a7760df546)
@@ -191,10 +191,10 @@ importers:
         version: 0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-nitro-pose-exercises:
         specifier: 1.1.19
-        version: 1.1.19(patch_hash=11cac023db0f51274f9fa8304f39e44bfc170431decace4409ac79bfeed5e449)(5cf851b8b64de3782f46370c80f36045)
+        version: 1.1.19(5cf851b8b64de3782f46370c80f36045)
       react-native-numeric-text:
         specifier: 0.2.0
-        version: 0.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+        version: 0.2.0(patch_hash=62102e5c7d109a5871caf8fe04056838b1207f650b213ab794bcac3a1a84f4da)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       react-native-reanimated:
         specifier: ~4.5.1
         version: 4.5.1(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -213,6 +213,9 @@ importers:
       react-native-vision-camera:
         specifier: 5.2.2
         version: 5.2.2(react-native-nitro-image@0.15.1(react-native-nitro-modules@0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-nitro-modules@0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+      react-native-vision-camera-face-detector:
+        specifier: 2.0.6
+        version: 2.0.6(263bb5ad98947336273d80de65048006)
       react-native-vision-camera-worklets:
         specifier: 5.0.11
         version: 5.0.11(3f264ea2ff4ba019105fa6680526dd0e)
@@ -225,6 +228,9 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      tailwind-variants:
+        specifier: ^3.3.1
+        version: 3.3.1(tailwind-merge@3.6.0)(tailwindcss@4.3.3)
       uniwind:
         specifier: 1.11.0
         version: 1.11.0(@expo/metro-config@57.0.8(expo@57.0.14)(typescript@6.0.3))(metro-cache@0.84.4)(metro-transform-worker@0.84.4)(metro@0.84.4)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(tailwindcss@4.3.3)
@@ -5954,6 +5960,14 @@ packages:
     peerDependencies:
       react: '>=18.0.0'
       react-native: '>=0.76.0'
+
+  react-native-vision-camera-face-detector@2.0.6:
+    resolution: {integrity: sha512-UWB+lPTaPy4bDRWcVCbmYBZdZ8u4p9FxPVeCNY6hmR4e+cnqQLRW+MgiYM2hremFlPUPoPJh8rH7702SBYuB7g==}
+    peerDependencies:
+      react: '>= 18'
+      react-native: '>= 0.74'
+      react-native-nitro-modules: '>= 0.35'
+      react-native-vision-camera: '>= 5.0'
 
   react-native-vision-camera-resizer@5.2.2:
     resolution: {integrity: sha512-4CQWkLrWwvCAnUC5zQOsDo76xwngjkqhb5x7UABNxtkzCAb091MJOC6QRuU/N11ieidWUovXyRJglPrupnzusQ==}
@@ -13544,7 +13558,7 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
 
-  react-native-nitro-pose-exercises@1.1.19(patch_hash=11cac023db0f51274f9fa8304f39e44bfc170431decace4409ac79bfeed5e449)(5cf851b8b64de3782f46370c80f36045):
+  react-native-nitro-pose-exercises@1.1.19(5cf851b8b64de3782f46370c80f36045):
     dependencies:
       react: 19.2.3
       react-native: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
@@ -13555,7 +13569,7 @@ snapshots:
       react-native-vision-camera-worklets: 5.0.11(3f264ea2ff4ba019105fa6680526dd0e)
       react-native-worklets: 0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
 
-  react-native-numeric-text@0.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3):
+  react-native-numeric-text@0.2.0(patch_hash=62102e5c7d109a5871caf8fe04056838b1207f650b213ab794bcac3a1a84f4da)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-native: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
@@ -13616,6 +13630,13 @@ snapshots:
       html2canvas: 1.4.1
       react: 19.2.3
       react-native: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
+
+  react-native-vision-camera-face-detector@2.0.6(263bb5ad98947336273d80de65048006):
+    dependencies:
+      react: 19.2.3
+      react-native: 0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
+      react-native-nitro-modules: 0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+      react-native-vision-camera: 5.2.2(react-native-nitro-image@0.15.1(react-native-nitro-modules@0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-nitro-modules@0.36.5(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
 
   react-native-vision-camera-resizer@5.2.2(263bb5ad98947336273d80de65048006):
     dependencies:

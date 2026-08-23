@@ -6,9 +6,23 @@ Connect automation.
 
 ## UI Boundaries
 
-Import generic UI components and icons directly from `panelui-native`. Do not
-create a parallel `apps/mobile/components/ui` wrapper layer. App-specific
-components may live under `apps/mobile/components` or their owning feature.
+Import unmodified generic UI components and icons directly from
+`panelui-native`. When a PanelUI component needs source customization, install
+it from the repository root with:
+
+```sh
+npx panelui-cli@latest add <component> --cwd apps/mobile
+```
+
+Then import and customize the generated file under `apps/mobile/components/ui`.
+Never edit `node_modules` or add `panelui-native` to pnpm `patchedDependencies`.
+The CLI-generated dependency chain is the only generic local UI layer;
+app-specific components may still live under `apps/mobile/components` or their
+owning feature.
+
+Keep `panelui.json`, `panelui-lock.json`, and `theme.css` under version control.
+Use the CLI for their updates; `pnpm sync:design-system` keeps the generated
+`global.css` imports and source paths compatible with that setup.
 
 The mobile app does not import web React components from `packages/ui`; it
 shares the design language through the semantic tokens generated into
@@ -19,8 +33,9 @@ Shared token changes belong in `packages/ui/src/tokens/design-tokens.json`.
 Run `pnpm sync:design-system` after changing those tokens.
 
 Before writing a custom generic control, inspect PanelUI's installed types or
-documentation and use its existing component. Use Uniwind semantic classes
-such as `bg-background`, `text-foreground`, `border-border`, `bg-primary`, and
+documentation and use its existing component. Install it with the PanelUI CLI
+before changing its source. Use Uniwind semantic classes such as
+`bg-background`, `text-foreground`, `border-border`, `bg-primary`, and
 `text-primary-foreground`; resolve dynamic colors with `useCSSVariable`.
 
 Do not hand-edit generated theme files:

@@ -1,4 +1,6 @@
+import { PauseIcon, PlayIcon, XIcon } from "@/components/icons"
 import { NumericText } from "@/components/numeric-text"
+import { Button } from "@/components/ui/button"
 import {
   useSession,
   type SessionPhase,
@@ -7,10 +9,10 @@ import type {
   TrainingPlan,
   WorkoutSession,
 } from "@/features/workout/_lib/storage"
-import PoseCamera from "@/features/workout/camera"
+import FaceCamera from "@/features/workout/camera"
 import { useI18n } from "@/hooks/use-i18n"
-import { Button, Text } from "panelui-native"
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
+import { Text } from "panelui-native"
+import { StyleSheet, View, useWindowDimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 import SetupGuide from "./setup-guide"
@@ -18,12 +20,21 @@ import SetupGuide from "./setup-guide"
 const TOP_EDGE = ["top"] as const
 const BOTTOM_EDGE = ["bottom"] as const
 const styles = StyleSheet.create({
-  activeCount: {
-    color: "#ffffff",
-    fontSize: 68,
-    lineHeight: 72,
+  bottomSafeArea: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
   },
-  activeTarget: { color: "rgba(255, 255, 255, 0.5)", fontSize: 28 },
+  control: {
+    backgroundColor: "rgba(45, 47, 46, 0.9)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 72,
+    width: 72,
+  },
   countdown: {
     color: "#ffffff",
     fontSize: 144,
@@ -31,7 +42,7 @@ const styles = StyleSheet.create({
   },
   countdownOverlay: {
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -39,16 +50,15 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  hudPanel: {
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
-    borderCurve: "continuous",
-    borderRadius: 24,
+  errorBanner: {
+    left: 24,
+    position: "absolute",
+    right: 24,
+    top: 96,
   },
-  hudTrack: {
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-    borderRadius: 999,
-    height: 6,
-    overflow: "hidden",
+  goalLabel: {
+    fontSize: 18,
+    letterSpacing: 1.2,
   },
   invalidToast: {
     alignSelf: "center",
@@ -58,20 +68,41 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   invalidToastLabel: { color: "#09090b" },
-  stopButton: {
-    backgroundColor: "#e11d48",
-    borderCurve: "continuous",
-    borderRadius: 18,
-    height: 60,
-    width: "100%",
-  },
-  bottomSafeArea: {
-    bottom: 0,
+  sessionCenter: {
+    alignItems: "center",
+    bottom: 180,
+    justifyContent: "center",
     left: 0,
     position: "absolute",
     right: 0,
+    top: 120,
   },
-  surface: { backgroundColor: "#000000" },
+  stopButton: {
+    backgroundColor: "#e60000",
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 80,
+    width: 80,
+  },
+  timer: {
+    alignItems: "center",
+    backgroundColor: "rgba(45, 47, 46, 0.9)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderCurve: "continuous",
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    height: 72,
+    justifyContent: "center",
+  },
+  timerLabel: {
+    color: "rgba(255, 255, 255, 0.62)",
+    fontSize: 24,
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0.5,
+  },
   topSafeArea: {
     left: 0,
     position: "absolute",
@@ -80,6 +111,25 @@ const styles = StyleSheet.create({
   },
 })
 
+function formatSessionTime(durationMs: number) {
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  const hundredths = Math.floor((durationMs % 1000) / 10)
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}.${String(hundredths).padStart(2, "0")}`
+}
+
+function getCountStyle(width: number) {
+  return {
+    fontSize: Math.min(220, width * 0.5),
+    lineHeight: Math.min(232, width * 0.53),
+  }
+}
+
 function CenterOverlay({
   countdown,
   phase,
@@ -87,9 +137,7 @@ function CenterOverlay({
   countdown: number
   phase: SessionPhase
 }) {
-  if (phase !== "countdown") {
-    return null
-  }
+  if (phase !== "countdown") return null
 
   return (
     <View className="pointer-events-none" style={styles.countdownOverlay}>
@@ -100,57 +148,12 @@ function CenterOverlay({
 
 function ErrorBanner({ message }: { message: string | null }) {
   return message ? (
-    <View className="absolute inset-x-6 top-24 rounded-2xl bg-destructive p-4">
+    <View className="rounded-2xl bg-destructive p-4" style={styles.errorBanner}>
       <Text selectable className="text-center text-destructive-foreground">
         {message}
       </Text>
     </View>
   ) : null
-}
-
-function getHudFillStyle(percent: number): StyleProp<ViewStyle> {
-  return { width: `${Math.min(100, percent)}%` }
-}
-
-function HudBar({ percent }: { percent: number }) {
-  const fillStyle = getHudFillStyle(percent)
-
-  return (
-    <View style={styles.hudTrack}>
-      <View className="h-full bg-primary" style={fillStyle} />
-    </View>
-  )
-}
-
-function ActiveScore({
-  targetReps,
-  validReps,
-}: {
-  targetReps: number
-  validReps: number
-}) {
-  return (
-    <View className="gap-2 px-5 py-3" style={styles.hudPanel}>
-      <View
-        accessible
-        accessibilityLabel={`${validReps}/${targetReps}`}
-        className="flex-row items-end"
-      >
-        <NumericText
-          accessible={false}
-          style={styles.activeCount}
-          value={validReps}
-        />
-        <Text style={styles.activeTarget}>/</Text>
-        <NumericText
-          accessible={false}
-          style={styles.activeTarget}
-          value={targetReps}
-        />
-      </View>
-      <HudBar percent={(validReps / Math.max(1, targetReps)) * 100} />
-    </View>
-  )
 }
 
 function InvalidToast({ message }: { message: string | null }) {
@@ -161,6 +164,25 @@ function InvalidToast({ message }: { message: string | null }) {
       </Text>
     </View>
   ) : null
+}
+
+function ActiveScore({ count, target }: { count: number; target: number }) {
+  const { t } = useI18n()
+  const { width } = useWindowDimensions()
+  const countStyle = getCountStyle(width)
+
+  return (
+    <View style={styles.sessionCenter}>
+      <Text className="text-muted-foreground" style={styles.goalLabel}>
+        {t("session.goal")} {target}
+      </Text>
+      <NumericText
+        className="text-foreground"
+        style={countStyle}
+        value={count}
+      />
+    </View>
+  )
 }
 
 export default function SessionScreen({
@@ -174,51 +196,88 @@ export default function SessionScreen({
 }) {
   const { t } = useI18n()
   const session = useSession({ onComplete, plan, targetReps })
+  const running = session.phase === "active" || session.phase === "paused"
 
   return (
-    <View className="flex-1" style={styles.surface}>
-      <PoseCamera
+    <View className="flex-1 bg-background">
+      <FaceCamera
         isActive
         onError={session.onCameraError}
-        onLandmarks={session.onLandmarks}
-        showDepthGuide={session.phase === "active"}
-        showSetupGuides={session.phase !== "active"}
+        onFace={session.onFace}
       />
 
-      <SafeAreaView edges={TOP_EDGE} style={styles.topSafeArea}>
-        <View
-          className={
-            session.phase === "active" ? "px-5 pt-3" : "items-end px-5 pt-3"
-          }
-        >
-          {session.phase === "active" ? (
-            <ActiveScore
-              targetReps={targetReps}
-              validReps={session.validReps}
+      {running ? (
+        <SafeAreaView edges={TOP_EDGE} style={styles.topSafeArea}>
+          <View className="items-end px-5 pt-3">
+            <View
+              className={
+                session.faceTracked
+                  ? "size-2.5 rounded-full bg-primary"
+                  : "size-2.5 rounded-full bg-muted-foreground/30"
+              }
             />
-          ) : (
-            <SetupGuide
-              framing={session.setupFraming}
-              phone={session.phoneInclination}
-            />
-          )}
-        </View>
-      </SafeAreaView>
+          </View>
+        </SafeAreaView>
+      ) : (
+        <SetupGuide
+          framing={session.setupFraming}
+          phone={session.phoneInclination}
+        />
+      )}
 
+      {running ? (
+        <ActiveScore count={session.validReps} target={targetReps} />
+      ) : null}
       <CenterOverlay countdown={session.countdown} phase={session.phase} />
       <ErrorBanner message={session.error} />
 
       <SafeAreaView edges={BOTTOM_EDGE} style={styles.bottomSafeArea}>
         <View className="items-center gap-3 px-5 pb-4">
           <InvalidToast message={session.toast} />
-          <Button
-            className="max-w-sm bg-destructive"
-            labelClassName="font-bold text-lg text-white"
-            onPress={session.stop}
-            style={styles.stopButton}
-          >
-            {t("session.stop")}
-          </Button>
+          {running ? (
+            <View className="w-full max-w-md flex-row items-center gap-3">
+              <View style={styles.timer}>
+                <Text style={styles.timerLabel}>
+                  {formatSessionTime(session.elapsedMs)}
+                </Text>
+              </View>
+              <Button
+                accessibilityLabel={t(
+                  session.phase === "paused"
+                    ? "session.resume"
+                    : "session.pause"
+                )}
+                onPress={session.togglePause}
+                size="icon"
+                style={styles.control}
+                variant="ghost"
+              >
+                {session.phase === "paused" ? (
+                  <PlayIcon color="#ffffff" fill="#ffffff" size={30} />
+                ) : (
+                  <PauseIcon color="#ffffff" size={30} />
+                )}
+              </Button>
+              <Button
+                accessibilityLabel={t("session.stop")}
+                onPress={session.stop}
+                size="icon"
+                style={styles.stopButton}
+                variant="ghost"
+              >
+                <XIcon color="#ffffff" size={36} strokeWidth={3} />
+              </Button>
+            </View>
+          ) : (
+            <Button
+              className="h-14 w-full max-w-sm rounded-full bg-foreground"
+              labelClassName="font-heading lowercase text-lg text-background"
+              onPress={session.stop}
+              size="lg"
+            >
+              {t("session.stop")}
+            </Button>
+          )}
         </View>
       </SafeAreaView>
     </View>

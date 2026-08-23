@@ -20,7 +20,7 @@ export const Route = createRootRouteWithContext<{
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "PUMPRS — Push-up training",
+        title: "pumpr. — Push-up training",
       },
     ],
     links: [

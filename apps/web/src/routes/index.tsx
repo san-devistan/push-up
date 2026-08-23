@@ -40,7 +40,7 @@ function App() {
     <div className="flex min-h-svh p-6">
       <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
         <div>
-          <h1 className="text-2xl font-bold tracking-[0.2em]">PUMPRS</h1>
+          <h1 className="text-2xl font-bold tracking-[0.2em]">pumpr.</h1>
           <p>Push-up training, counted on-device.</p>
           <p>Effect is installed for this workspace.</p>
           <p>{isCompactViewport ? "Compact viewport" : "Wide viewport"}</p>

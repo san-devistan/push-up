@@ -8,7 +8,7 @@ import * as SecureStore from "expo-secure-store"
 const configuredScheme = Constants.expoConfig?.scheme
 const scheme =
   (Array.isArray(configuredScheme) ? configuredScheme[0] : configuredScheme) ??
-  "pushup"
+  "pumpr"
 export const isAuthConfigured = Boolean(process.env.EXPO_PUBLIC_CONVEX_SITE_URL)
 
 export const authClient = createAuthClient({

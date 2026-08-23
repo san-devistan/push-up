@@ -1,4 +1,14 @@
 import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  CircleArrowUpRightIcon,
+  CircleXIcon,
+  ClockIcon,
+  ShareNodesIcon,
+  SparklesIcon,
+} from "@/components/icons"
+import { Button } from "@/components/ui/button"
+import {
   StatNumber,
   StatsDivider,
   StatsList,
@@ -16,17 +26,7 @@ import { useI18n } from "@/hooks/use-i18n"
 import { GLASS_TINT } from "@/lib/glass"
 import type { TranslationKey } from "@/lib/i18n"
 import { BlurView } from "expo-blur"
-import {
-  ArrowUpRightIcon,
-  Button,
-  CalendarIcon,
-  ChevronLeftIcon,
-  ClockIcon,
-  ShareNodesIcon,
-  SparklesIcon,
-  Text,
-  XIcon,
-} from "panelui-native"
+import { Text } from "panelui-native"
 import { Fragment } from "react"
 import {
   ScrollView,
@@ -37,15 +37,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context"
 
 const FAILURE_REASONS = [
-  "body_misalignment",
-  "incomplete_lockout",
+  "incomplete_return",
   "insufficient_depth",
   "tracking_lost",
 ] as const satisfies readonly FailureReason[]
 const SCREEN_EDGES = ["top", "bottom"] as const
 const FAILURE_LABEL_KEYS = {
-  body_misalignment: "summary.failureAlign",
-  incomplete_lockout: "summary.failureLockout",
+  incomplete_return: "summary.failureReturn",
   insufficient_depth: "summary.failureDepth",
   tracking_lost: "summary.failureTracking",
 } satisfies Record<FailureReason, TranslationKey>
@@ -99,8 +97,7 @@ function getSessionStats(session: WorkoutSession) {
     : 0
   const failedReps = session.attempts.filter((attempt) => !attempt.valid).length
   const failureCounts: Record<FailureReason, number> = {
-    body_misalignment: 0,
-    incomplete_lockout: 0,
+    incomplete_return: 0,
     insufficient_depth: 0,
     tracking_lost: 0,
   }
@@ -198,11 +195,14 @@ export default function SummaryScreen({
         />
 
         <StatsList>
-          <StatsListRow icon={ArrowUpRightIcon} label={t("common.successRate")}>
+          <StatsListRow
+            icon={CircleArrowUpRightIcon}
+            label={t("common.successRate")}
+          >
             <StatNumber format={PERCENT_FORMAT} value={successRate / 100} />
           </StatsListRow>
           <StatsDivider />
-          <StatsListRow icon={XIcon} label={t("common.failedReps")}>
+          <StatsListRow icon={CircleXIcon} label={t("common.failedReps")}>
             <FailedRepSummary
               failedReps={failedReps}
               failureCounts={failureCounts}

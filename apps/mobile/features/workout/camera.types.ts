@@ -1,9 +1,14 @@
-import type { PoseLandmark } from "@/features/workout/_lib/counter"
+export type FaceObservation = {
+  frameHeight: number
+  frameWidth: number
+  height: number
+  rollAngle: number
+  width: number
+  yawAngle: number
+}
 
-export type PoseCameraProps = {
+export type FaceCameraProps = {
   isActive: boolean
   onError: (message: string) => void
-  onLandmarks: (landmarks: readonly PoseLandmark[]) => void
-  showDepthGuide?: boolean
-  showSetupGuides?: boolean
+  onFace: (face: FaceObservation | null) => void
 }

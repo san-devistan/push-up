@@ -1,4 +1,7 @@
-import { Slab } from "@/features/workout/_components/figures"
+import { ArrowUpRightIcon } from "@/components/icons"
+import { Button } from "@/components/ui/button"
+import { ProgressButton } from "@/components/ui/progress-button"
+import { Overline, Slab } from "@/features/workout/_components/figures"
 import { clearWorkoutData } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
@@ -8,9 +11,9 @@ import { api } from "@workspace/backend/api"
 import { useMutation } from "convex/react"
 import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
-import { ArrowUpRightIcon, Button, Text, TrashIcon } from "panelui-native"
+import { Text } from "panelui-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
-import { Alert, StyleSheet, View } from "react-native"
+import { StyleSheet, View } from "react-native"
 import Svg, { Path } from "react-native-svg"
 
 const MARK_SIZE = 18
@@ -108,7 +111,7 @@ async function connectApple(language: Language) {
     return error?.message ?? null
   } catch (caught) {
     return errorCode(caught) === "ERR_REQUEST_CANCELED"
-      ? null
+      ? undefined
       : translate(language, "connect.appleUnavailable")
   }
 }
@@ -116,7 +119,7 @@ async function connectApple(language: Language) {
 async function connectGoogle(language: Language) {
   try {
     const { error } = await authClient.signIn.social({
-      callbackURL: "pushup://",
+      callbackURL: "pumpr://",
       provider: "google",
     })
 
@@ -130,13 +133,23 @@ function getConnectAction(
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>,
   pending: PendingAction,
-  connect: () => Promise<string | null>
+  connect: () => Promise<string | null | undefined>,
+  onConnected?: () => void
 ) {
   return () => {
     setError(null)
     setPending(pending)
     void connect()
-      .then(setError)
+      .then((error) => {
+        if (error !== undefined) {
+          setError(error)
+          if (error === null) {
+            onConnected?.()
+          }
+        }
+
+        return error
+      })
       .finally(() => setPending(null))
   }
 }
@@ -159,36 +172,25 @@ function getSignOutAction(
 
 function getDeleteDataAction(
   clearRemoteData: () => Promise<unknown>,
-  messages: {
-    body: string
-    cancel: string
-    confirm: string
-    error: string
-    title: string
-  },
+  errorMessage: string,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>
 ) {
   return () => {
-    Alert.alert(messages.title, messages.body, [
-      { style: "cancel", text: messages.cancel },
-      {
-        onPress: () => {
-          setError(null)
-          setPending("delete")
-          void clearRemoteData()
-            .then(() => clearWorkoutData())
-            .catch(() => setError(messages.error))
-            .finally(() => setPending(null))
-        },
-        style: "destructive",
-        text: messages.confirm,
-      },
-    ])
+    setError(null)
+    setPending("delete")
+    void clearRemoteData()
+      .then(() => clearWorkoutData())
+      .catch(() => setError(errorMessage))
+      .finally(() => setPending(null))
   }
 }
 
-export function ConnectProviders() {
+export function ConnectProviders({
+  onConnected,
+}: {
+  onConnected?: () => void
+} = {}) {
   const { language } = useI18n()
   const isDark = useColorScheme() === "dark"
   const [appleAvailable, setAppleAvailable] = useState(false)
@@ -199,11 +201,19 @@ export function ConnectProviders() {
     void AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
   }, [])
 
-  const withApple = getConnectAction(setError, setPending, "apple", () =>
-    connectApple(language)
+  const withApple = getConnectAction(
+    setError,
+    setPending,
+    "apple",
+    () => connectApple(language),
+    onConnected
   )
-  const withGoogle = getConnectAction(setError, setPending, "google", () =>
-    connectGoogle(language)
+  const withGoogle = getConnectAction(
+    setError,
+    setPending,
+    "google",
+    () => connectGoogle(language),
+    onConnected
   )
   const disabled = pending !== null
 
@@ -257,13 +267,7 @@ export function Connect() {
   )
   const deleteData = getDeleteDataAction(
     () => clearRemoteData({}),
-    {
-      body: t("connect.deleteBody"),
-      cancel: t("common.cancel"),
-      confirm: t("common.delete"),
-      error: t("connect.couldNotDelete"),
-      title: t("connect.deleteTitle"),
-    },
+    t("connect.couldNotDelete"),
     setError,
     setPending
   )
@@ -278,7 +282,7 @@ export function Connect() {
 
   return (
     <Slab>
-      <Text className="font-bold text-base">{t("connect.sync")}</Text>
+      <Overline>{t("connect.sync")}</Overline>
       {isAnonymous ? <ConnectProviders /> : null}
       <View className="gap-3 border-t border-border pt-3 dark:border-foreground/20">
         {isConnected ? (
@@ -287,10 +291,15 @@ export function Connect() {
             {t("connect.signOut")}
           </Button>
         ) : null}
-        <Button disabled={disabled} onPress={deleteData} variant="destructive">
-          <TrashIcon />
-          {t("connect.deleteData")}
-        </Button>
+        <ProgressButton
+          autoReset
+          disabled={disabled}
+          haptics
+          onComplete={deleteData}
+          variant="destructive"
+        >
+          <ProgressButton.Label>{t("connect.deleteData")}</ProgressButton.Label>
+        </ProgressButton>
       </View>
       {error ? (
         <Text selectable className="text-destructive">

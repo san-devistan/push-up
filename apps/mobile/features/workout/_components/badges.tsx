@@ -1,14 +1,17 @@
+import { CheckIcon, LockIcon } from "@/components/icons"
 import { NUMERIC_TEXT_SLOT, NumericPhrase } from "@/components/numeric-text"
 import { getCompactNumber } from "@/features/workout/_lib/format"
 import type { LevelMilestone } from "@/features/workout/_lib/gamification"
 import { useI18n } from "@/hooks/use-i18n"
 import { cn } from "@/lib/utils"
-import { Badge, CheckIcon, LockIcon, Progress } from "panelui-native"
+import { Badge, Progress } from "panelui-native"
 import { StyleSheet, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", gap: 8 },
+  number: { transform: [{ translateY: 0 }] },
+  tightNumber: { marginRight: -5, transform: [{ translateY: 0 }] },
 })
 
 function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
@@ -29,8 +32,8 @@ function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
         : "levels.total"
   const label = t(labelKey, { value: `${target.value}${target.suffix}` })
   const textClassName = milestone.earned
-    ? "text-xs font-semibold text-primary-foreground"
-    : "text-xs font-semibold text-foreground"
+    ? "font-heading text-xs text-primary-foreground"
+    : "font-heading text-xs text-foreground"
 
   return (
     <Badge
@@ -39,7 +42,7 @@ function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
         percent: Math.round(progress),
       })}
       className={cn(
-        "relative h-10 min-w-0 flex-1 overflow-hidden border-border bg-background p-0 dark:bg-muted",
+        "relative h-10 min-w-0 flex-1 overflow-hidden rounded-full border-border bg-background p-0 dark:bg-muted",
         milestone.earned && "border-primary bg-primary dark:bg-primary"
       )}
       variant="secondary"
@@ -47,15 +50,14 @@ function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
       {milestone.earned ? null : (
         <Progress
           accessibilityElementsHidden
-          className="absolute inset-x-0 bottom-0"
+          className="absolute inset-0 h-full rounded-full bg-transparent"
           importantForAccessibility="no-hide-descendants"
-          indicatorClassName="bg-primary/30"
+          indicatorClassName="h-full rounded-none bg-primary/30"
           pointerEvents="none"
-          size="sm"
           value={progress}
         />
       )}
-      <View className="z-10 min-w-0 flex-1 flex-row items-center justify-center gap-1.5 px-2">
+      <View className="z-10 min-w-0 flex-1 flex-row items-center justify-center px-1.5">
         {milestone.earned ? (
           <CheckIcon
             color={
@@ -64,13 +66,20 @@ function MilestoneChip({ milestone }: { milestone: LevelMilestone }) {
                 : undefined
             }
             size={14}
+            strokeWidth={3}
           />
         ) : (
-          <LockIcon size={14} />
+          <LockIcon size={14} strokeWidth={3} />
         )}
         <NumericPhrase
           className={textClassName}
+          containerClassName="shrink items-end justify-center"
           maximumFractionDigits={2}
+          style={
+            milestone.id === "recentDailyAverage"
+              ? styles.number
+              : styles.tightNumber
+          }
           template={t(labelKey, {
             value: `${NUMERIC_TEXT_SLOT}${target.suffix}`,
           })}

@@ -1,0 +1,195 @@
+{
+  "version": 2,
+  "files": {
+    "components/ui/accessibility.ts": {
+      "item": "time-picker",
+      "digest": "sha256:c72e1453d70b6aa31791b5937b10b4ef36f60871b3fc8486b0945f7dbfab7b72"
+    },
+    "components/ui/time-picker.tsx": {
+      "item": "time-picker",
+      "digest": "sha256:80824e31cde0481f1ad49adfb5d5c13fa3eeb876fa6d8bdbcb458649112256c5"
+    },
+    "components/ui/ruler-window.ts": {
+      "item": "time-picker",
+      "digest": "sha256:12a559e51d54818c98404fa60b642ef98f617f0fb670dfb2047f8cb8c7284091"
+    },
+    "components/ui/button.tsx": {
+      "item": "button",
+      "digest": "sha256:98f7b42fedb7605835411840dc7192ffdcfc2c1da006f25bfbffa759701ac82d"
+    },
+    "components/ui/animated-pressable.tsx": {
+      "item": "animated-pressable",
+      "digest": "sha256:1b36a4a54b2b7e58ebb087370f867b8f8641d7e620045d97e931abad6356d150"
+    },
+    "lib/cn.ts": {
+      "item": "cn",
+      "digest": "sha256:9304a861c8673bee09e0f12de31773abbde503b02e59dfd74763ddec2e37cf05"
+    },
+    "components/ui/icons.tsx": {
+      "item": "icons",
+      "digest": "sha256:8218fcb9378cb100d8c49a335925abb6221be25f1ef23a78c93393de02488119"
+    },
+    "hooks/use-direction.ts": {
+      "item": "use-direction",
+      "digest": "sha256:9202d8550abaed8720af42d0320acf51e227fbf23f649b5636fd26475b849867"
+    },
+    "lib/native.ts": {
+      "item": "native",
+      "digest": "sha256:4100721470e08265f0013499cc4b2c16cf5e4aa6b2e0113cd030de7a37e83d44"
+    },
+    "components/ui/spinner.tsx": {
+      "item": "spinner",
+      "digest": "sha256:bb64b6e48da6dc9b0f92c356562bd561a974afa966bf06120594a508d92d3436"
+    },
+    "components/ui/text.tsx": {
+      "item": "text",
+      "digest": "sha256:7d2ac97b2f276c5ff03f524b21cde8616cfe9217a0a0c49d39eeba620bf462de"
+    },
+    "components/ui/dialog.tsx": {
+      "item": "dialog",
+      "digest": "sha256:4c788e0b535ebc1c59cf892f51a5c8c7286aec2f06ee9e88ae3dc8b6f7e04679"
+    },
+    "components/ui/portal.tsx": {
+      "item": "portal",
+      "digest": "sha256:41e534624b7cf23bd2bef9e5125561819b61c9c22921b1aa5496bf9978c03943"
+    },
+    "components/ui/focus-restoration-store.ts": {
+      "item": "focus-restoration-store",
+      "digest": "sha256:cd47b2ec6b440f1073e831912037677aaca12330f33a8aea335d67a46980a7a9"
+    },
+    "components/ui/modal-isolation-store.ts": {
+      "item": "modal-isolation-store",
+      "digest": "sha256:346301f0da15175f23a8918834d0c6e9bbdb096e3c130fa92bc9640dc3500c70"
+    },
+    "components/ui/scrim.tsx": {
+      "item": "scrim",
+      "digest": "sha256:76e113e0f699505d878ec6ac1c2384ca6dfaea2f0235f9050b52cce045c4fad6"
+    },
+    "hooks/use-back-handler.ts": {
+      "item": "use-back-handler",
+      "digest": "sha256:7c45197c64beb13d8ab1f386758e07e2d83bdb6d02e5d83e27153afbdfa686e1"
+    },
+    "components/ui/popover.tsx": {
+      "item": "popover",
+      "digest": "sha256:65fc1cc44dfdc3085de58f59ed690a4bf6931f2f5d5fef0605339d96753de2cf"
+    },
+    "components/ui/bottom-sheet.tsx": {
+      "item": "bottom-sheet",
+      "digest": "sha256:587398dce5b4c23bee8b767cc2dbdaeddbc59fe0a96d7095a714dd944c3aa199"
+    },
+    "lib/time.ts": {
+      "item": "time",
+      "digest": "sha256:5852ab78d7c53e3184b65efad0f4bc690ca3addf163a45fe4b0471d4ca7763e2"
+    },
+    "components/ui/panel-ui-provider.tsx": {
+      "item": "panel-ui-provider",
+      "digest": "sha256:049a65ce93af8724402692abdf3bc321518122ee58364b0c4ecde8912eb9357b"
+    },
+    "components/ui/toast.tsx": {
+      "item": "toast",
+      "digest": "sha256:9db0a732afe98dc8a0ad0033c8fce362b8d9ac5c6f9110c4fec44baea5c587fc"
+    },
+    "components/ui/toast-store.ts": {
+      "item": "toast",
+      "digest": "sha256:3a74ab7c74e9aae50664bd5e7fd1204b267b45e20a1e89821911ceee4fc3d63f"
+    },
+    "lib/haptics.ts": {
+      "item": "haptics",
+      "digest": "sha256:aad3c62bb6b9039ef5db86da4f161e415f3f459e25b192a192ae325997733e41"
+    },
+    "components/ui/tabs.tsx": {
+      "item": "tabs",
+      "digest": "sha256:59b596d83521c38350dd3de4335e2c00111817fcbdfeb93a0cad5fa7b9406156"
+    },
+    "components/ui/accordion.tsx": {
+      "item": "accordion",
+      "digest": "sha256:8b41679ac31160ff78f94a08a8f81d6815c1fd6d20385140a1d011f25c0c050d"
+    },
+    "components/ui/timeline.tsx": {
+      "item": "timeline",
+      "digest": "sha256:65aff13cab382848912009b6b502653d47900318633959b103bf8171c03916f0"
+    },
+    "components/ui/timeline-geometry.ts": {
+      "item": "timeline",
+      "digest": "sha256:f19edc36a4a6d173886c72c92b64215303353d9664ce85db7a94a7d0fb2667c1"
+    },
+    "components/ui/progress-button.tsx": {
+      "item": "progress-button",
+      "digest": "sha256:12b9435753f7a457382524775bfd78dacefcb469ccd7294ed652f626fc4b3b4b"
+    },
+    "components/ui/progress-button-hold.ts": {
+      "item": "progress-button",
+      "digest": "sha256:a532b9e90c6e59dedddcd6695e94f9852a0336c33c2721f78f180918b032661d"
+    },
+    "components/ui/heatmap-chart.tsx": {
+      "item": "heatmap-chart",
+      "digest": "sha256:0b9669b508fd28ad63dd4f485e3c3fb5d05fec1cacaa14fb891657bc6bdf7097"
+    },
+    "components/ui/chart-accessibility.ts": {
+      "item": "chart-accessibility",
+      "digest": "sha256:32186807d2bc752936da901286d067f535829ba096d25f2bfffd6afa456e5590"
+    },
+    "lib/date.ts": {
+      "item": "date",
+      "digest": "sha256:3c9d1b865d87e56922e2d6e1b8fac5c3a28ba658e737b0a0c1990d0bd7f42829"
+    }
+  },
+  "roots": {
+    "time-picker": [
+      "time-picker",
+      "button",
+      "animated-pressable",
+      "cn",
+      "icons",
+      "use-direction",
+      "native",
+      "spinner",
+      "text",
+      "dialog",
+      "portal",
+      "focus-restoration-store",
+      "modal-isolation-store",
+      "scrim",
+      "use-back-handler",
+      "haptics",
+      "popover",
+      "bottom-sheet",
+      "time"
+    ],
+    "panel-ui-provider": [
+      "panel-ui-provider",
+      "cn",
+      "portal",
+      "focus-restoration-store",
+      "modal-isolation-store",
+      "toast",
+      "button",
+      "animated-pressable",
+      "icons",
+      "use-direction",
+      "native",
+      "spinner",
+      "text"
+    ],
+    "tabs": ["tabs", "cn", "text", "use-direction"],
+    "accordion": ["accordion", "icons", "use-direction", "text"],
+    "timeline": ["timeline", "haptics", "icons", "use-direction", "text"],
+    "progress-button": [
+      "progress-button",
+      "haptics",
+      "icons",
+      "use-direction",
+      "text"
+    ],
+    "heatmap-chart": [
+      "heatmap-chart",
+      "chart-accessibility",
+      "cn",
+      "date",
+      "text",
+      "use-direction"
+    ]
+  },
+  "legacyFiles": [],
+  "registry": "https://panelui.dev/r"
+}

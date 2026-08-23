@@ -3,7 +3,7 @@ import type { Activity } from "@/features/workout/_lib/activity"
 export const DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_DATA === "1"
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const VISIBLE_DAYS = 16 * 7
+const VISIBLE_DAYS = 26 * 7
 const CHART_WEEKS = 8
 const REST_GAPS = [
   { from: 96, to: 89 },
@@ -53,6 +53,7 @@ export function demoActivity(today: string): Activity {
   const totalPushups = recentDays.reduce((total, day) => total + day.reps, 0)
   const activeDays = recentDays.filter((day) => day.reps > 0)
   const totalAttempts = Math.round(totalPushups / 0.88)
+  const todayReps = recentDays.at(-1)?.reps ?? 0
   let currentStreak = 0
 
   for (let index = recentDays.length - 1; index >= 0; index--) {
@@ -70,7 +71,9 @@ export function demoActivity(today: string): Activity {
     currentStreak,
     recentDays,
     successRate: 88,
-    todayReps: 6,
+    todayAttempts: Math.round(todayReps / 0.88),
+    todayReps,
+    totalActiveMs: totalAttempts * 2380,
     totalAttempts,
     totalPushups,
     totalSessions: activeDays.length,

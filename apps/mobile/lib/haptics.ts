@@ -8,18 +8,7 @@ export function hapticHard() {
   }
 }
 
-export function hapticSuccess() {
-  if (process.env.EXPO_OS === "ios") {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-  } else if (process.env.EXPO_OS === "android") {
-    void Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm)
-  }
-}
-
-export function hapticFailure() {
-  if (process.env.EXPO_OS === "ios") {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-  } else if (process.env.EXPO_OS === "android") {
-    void Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Reject)
-  }
-}
+export const hapticSuccess = hapticHard
+export const hapticFailure = hapticHard
+export const impactKnock = hapticHard
+export const selectionTick = hapticHard

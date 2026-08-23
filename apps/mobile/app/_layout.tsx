@@ -1,3 +1,4 @@
+import { PanelUIProvider as LocalPanelUIProvider } from "@/components/ui/panel-ui-provider"
 import { isOnboardingComplete } from "@/features/onboarding/storage"
 import {
   PreferencesProvider,
@@ -66,7 +67,8 @@ if (!convex) {
 }
 
 const stackScreenOptions = { headerShown: false } as const
-const homeScreenOptions = { freezeOnBlur: true } as const
+const homeScreenOptions = { freezeOnBlur: true, gestureEnabled: false } as const
+const onboardingScreenOptions = { gestureEnabled: false } as const
 const initialRouteName = isOnboardingComplete() ? "(tabs)" : "onboarding"
 const sessionScreenOptions = {
   animation: "fade",
@@ -170,19 +172,33 @@ function RootProviders() {
   }, [colorScheme])
 
   return (
+    <PanelProviders
+      iconColor={typeof foreground === "string" ? foreground : undefined}
+    >
+      <OptionalConvexProvider>
+        <PlanProvider>
+          <ThemeProvider value={NAV_THEME[colorScheme]}>
+            <RootStack />
+            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+          </ThemeProvider>
+        </PlanProvider>
+      </OptionalConvexProvider>
+    </PanelProviders>
+  )
+}
+
+function PanelProviders({
+  children,
+  iconColor,
+}: {
+  children: ReactNode
+  iconColor?: string
+}) {
+  return (
     <PanelUIProvider>
-      <IconColorProvider
-        color={typeof foreground === "string" ? foreground : undefined}
-      >
-        <OptionalConvexProvider>
-          <PlanProvider>
-            <ThemeProvider value={NAV_THEME[colorScheme]}>
-              <RootStack />
-              <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-            </ThemeProvider>
-          </PlanProvider>
-        </OptionalConvexProvider>
-      </IconColorProvider>
+      <LocalPanelUIProvider background={false}>
+        <IconColorProvider color={iconColor}>{children}</IconColorProvider>
+      </LocalPanelUIProvider>
     </PanelUIProvider>
   )
 }
@@ -193,7 +209,7 @@ function RootStack() {
       initialRouteName={initialRouteName}
       screenOptions={stackScreenOptions}
     >
-      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="onboarding" options={onboardingScreenOptions} />
       <Stack.Screen name="(tabs)" options={homeScreenOptions} />
       <Stack.Screen name="session" options={sessionScreenOptions} />
       <Stack.Screen name="levels" />

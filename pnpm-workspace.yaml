@@ -20,4 +20,4 @@ allowBuilds:
   msw: false
 
 patchedDependencies:
-  react-native-nitro-pose-exercises@1.1.19: patches/react-native-nitro-pose-exercises@1.1.19.patch
+  react-native-numeric-text@0.2.0: patches/react-native-numeric-text@0.2.0.patch

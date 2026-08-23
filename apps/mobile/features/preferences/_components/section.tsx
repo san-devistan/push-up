@@ -1,3 +1,9 @@
+import {
+  ClockIcon,
+  SolidMessageCircleIcon,
+  SolidSunIcon,
+  type IconProps,
+} from "@/components/icons"
 import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import type {
   AppearancePreference,
@@ -5,15 +11,9 @@ import type {
   LanguagePreference,
 } from "@/features/preferences/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
+import { hapticHard } from "@/lib/haptics"
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "@/lib/i18n"
-import {
-  ClockIcon,
-  MessageCircleIcon,
-  Select,
-  SunIcon,
-  Text,
-  type IconProps,
-} from "panelui-native"
+import { Select, Text } from "panelui-native"
 import type { ComponentType } from "react"
 import { View } from "react-native"
 
@@ -44,6 +44,10 @@ function getChoiceChange<T extends string>(
   }
 }
 
+function hapticOnOpenChange() {
+  hapticHard()
+}
+
 function PreferenceChoiceRow<T extends string>({
   icon,
   label,
@@ -67,6 +71,7 @@ function PreferenceChoiceRow<T extends string>({
       <Select
         className="w-32"
         contentWidth="content"
+        onOpenChange={hapticOnOpenChange}
         onValueChange={change}
         placeholder={label}
         presentation="overlay"
@@ -109,7 +114,7 @@ export function PreferencesSection() {
   return (
     <>
       <PreferenceChoiceRow
-        icon={MessageCircleIcon}
+        icon={SolidMessageCircleIcon}
         label={t("preferences.language")}
         onChange={setLanguage}
         options={LANGUAGE_CHOICES}
@@ -117,7 +122,7 @@ export function PreferencesSection() {
       />
       <Divider />
       <PreferenceChoiceRow
-        icon={SunIcon}
+        icon={SolidSunIcon}
         label={t("preferences.appearance")}
         onChange={setAppearance}
         options={appearanceChoices}

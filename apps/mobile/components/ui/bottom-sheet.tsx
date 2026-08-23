@@ -1,0 +1,777 @@
+import {
+  cloneElement,
+  createContext,
+  isValidElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewProps,
+} from 'react-native';
+import { useCSSVariable } from 'uniwind';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  Extrapolation,
+  FadeIn,
+  interpolate,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tv } from 'tailwind-variants';
+import { getNativeUI } from '@/lib/native';
+import { XIcon } from '@/components/ui/icons';
+import { ModalPortal } from '@/components/ui/portal';
+import { Scrim } from '@/components/ui/scrim';
+import { Text, textChildren } from '@/components/ui/text';
+import { useBackHandler } from '@/hooks/use-back-handler';
+import { cn } from '@/lib/cn';
+import { impactKnock } from '@/lib/haptics';
+
+/**
+ * One spring for the whole surface, in Apple's two designer parameters rather
+ * than mass/stiffness/damping — the sheet arriving, the sheet snapping back and
+ * the sheet leaving used to be three slightly different springs, which is three
+ * different weights for one object.
+ *
+ * A little under critically damped, so it settles without a bounce. A sheet
+ * that overshoots reads as light, and a sheet is not light.
+ *
+ * Slower than the 300ms a small state change gets, and deliberately. This is a
+ * large surface travelling most of the screen, and it is the same category of
+ * movement as a screen transition rather than as a toggle — the platform's own
+ * sheets are slower still. Taken at toggle speed it arrives before the eye has
+ * followed it, which reads as a jump-cut to a different screen rather than as
+ * something coming up from the bottom.
+ */
+const SPRING = { duration: 420, dampingRatio: 0.9 } as const;
+
+/**
+ * Leaving, where the far side of the travel is off screen: clamped, because a
+ * spring allowed to overshoot past the bottom flashes a gap under the sheet on
+ * its way back.
+ */
+const EXIT_SPRING = { duration: 380, dampingRatio: 1, overshootClamping: true } as const;
+
+const DISMISS_DISTANCE = 120;
+const DISMISS_VELOCITY = 800;
+
+/*
+ * Built once at module scope. A layout-animation builder constructed in render
+ * is a new object every commit, and the sheet re-renders while it is open.
+ */
+const ENTERING = SlideInDown.springify().dampingRatio(0.9).duration(420);
+// Leaving is quicker than arriving, but not by much: the sheet is still
+// crossing the whole screen, and a surface that big snapping out of existence
+// is more startling than the delay it saves is worth.
+const EXITING = SlideOutDown.springify().dampingRatio(1).duration(340);
+
+/**
+ * Where a flick would come to rest if it kept decelerating — Apple's
+ * exponential-decay form.
+ *
+ * Distance alone makes the sheet heavy: a short fast flick downward is
+ * unmistakably a dismissal, and asking it to also travel 120 points first means
+ * the reader has to throw the sheet twice.
+ */
+function project(velocity: number): number {
+  'worklet';
+  const decelerationRate = 0.998;
+  return ((velocity / 1000) * decelerationRate) / (1 - decelerationRate);
+}
+
+const sheetVariants = tv({
+  base: 'border border-border bg-background px-5 pt-2 shadow-lg',
+  variants: {
+    detached: {
+      // Docked: the sheet is continuous with the bottom of the screen, so the
+      // bottom edge is not a real edge and drawing a line along it would be a
+      // rule through the middle of nothing.
+      false: 'rounded-t-3xl border-b-0',
+      // Floating: all four edges are real, so all four are drawn and all four
+      // corners are rounded.
+      true: 'mx-4 mb-6 rounded-3xl',
+    },
+  },
+  defaultVariants: {
+    detached: false,
+  },
+});
+
+interface BottomSheetContextValue {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+
+const BottomSheetContext = createContext<BottomSheetContextValue | null>(null);
+
+function useBottomSheet(component: string): BottomSheetContextValue {
+  const context = useContext(BottomSheetContext);
+  if (!context) {
+    throw new Error(`${component} must be used within a <BottomSheet>`);
+  }
+  return context;
+}
+
+export interface BottomSheetProps {
+  children: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultOpen?: boolean;
+  /**
+   * Present the platform's own sheet instead of this one, so it gets the
+   * system's detents, scroll interaction and dismiss gesture. Requires the
+   * optional `@expo/ui` package; without it this prop does nothing.
+   *
+   * **Theme tokens do not apply to the sheet chrome** — the platform draws the
+   * container, so `BottomSheet.Content`'s `className` and its drag handle are
+   * ignored. The content inside is still yours.
+   */
+  native?: boolean;
+  /**
+   * Heights the native sheet can rest at. Omit to size to the content.
+   * `{ fraction }` and `{ height }` are iOS-only; Android snaps them to the
+   * nearest of `half` / `full`.
+   */
+  snapPoints?: ('half' | 'full' | { fraction: number } | { height: number })[];
+}
+
+/**
+ * Roughly how tall the platform will make the sheet at a given detent, as a
+ * fraction of the screen. Approximate on purpose — it is used as a floor for
+ * the content, not as the sheet's real height, which the platform owns.
+ */
+const DETENT_FRACTION = { half: 0.5, full: 0.9 } as const;
+
+/**
+ * The height the content should at least fill for a given set of detents.
+ *
+ * Without this the hosted content sizes to itself and the platform centres
+ * that smaller box inside the taller sheet, which is why a short sheet shows
+ * its content floating in the middle. Filling the detent leaves nothing to
+ * centre, so the content sits where it was written: at the top.
+ */
+function detentFloor(
+  snapPoints: BottomSheetProps['snapPoints'],
+  screenHeight: number
+): number | undefined {
+  if (!snapPoints?.length) return undefined;
+
+  // The sheet opens at its first detent, so that is the one to fill.
+  const first = snapPoints[0];
+  if (first === 'half' || first === 'full') {
+    return screenHeight * DETENT_FRACTION[first];
+  }
+  if (typeof first === 'object' && 'fraction' in first) {
+    return screenHeight * first.fraction;
+  }
+  if (typeof first === 'object' && 'height' in first) return first.height;
+  return undefined;
+}
+
+/**
+ * Set by the root so Content knows the platform is drawing the sheet, and with
+ * which detents. Null means the styled sheet renders.
+ */
+const NativeSheetContext = createContext<{
+  nativeUI: NonNullable<ReturnType<typeof getNativeUI>>;
+  snapPoints: BottomSheetProps['snapPoints'];
+} | null>(null);
+
+/**
+ * The wiring between the sheet's drag and a scrolling body inside it. Set by
+ * `Content`, filled in by `Body` — the two gestures have to agree on where the
+ * list is scrolled to before either can decide whose drag it is.
+ */
+/*
+ * Taken off the factory rather than imported by name: the package exports two
+ * different `NativeGesture` types, and the one reachable from its entry point
+ * is not the one `Gesture.Native()` returns.
+ */
+type ScrollGesture = ReturnType<typeof Gesture.Native>;
+
+const SheetSurfaceContext = createContext<{
+  scrollGesture: ScrollGesture;
+  scrollOffset: SharedValue<number>;
+  hasScrollable: SharedValue<boolean>;
+} | null>(null);
+
+function BottomSheetRoot({
+  children,
+  open,
+  onOpenChange,
+  defaultOpen = false,
+  native,
+  snapPoints,
+}: BottomSheetProps) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isControlled = open !== undefined;
+  const resolvedOpen = isControlled ? open : internalOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange]
+  );
+
+  const context = useMemo(
+    () => ({ open: resolvedOpen, setOpen }),
+    [resolvedOpen, setOpen]
+  );
+
+  const nativeUI = native ? getNativeUI() : null;
+  const nativeSheet = useMemo(
+    () => (nativeUI ? { nativeUI, snapPoints } : null),
+    [nativeUI, snapPoints]
+  );
+
+  return (
+    <BottomSheetContext.Provider value={context}>
+      <NativeSheetContext.Provider value={nativeSheet}>
+        {children}
+      </NativeSheetContext.Provider>
+    </BottomSheetContext.Provider>
+  );
+}
+
+interface BottomSheetTriggerProps {
+  children: ReactElement<{ onPress?: (...args: unknown[]) => void }>;
+}
+
+function BottomSheetTrigger({ children }: BottomSheetTriggerProps) {
+  const { setOpen } = useBottomSheet('BottomSheet.Trigger');
+  if (!isValidElement(children)) return children;
+
+  return cloneElement(children, {
+    onPress: (...args: unknown[]) => {
+      children.props.onPress?.(...args);
+      setOpen(true);
+    },
+  });
+}
+
+export interface BottomSheetContentProps extends ViewProps {
+  className?: string;
+  /** Tap on the backdrop closes the sheet. Default true. */
+  dismissible?: boolean;
+  /**
+   * Show a close button in the top trailing corner — the right in a
+   * left-to-right app, the left in a right-to-left one. On by default for the
+   * styled sheet; ignored by the native sheet, which has its own dismiss
+   * affordances.
+   */
+  showClose?: boolean;
+  /**
+   * Show the drag handle at the top of the sheet. On by default, because a
+   * sheet that can be dragged should say so.
+   *
+   * Turn it off when the sheet draws its own — a component wrapping this one
+   * to give the surface a material of its own has to put the handle on that
+   * material, and a handle floating above it belongs to nothing.
+   */
+  showGrabber?: boolean;
+  /**
+   * Float the sheet clear of the screen edges instead of docking it to the
+   * bottom, so it reads as a card laid over the app rather than a drawer
+   * pulled out of it. All four corners round and the bottom border comes back,
+   * since a floating sheet has four real edges where a docked one has three.
+   * Ignored by the native sheet, which the platform positions itself.
+   */
+  detached?: boolean;
+  /**
+   * Frost the screen behind the sheet instead of dimming it, so what is behind
+   * stays legible as shape and colour while losing its detail. Needs the
+   * optional `expo-blur`; without it this dims, rather than failing.
+   *
+   * Someone who has Reduce Transparency switched on gets an opaque
+   * backdrop instead, which is the whole point of the setting.
+   */
+  blur?: boolean;
+  /**
+   * How tall the sheet opens.
+   *
+   * `auto` sizes to the content, which is right for a sheet that is a handful
+   * of rows. `half` and `full` fix the height instead, for content that has to
+   * be given the room rather than allowed to ask for it — a list, a form, a
+   * document. Either way the sheet is clamped to leave the status bar clear,
+   * so `full` is as tall as the screen allows rather than as tall as the screen.
+   *
+   * On the native sheet this maps onto the platform's detents.
+   */
+  size?: 'auto' | 'half' | 'full';
+  children?: ReactNode;
+}
+
+/**
+ * Fractions of the screen the sized sheets aim for. `full` is not 1: a sheet
+ * that reached the top would have nothing behind it to read as laid *over*,
+ * and the gap is what says the app is still there underneath.
+ */
+const SIZE_FRACTION = { half: 0.5, full: 0.94 } as const;
+
+function BottomSheetContent({
+  className,
+  dismissible = true,
+  showClose = true,
+  showGrabber = true,
+  detached = false,
+  blur = false,
+  size = 'auto',
+  children,
+  ...props
+}: BottomSheetContentProps) {
+  const context = useBottomSheet('BottomSheet.Content');
+  const { open, setOpen } = context;
+  const nativeSheet = useContext(NativeSheetContext);
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const insets = useSafeAreaInsets();
+  const translateY = useSharedValue(0);
+  const closeTint = useCSSVariable('--color-muted-foreground');
+
+  /*
+   * The scrolling body's gesture, if there is one. It is built here rather
+   * than in `BottomSheet.Body` because the drag below has to name it, and a
+   * gesture is composed before its children have mounted. `Body` attaches it
+   * to its own scroll view; with no `Body` it is simply never attached, and
+   * the drag reverts to owning every touch.
+   */
+  const scrollGesture = useMemo(() => Gesture.Native(), []);
+  const scrollOffset = useSharedValue(0);
+  const hasScrollable = useSharedValue(false);
+
+  const close = useCallback(() => setOpen(false), [setOpen]);
+
+  // The sheet closes on the Android back button while it is up, the same as a
+  // backdrop tap — but only when it is dismissible.
+  useBackHandler(open && dismissible, close);
+
+  /*
+   * The offset survives a close — the early return below sits after every
+   * hook, so this component keeps its state while the sheet is hidden. A
+   * swipe-dismiss leaves it parked a screen height down, and without this the
+   * next open would draw the sheet below the fold behind a full backdrop:
+   * a dimmed screen with nothing on it and no reachable close button.
+   */
+  useEffect(() => {
+    if (open) translateY.value = 0;
+  }, [open, translateY]);
+
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        /*
+         * A drag has to travel before it takes the touch. This detector wraps
+         * the whole sheet, close button included, and an unqualified Pan
+         * activates on a few pixels of drift — cancelling the press the button
+         * is in the middle of, so a tap with any finger travel does nothing.
+         */
+        .activeOffsetY([-12, 12])
+        /*
+         * A scrolling body runs its own gesture, and without this the two
+         * compete: whichever wins takes the touch outright, so either the
+         * list never scrolls or the sheet never drags. Running them together
+         * lets the rule below decide which one a given drag belongs to.
+         */
+        .simultaneousWithExternalGesture(scrollGesture)
+        .onChange((event) => {
+          /*
+           * The list gets the drag until it has nothing left to scroll. Once
+           * it is at the top the sheet takes over, which is the gesture people
+           * already expect: pulling down on a list that cannot go further
+           * pulls the sheet instead. The second clause keeps a sheet that is
+           * already part-way dragged following the finger, so releasing the
+           * drag halfway does not strand it.
+           */
+          if (hasScrollable.value && scrollOffset.value > 0 && translateY.value <= 0) {
+            return;
+          }
+          // Rubber-band when dragging upward, follow the finger downward.
+          const next = translateY.value + event.changeY;
+          translateY.value = next > 0 ? next : next / 3;
+        })
+        .onEnd((event) => {
+          /*
+           * Velocity decides as much as distance does, and it is handed to the
+           * animation rather than only consulted by it. A flat timing from
+           * wherever the finger let go ignores how fast it was moving, so the
+           * frame the touch ends is a visible seam between a fast drag and a
+           * slow slide — the single detail that separates a sheet that follows
+           * your hand from one that merely goes where you put it.
+           */
+          const projected = translateY.value + project(event.velocityY);
+          if (
+            projected > DISMISS_DISTANCE ||
+            event.velocityY > DISMISS_VELOCITY
+          ) {
+            translateY.value = withSpring(
+              screenHeight,
+              { ...EXIT_SPRING, velocity: event.velocityY },
+              (finished) => {
+                if (finished) runOnJS(close)();
+              }
+            );
+          } else {
+            translateY.value = withSpring(0, { ...SPRING, velocity: event.velocityY });
+            // It caught rather than went. Fired here, at the moment the sheet
+            // commits to staying, not when it finishes arriving.
+            runOnJS(impactKnock)();
+          }
+        }),
+    // Rebuilt only when one of these changes. Built inline it would be a new
+    // gesture on every render — and the sheet re-renders while it is being
+    // used, each time re-attaching the handler and dropping the live touch.
+    [close, screenHeight, translateY, scrollGesture, scrollOffset, hasScrollable]
+  );
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateY.value,
+      [0, screenHeight],
+      [1, 0],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  /*
+   * A sized sheet is clamped rather than handed its fraction outright.
+   * `insets.top` is the status bar and the notch, and content that runs under
+   * those is unreadable at exactly the moment the sheet is at its tallest.
+   */
+  const sizedHeight =
+    size === 'auto'
+      ? undefined
+      : Math.min(
+          screenHeight * SIZE_FRACTION[size],
+          screenHeight - insets.top - (detached ? 24 : 8)
+        );
+
+  const surface = useMemo(
+    () => ({ scrollGesture, scrollOffset, hasScrollable }),
+    [scrollGesture, scrollOffset, hasScrollable]
+  );
+
+  if (nativeSheet) {
+    const { BottomSheet: NativeBottomSheet, RNHostView } = nativeSheet.nativeUI;
+    /*
+     * `snapPoints` on the root is the finer control and wins; `size` is the
+     * shorthand, and maps onto the platform's own detents rather than a
+     * height, so a native sheet keeps the system's snapping.
+     */
+    const snapPoints =
+      nativeSheet.snapPoints ?? (size === 'auto' ? undefined : [size]);
+    // The platform owns presentation, so this stays mounted and toggles
+    // isPresented rather than unmounting on close.
+    //
+    // RNHostView is not optional: our content is React Native, and the native
+    // sheet cannot measure RN views directly. Without it the sheet sizes to
+    // nothing and the content spills outside its container.
+    return (
+      <NativeBottomSheet
+        isPresented={open}
+        onDismiss={dismissible ? close : () => {}}
+        snapPoints={snapPoints}
+      >
+        <RNHostView matchContents>
+          <BottomSheetContext.Provider value={context}>
+            <View
+              {...props}
+              className={cn(
+                // The universal Expo sheet already owns its native Host.
+                // Keep only the RN bridge here so fit-to-content measures the
+                // actual panel instead of an absolute nested host.
+                'justify-start gap-2 px-5 pt-3',
+                className
+              )}
+              style={{
+                // An explicit width, not `w-full`. Inside the native host
+                // there is no parent width for a percentage to resolve
+                // against, so `100%` measures against nothing and the
+                // content lays out wider than the sheet it sits in.
+                width: screenWidth,
+                minHeight: detentFloor(snapPoints, screenHeight),
+                paddingBottom: 16,
+              }}
+            >
+              {textChildren(children)}
+            </View>
+          </BottomSheetContext.Provider>
+        </RNHostView>
+      </NativeBottomSheet>
+    );
+  }
+
+  if (!open) return null;
+
+  return (
+    <ModalPortal>
+      {/* Portal content mounts under PortalHost, outside this provider's
+          subtree — re-provide the context so nested consumers keep working. */}
+      <BottomSheetContext.Provider value={context}>
+        <View className="absolute inset-0 justify-end">
+        {/* Derived from the same value the sheet moves on, so the backdrop
+            cannot disagree with it: dragging the sheet halfway down lightens
+            the screen behind it by half. Left to its own fade the scrim stayed
+            fully dark until the sheet had gone, which reads as a dimmed screen
+            with nothing on it. */}
+        <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
+          {/* Scrim draws the backdrop and its own fade; the Pressable over it
+              is what closes the sheet, since the scrim takes no touches. */}
+          <Scrim blur={blur} />
+          <Pressable
+            accessibilityLabel="Close sheet"
+            className="flex-1"
+            onPress={
+              dismissible
+                ? () => {
+                    impactKnock();
+                    close();
+                  }
+                : undefined
+            }
+          />
+        </Animated.View>
+        <GestureDetector gesture={pan}>
+          <Animated.View
+            /*
+             * The same spring the drag settles with, so a sheet caught halfway
+             * through arriving and a sheet released after a drag are the same
+             * object moving at the same weight.
+             *
+             * Reduced motion keeps the scrim's fade and drops the slide: the
+             * state change still has to be legible, and it is the travel that
+             * setting is about.
+             */
+            entering={reducedMotion ? FadeIn.duration(150) : ENTERING}
+            exiting={reducedMotion ? FadeOut.duration(150) : EXITING}
+            accessibilityViewIsModal
+            className={sheetVariants({ detached, className })}
+            {...props}
+            // After the spread, and with the caller's own style folded in
+            // rather than replacing the array: spread last, a caller passing
+            // `style` for a height would silently drop the drag transform and
+            // the safe-area padding with it.
+            style={[
+              sheetStyle,
+              // A detached sheet's own bottom margin already clears the home
+              // indicator, so it takes plain padding rather than stacking the
+              // inset on top of the gap.
+              { paddingBottom: detached ? 16 : Math.max(insets.bottom, 16) },
+              sizedHeight === undefined ? null : { height: sizedHeight },
+              props.style,
+            ]}
+          >
+            <SheetSurfaceContext.Provider value={surface}>
+              {showGrabber ? (
+                <View className="mb-3 self-center">
+                  <View className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+                </View>
+              ) : null}
+              {textChildren(children)}
+              {/*
+                * Last, and lifted above the content.
+                *
+                * Drawn before the children it was covered by whichever of them
+                * reached the top-right corner — a title spanning the sheet's
+                * width is enough — and in React Native a later sibling wins
+                * the touch. The button still looked untouched, so the failure
+                * read as intermittent: taps landing on the sliver above the
+                * title worked, taps anywhere else went to the title and did
+                * nothing. `hitSlop` made it worse by growing the part of the
+                * target that was already buried.
+                */}
+              {showClose ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                  onPress={() => {
+                    impactKnock();
+                    close();
+                  }}
+                  hitSlop={8}
+                  className="absolute end-4 top-3 z-10 h-8 w-8 items-center justify-center rounded-full bg-muted active:opacity-70"
+                >
+                  <XIcon
+                    size={16}
+                    color={typeof closeTint === 'string' ? closeTint : undefined}
+                  />
+                </Pressable>
+              ) : null}
+            </SheetSurfaceContext.Provider>
+          </Animated.View>
+        </GestureDetector>
+        </View>
+      </BottomSheetContext.Provider>
+    </ModalPortal>
+  );
+}
+
+export interface BottomSheetHeaderProps extends ViewProps {
+  className?: string;
+  /** Heading for the sheet. Strings are wrapped; anything else is drawn as given. */
+  title?: ReactNode;
+  /** A line under the title, for what the sheet is asking. */
+  description?: ReactNode;
+  children?: ReactNode;
+}
+
+/**
+ * A fixed heading above the sheet's body.
+ *
+ * It exists mostly to reserve the top-right corner. The close button is
+ * absolutely positioned there, so anything full-width at the top of a sheet
+ * sits under it — a title is exactly that shape, and the end padding here is
+ * what keeps the two from meeting. Being outside `Body` is the other half:
+ * it stays put while the content scrolls under it, so the sheet still says
+ * what it is once the list has moved.
+ */
+function BottomSheetHeader({
+  className,
+  title,
+  description,
+  children,
+  ...props
+}: BottomSheetHeaderProps) {
+  return (
+    <View className={cn('gap-1 pb-3 pe-12', className)} {...props}>
+      {textChildren(title, (text) => (
+        <Text size="lg" weight="semibold">
+          {text}
+        </Text>
+      ))}
+      {textChildren(description, (text) => (
+        <Text size="sm" muted>
+          {text}
+        </Text>
+      ))}
+      {textChildren(children)}
+    </View>
+  );
+}
+BottomSheetHeader.displayName = 'BottomSheet.Header';
+
+export interface BottomSheetBodyProps
+  extends Omit<ComponentProps<typeof Animated.ScrollView>, 'ref'> {
+  className?: string;
+  children?: ReactNode;
+}
+
+/**
+ * The scrolling part of a sized sheet.
+ *
+ * A plain `ScrollView` works here too, but only one of the two gestures can
+ * win a given drag and neither knows about the other, so the list and the
+ * sheet fight over every downward swipe. This one reports where it is
+ * scrolled to, which is what lets the sheet hold off until the list has run
+ * out — pull down on a list at its top and the sheet comes with you, pull
+ * down anywhere else and the list scrolls.
+ */
+function BottomSheetBody({
+  className,
+  children,
+  onScroll,
+  ...props
+}: BottomSheetBodyProps) {
+  const surface = useContext(SheetSurfaceContext);
+
+  useEffect(() => {
+    if (!surface) return;
+    surface.hasScrollable.value = true;
+    return () => {
+      surface.hasScrollable.value = false;
+      surface.scrollOffset.value = 0;
+    };
+  }, [surface]);
+
+  /*
+   * Pulled out before the handler rather than read off `surface` inside it.
+   * A scroll handler is a worklet, and everything it closes over is copied to
+   * the UI thread — closing over the context object would drag the gesture
+   * along with it, and a gesture is not a value that can be copied.
+   */
+  const scrollOffset = surface?.scrollOffset;
+
+  const handler = useAnimatedScrollHandler((event) => {
+    if (scrollOffset) scrollOffset.value = event.contentOffset.y;
+  });
+
+  const body = (
+    <Animated.ScrollView
+      onScroll={handler}
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      className={cn('flex-1', className)}
+      {...props}
+    >
+      {textChildren(children)}
+    </Animated.ScrollView>
+  );
+
+  /*
+   * The detector is what gives the scroll a handler the sheet's drag can name.
+   * Without one the two are strangers, and the first to activate takes the
+   * touch outright — which is the whole bug this part exists to solve.
+   */
+  if (!surface) return body;
+  return <GestureDetector gesture={surface.scrollGesture}>{body}</GestureDetector>;
+}
+BottomSheetBody.displayName = 'BottomSheet.Body';
+
+export interface BottomSheetFooterProps extends ViewProps {
+  className?: string;
+  children?: ReactNode;
+}
+
+/**
+ * A row pinned below the body, for whatever the sheet is asking to be decided.
+ * Outside `Body` so it stays reachable however far the content scrolls — an
+ * action that has to be scrolled to is one people do not find.
+ */
+function BottomSheetFooter({
+  className,
+  children,
+  ...props
+}: BottomSheetFooterProps) {
+  return (
+    <View
+      className={cn('gap-2 border-t border-border pt-3', className)}
+      {...props}
+    >
+      {textChildren(children)}
+    </View>
+  );
+}
+BottomSheetFooter.displayName = 'BottomSheet.Footer';
+
+export const BottomSheet = Object.assign(BottomSheetRoot, {
+  Trigger: BottomSheetTrigger,
+  Content: BottomSheetContent,
+  Header: BottomSheetHeader,
+  Body: BottomSheetBody,
+  Footer: BottomSheetFooter,
+});

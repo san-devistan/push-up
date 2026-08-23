@@ -1,59 +1,33 @@
-import type { SetupState } from "./setup.ts"
-// Relative so `pnpm check:counter` can run this file under bare node, which
-// does not resolve the "@/" alias.
-import { closeTrace, sampleTrace, startTrace, type PoseTrace } from "./trace.ts"
+import {
+  closeTrace,
+  sampleTrace,
+  startTrace,
+  type MotionTrace,
+} from "./trace.ts"
 
-export const PUSHUP_THRESHOLDS = {
-  depthTolerance: 0.01,
-  leaveTop: 150,
-  recoveryMaxElbowAngle: 125,
+export const FACE_COUNTER_THRESHOLDS = {
+  bottom: 1.35,
+  leaveTop: 1.12,
+  minimumAttemptMs: 450,
   recoveryMaxTrackingGapMs: 750,
-  recoveryMinAttemptMs: 700,
-  top: 160,
-  visibility: 0.1,
-} as const
-
-export const SETUP_ZONES = {
-  head: { max: 0.3, min: 0.1 },
-  wrist: { max: 0.85, min: 0.65 },
+  returnTop: 1.08,
 } as const
 
 export type FailureReason =
-  | "body_misalignment"
-  | "incomplete_lockout"
+  | "incomplete_return"
   | "insufficient_depth"
   | "tracking_lost"
 
-export type PoseLandmark = {
-  x: number
-  y: number
-  visibility: number
-}
-
-export type PoseMetrics = {
-  confidence: number
-  elbowAngle: number
-  shoulderY: number
-}
-
 export type WorkoutAttempt = {
-  // Shoulder distance from the calibrated depth guide, sampled through the
-  // rep. Zero is the actual target shown by the camera overlay.
   depthTrace?: number[]
   durationMs: number
   failureReasons: FailureReason[]
-  minBodyAngle: number
-  minElbowAngle: number
   startedAtOffsetMs: number
-  // Elbow angles sampled through the rep, oldest first — the motion curve the
-  // summary graphs. Absent on sessions recorded before tracing existed.
-  trace?: number[]
   valid: boolean
 }
 
-type ActiveAttempt = PoseTrace & {
+type ActiveAttempt = MotionTrace & {
   maxTrackingGapMs: number
-  minElbowAngle: number
   reachedBottom: boolean
   startedAtOffsetMs: number
   trackingLostAtOffsetMs: number | null
@@ -69,254 +43,28 @@ export type CounterEvent =
   | { type: "none" }
   | { attempt: WorkoutAttempt; type: "attempt-completed" }
 
-const ARM_LANDMARKS = [
-  { elbow: 13, shoulder: 11, wrist: 15 },
-  { elbow: 14, shoulder: 12, wrist: 16 },
-] as const
-
-const BODY_LANDMARKS = [11, 12, 13, 14, 15, 16, 23, 24] as const
-const DEPTH_GUIDE_TRAVEL_RATIO = 0.4
-const HEAD_LANDMARKS = [0, 2, 5, 7, 8] as const
-const LEGACY_FRONT_BODY_ANGLE = 180
-
-function angle(
-  pointA: PoseLandmark,
-  vertex: PoseLandmark,
-  pointC: PoseLandmark
-) {
-  const first = { x: pointA.x - vertex.x, y: pointA.y - vertex.y }
-  const second = { x: pointC.x - vertex.x, y: pointC.y - vertex.y }
-  const denominator =
-    Math.hypot(first.x, first.y) * Math.hypot(second.x, second.y)
-
-  if (denominator === 0) {
-    return 0
-  }
-
-  const cosine = Math.min(
-    1,
-    Math.max(-1, (first.x * second.x + first.y * second.y) / denominator)
-  )
-
-  return (Math.acos(cosine) * 180) / Math.PI
-}
-
-export function getPoseMetrics(
-  landmarks: readonly PoseLandmark[]
-): PoseMetrics | null {
-  const leftShoulder = landmarks[11]
-  const rightShoulder = landmarks[12]
-
-  if (!leftShoulder || !rightShoulder) {
-    return null
-  }
-
-  const visibleArms = ARM_LANDMARKS.map((indices) => {
-    const points = {
-      elbow: landmarks[indices.elbow],
-      shoulder: landmarks[indices.shoulder],
-      wrist: landmarks[indices.wrist],
-    }
-
-    if (Object.values(points).some((point) => point === undefined)) {
-      return null
-    }
-
-    return {
-      confidence: Math.min(
-        points.elbow.visibility,
-        points.shoulder.visibility,
-        points.wrist.visibility
-      ),
-      points,
-    }
-  }).filter((arm) => arm !== null)
-  // oxlint-disable-next-line unicorn/no-array-sort -- Hermes does not support toSorted.
-  const arm = visibleArms.sort((first, second) => {
-    return second.confidence - first.confidence
-  })[0]
-
-  if (!arm) {
-    return null
-  }
-
-  const confidence = Math.min(
-    arm.confidence,
-    leftShoulder.visibility,
-    rightShoulder.visibility
-  )
-  const shouldersAreVisibleFromFront =
-    Math.abs(leftShoulder.x - rightShoulder.x) > 0.06
-  const handIsBelowShoulders =
-    arm.points.wrist.y > (leftShoulder.y + rightShoulder.y) / 2 - 0.08
-
-  if (
-    confidence < PUSHUP_THRESHOLDS.visibility ||
-    !shouldersAreVisibleFromFront ||
-    !handIsBelowShoulders
-  ) {
-    return null
-  }
-
-  return {
-    confidence,
-    elbowAngle: angle(arm.points.shoulder, arm.points.elbow, arm.points.wrist),
-    shoulderY: (leftShoulder.y + rightShoulder.y) / 2,
-  }
-}
-
-export function getDepthGuideY(
-  landmarks: readonly PoseLandmark[]
-): number | null {
-  const guidePositions = ARM_LANDMARKS.flatMap((indices) => {
-    const shoulder = landmarks[indices.shoulder]
-    const wrist = landmarks[indices.wrist]
-
-    if (
-      !shoulder ||
-      !wrist ||
-      Math.min(shoulder.visibility, wrist.visibility) <
-        PUSHUP_THRESHOLDS.visibility ||
-      wrist.y <= shoulder.y
-    ) {
-      return []
-    }
-
-    return [shoulder.y + (wrist.y - shoulder.y) * DEPTH_GUIDE_TRAVEL_RATIO]
-  })
-
-  return guidePositions.length === 0
-    ? null
-    : guidePositions.reduce((total, position) => total + position, 0) /
-        guidePositions.length
-}
-
-export function isDepthReached(
-  landmarks: readonly PoseLandmark[],
-  depthGuideY: number | null
-) {
-  if (depthGuideY === null) {
-    return false
-  }
-
-  const shoulderPositions = [11, 12].flatMap((index) => {
-    const shoulder = landmarks[index]
-    return shoulder && shoulder.visibility >= PUSHUP_THRESHOLDS.visibility
-      ? [shoulder.y]
-      : []
-  })
-
-  return (
-    shoulderPositions.length > 0 &&
-    shoulderPositions.reduce((total, position) => total + position, 0) /
-      shoulderPositions.length >=
-      depthGuideY - PUSHUP_THRESHOLDS.depthTolerance
-  )
-}
-
-export function isReadyPosition(metrics: PoseMetrics | null) {
-  return metrics !== null && metrics.elbowAngle >= PUSHUP_THRESHOLDS.top
-}
-
-function hasVisibleLandmark(landmarks: readonly PoseLandmark[], index: number) {
-  return (landmarks[index]?.visibility ?? 0) >= PUSHUP_THRESHOLDS.visibility
-}
-
-function hasVisibleBody(landmarks: readonly PoseLandmark[]) {
-  return BODY_LANDMARKS.some((index) => hasVisibleLandmark(landmarks, index))
-}
-
-function averageVisibleY(
-  landmarks: readonly PoseLandmark[],
-  indices: readonly number[]
-) {
-  const positions = indices.flatMap((index) =>
-    hasVisibleLandmark(landmarks, index) ? [landmarks[index]?.y ?? 0] : []
-  )
-
-  return positions.length === 0
-    ? null
-    : positions.reduce((total, position) => total + position, 0) /
-        positions.length
-}
-
-export function getSetupState(
-  landmarks: readonly PoseLandmark[],
-  metrics: PoseMetrics | null,
-  ready: boolean
-): SetupState {
-  if (!hasVisibleBody(landmarks)) {
-    return { framing: "unknown", hint: "fitBody", valid: false }
-  }
-
-  const headY = averageVisibleY(landmarks, HEAD_LANDMARKS)
-  const handsY = averageVisibleY(landmarks, [15, 16])
-
-  if (headY === null || handsY === null) {
-    return { framing: "unknown", hint: "showHeadHands", valid: false }
-  }
-
-  if (headY < SETUP_ZONES.head.min || handsY > SETUP_ZONES.wrist.max) {
-    return { framing: "close", hint: "moveBack", valid: false }
-  }
-
-  if (headY > SETUP_ZONES.head.max && handsY < SETUP_ZONES.wrist.min) {
-    return { framing: "far", hint: "moveCloser", valid: false }
-  }
-
-  if (headY > SETUP_ZONES.head.max) {
-    return {
-      framing: "off-center",
-      hint: "raisePhone",
-      valid: false,
-    }
-  }
-
-  if (handsY < SETUP_ZONES.wrist.min) {
-    return {
-      framing: "off-center",
-      hint: "lowerPhone",
-      valid: false,
-    }
-  }
-
-  if (!metrics) {
-    return { framing: "ready", hint: "faceCamera", valid: false }
-  }
-
-  return ready
-    ? { framing: "ready", hint: "holdStill", valid: true }
-    : { framing: "ready", hint: "startTop", valid: false }
-}
-
 export function createCounterState(): CounterState {
   return { activeAttempt: null, attempts: [], validReps: 0 }
 }
 
 export function recordTrackingLoss(
   state: CounterState,
-  lastPoseAtOffsetMs: number,
-  depthReached: boolean
+  lastFaceAtOffsetMs: number
 ): CounterState {
-  if (!state.activeAttempt) {
-    return state
-  }
+  if (!state.activeAttempt) return state
 
   return {
     ...state,
     activeAttempt: {
       ...state.activeAttempt,
-      reachedBottom: state.activeAttempt.reachedBottom || depthReached,
       trackingLostAtOffsetMs:
-        state.activeAttempt.trackingLostAtOffsetMs ?? lastPoseAtOffsetMs,
+        state.activeAttempt.trackingLostAtOffsetMs ?? lastFaceAtOffsetMs,
     },
   }
 }
 
 function closeTrackingGap(attempt: ActiveAttempt, elapsedMs: number) {
-  if (attempt.trackingLostAtOffsetMs === null) {
-    return attempt
-  }
+  if (attempt.trackingLostAtOffsetMs === null) return attempt
 
   return {
     ...attempt,
@@ -328,31 +76,39 @@ function closeTrackingGap(attempt: ActiveAttempt, elapsedMs: number) {
   }
 }
 
-function canRecoverBottom(
+function createFailureReasons(
   attempt: ActiveAttempt,
-  metrics: PoseMetrics,
-  elapsedMs: number
-) {
-  return (
-    !attempt.reachedBottom &&
-    attempt.maxTrackingGapMs > 0 &&
-    attempt.maxTrackingGapMs <= PUSHUP_THRESHOLDS.recoveryMaxTrackingGapMs &&
-    elapsedMs - attempt.startedAtOffsetMs >=
-      PUSHUP_THRESHOLDS.recoveryMinAttemptMs &&
-    attempt.minElbowAngle <= PUSHUP_THRESHOLDS.recoveryMaxElbowAngle &&
-    metrics.elbowAngle >= PUSHUP_THRESHOLDS.top
-  )
+  durationMs: number
+): FailureReason[] {
+  const reasons: FailureReason[] = []
+
+  if (
+    !attempt.reachedBottom ||
+    durationMs < FACE_COUNTER_THRESHOLDS.minimumAttemptMs
+  ) {
+    reasons.push("insufficient_depth")
+  }
+
+  if (
+    attempt.maxTrackingGapMs > FACE_COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
+  ) {
+    reasons.push("tracking_lost")
+  }
+
+  return reasons
 }
 
-export function processPoseMetrics(
+export function processFaceScale(
   state: CounterState,
-  metrics: PoseMetrics,
-  elapsedMs: number,
-  depthReached: boolean,
-  depthOffset: number | null = null
+  faceScale: number,
+  topScale: number,
+  elapsedMs: number
 ): { event: CounterEvent; state: CounterState } {
+  const scaleRatio = faceScale / topScale
+  const depthOffset = scaleRatio - FACE_COUNTER_THRESHOLDS.bottom
+
   if (!state.activeAttempt) {
-    if (metrics.elbowAngle >= PUSHUP_THRESHOLDS.leaveTop) {
+    if (scaleRatio < FACE_COUNTER_THRESHOLDS.leaveTop) {
       return { event: { type: "none" }, state }
     }
 
@@ -362,58 +118,40 @@ export function processPoseMetrics(
         ...state,
         activeAttempt: {
           maxTrackingGapMs: 0,
-          minElbowAngle: metrics.elbowAngle,
-          reachedBottom: depthReached,
+          reachedBottom: scaleRatio >= FACE_COUNTER_THRESHOLDS.bottom,
           startedAtOffsetMs: elapsedMs,
           trackingLostAtOffsetMs: null,
-          ...startTrace(metrics.elbowAngle, depthOffset, elapsedMs),
+          ...startTrace(depthOffset, elapsedMs),
         },
       },
     }
   }
 
   const gapClosed = closeTrackingGap(state.activeAttempt, elapsedMs)
-  const trackedAttempt = {
+  const traced = {
     ...gapClosed,
-    ...sampleTrace(gapClosed, metrics.elbowAngle, depthOffset, elapsedMs),
-  }
-  const observedAttempt = {
-    ...trackedAttempt,
-    minElbowAngle: Math.min(trackedAttempt.minElbowAngle, metrics.elbowAngle),
-    reachedBottom: trackedAttempt.reachedBottom || depthReached,
+    ...sampleTrace(gapClosed, depthOffset, elapsedMs),
   }
   const activeAttempt = {
-    ...observedAttempt,
+    ...traced,
     reachedBottom:
-      observedAttempt.reachedBottom ||
-      canRecoverBottom(observedAttempt, metrics, elapsedMs),
+      traced.reachedBottom || scaleRatio >= FACE_COUNTER_THRESHOLDS.bottom,
   }
 
-  if (metrics.elbowAngle < PUSHUP_THRESHOLDS.top) {
+  if (scaleRatio > FACE_COUNTER_THRESHOLDS.returnTop) {
     return {
       event: { type: "none" },
       state: { ...state, activeAttempt },
     }
   }
 
-  const failureReasons: FailureReason[] = []
-
-  if (!activeAttempt.reachedBottom) {
-    failureReasons.push(
-      activeAttempt.maxTrackingGapMs > 0 &&
-        activeAttempt.minElbowAngle <= PUSHUP_THRESHOLDS.recoveryMaxElbowAngle
-        ? "tracking_lost"
-        : "insufficient_depth"
-    )
-  }
-
+  const durationMs = Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs)
+  const failureReasons = createFailureReasons(activeAttempt, durationMs)
   const attempt = {
-    durationMs: Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs),
+    depthTrace: closeTrace(activeAttempt, depthOffset, elapsedMs),
+    durationMs,
     failureReasons,
-    minBodyAngle: LEGACY_FRONT_BODY_ANGLE,
-    minElbowAngle: activeAttempt.minElbowAngle,
     startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
-    ...closeTrace(activeAttempt, metrics.elbowAngle, depthOffset, elapsedMs),
     valid: failureReasons.length === 0,
   } satisfies WorkoutAttempt
 
@@ -435,32 +173,29 @@ export function finishActiveAttempt(
   state: CounterState,
   elapsedMs: number
 ): CounterState {
-  if (!state.activeAttempt) {
-    return state
-  }
+  if (!state.activeAttempt) return state
 
   const activeAttempt = closeTrackingGap(state.activeAttempt, elapsedMs)
-  const failureReasons: FailureReason[] = activeAttempt.reachedBottom
-    ? ["incomplete_lockout"]
-    : [
-        activeAttempt.maxTrackingGapMs > 0 &&
-        activeAttempt.minElbowAngle <= PUSHUP_THRESHOLDS.recoveryMaxElbowAngle
-          ? "tracking_lost"
-          : "insufficient_depth",
-      ]
+  const failureReasons: FailureReason[] = [
+    activeAttempt.reachedBottom ? "incomplete_return" : "insufficient_depth",
+  ]
+
+  if (
+    activeAttempt.maxTrackingGapMs >
+    FACE_COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
+  ) {
+    failureReasons.push("tracking_lost")
+  }
 
   return {
     activeAttempt: null,
     attempts: [
       ...state.attempts,
       {
+        depthTrace: activeAttempt.depthTrace,
         durationMs: Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs),
         failureReasons,
-        depthTrace: activeAttempt.depthTrace,
-        minBodyAngle: LEGACY_FRONT_BODY_ANGLE,
-        minElbowAngle: activeAttempt.minElbowAngle,
         startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
-        trace: activeAttempt.trace,
         valid: false,
       },
     ],

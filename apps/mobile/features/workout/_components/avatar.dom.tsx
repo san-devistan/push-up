@@ -23,6 +23,9 @@ const DOCUMENT_STYLES = `
   .bs-avatar {
     display: inline-grid;
     max-width: 100%;
+    max-height: 100%;
+    width: min(100vw, 100vh) !important;
+    height: min(100vw, 100vh) !important;
     aspect-ratio: 1;
     place-items: center;
   }
@@ -44,14 +47,21 @@ const DOCUMENT_STYLES = `
 
 export default function WorkoutAvatar({
   animation,
+  expression,
 }: {
-  animation: keyof typeof definition.animations
+  animation?: keyof typeof definition.animations
   dom?: DOMProps
+  expression?: keyof typeof definition.expressions
 }) {
   return (
     <>
       <style>{DOCUMENT_STYLES}</style>
-      <PumprAvatar animation={animation} ariaLabel="pumpr avatar" size="100%" />
+      <PumprAvatar
+        animation={animation}
+        ariaLabel="pumpr avatar"
+        expression={expression}
+        size="100%"
+      />
     </>
   )
 }

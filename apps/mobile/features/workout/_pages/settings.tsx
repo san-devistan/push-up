@@ -1,18 +1,36 @@
+import { EdgeBlur } from "@/components/edge-blur"
+import {
+  AlertTriangleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CrosshairIcon,
+  MicIcon,
+  PlusIcon,
+  RepeatIcon,
+  SolidBellIcon,
+  TrophyIcon,
+  XIcon,
+  type IconProps,
+} from "@/components/icons"
 import {
   NUMERIC_TEXT_SLOT,
   NumericPhrase,
   NumericText,
 } from "@/components/numeric-text"
+import { Button } from "@/components/ui/button"
 import { PreferencesSection } from "@/features/preferences/_components/section"
 import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import { Connect } from "@/features/workout/_components/connect"
 import { Overline, Slab } from "@/features/workout/_components/figures"
-import GoalSlider from "@/features/workout/_components/goal-slider"
+import WorkoutSectionRail from "@/features/workout/_components/section-rail"
 import TimeControl from "@/features/workout/_components/time-control"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
 import { formatClock } from "@/features/workout/_lib/format"
 import {
+  goalAtIndex,
+  LAST_GOAL_INDEX,
   MAX_TRAINING_TIMES,
+  nearestGoalIndex,
   repsPerSession,
 } from "@/features/workout/_lib/goal"
 import type { ReminderState } from "@/features/workout/_lib/reminders"
@@ -22,41 +40,48 @@ import type {
 } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
 import { hapticHard } from "@/lib/haptics"
+import { FONT_FAMILY } from "@/lib/theme"
 import Constants from "expo-constants"
-import { useRouter } from "expo-router"
-import {
-  AlertTriangleIcon,
-  BellIcon,
-  Button,
-  ChevronLeftIcon,
-  CrosshairIcon,
-  MicIcon,
-  PlusIcon,
-  RepeatIcon,
-  ShieldCheckIcon,
-  Switch,
-  Text,
-  XIcon,
-  type IconProps,
-} from "panelui-native"
+import { Link, Stack, useRouter } from "expo-router"
+import { Slider, Switch, Text } from "panelui-native"
+import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import type { ComponentType } from "react"
-import { Pressable, StyleSheet, View } from "react-native"
-import Animated from "react-native-reanimated"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
-const SCREEN_EDGES = ["top", "bottom"] as const
-const APP_NAME = Constants.expoConfig?.name ?? "PUMPRS"
+const APP_NAME = Constants.expoConfig?.name ?? "pumpr."
 const APP_VERSION = Constants.expoConfig?.version ?? "dev"
+const SETTINGS_SECTION_IDS = ["training", "preferences", "sync"]
+const SETTINGS_READING_LINE = 320
+const HEADER_FONT_FAMILY =
+  process.env.EXPO_OS === "ios" ? "Anton-Regular" : FONT_FAMILY.heading
 const styles = StyleSheet.create({
   content: {
     gap: 16,
-    paddingBottom: 40,
+    paddingBottom: 104,
     paddingHorizontal: 20,
     paddingTop: 8,
   },
   screen: { flex: 1 },
 })
+const SETTINGS_SCREEN_OPTIONS = {
+  headerBackVisible: false,
+  headerLargeTitleShadowVisible: false,
+  headerLeft: renderSettingsBackButton,
+  headerShadowVisible: false,
+  headerShown: true,
+  headerTransparent: true,
+  scrollEdgeEffects: { top: "hidden" },
+} as const
+const SETTINGS_TITLE_STYLE = {
+  fontFamily: HEADER_FONT_FAMILY,
+  fontSize: 24,
+} as const
+const SETTINGS_LARGE_TITLE_STYLE = {
+  fontFamily: HEADER_FONT_FAMILY,
+  fontSize: 44,
+} as const
+const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 
 function nextTrainingTime(times: readonly TrainingTime[]): TrainingTime {
   const last = times.at(-1) ?? { hour: 8, minute: 0 }
@@ -67,34 +92,37 @@ function Divider() {
   return <View className="h-px bg-border" />
 }
 
-function SettingsHeader() {
+function SettingsBackButton() {
   const { t } = useI18n()
   const router = useRouter()
 
   return (
-    <View className="flex-row items-center">
-      <Button
-        accessibilityLabel={t("levels.goBack")}
-        className="h-10 w-10 rounded-full bg-muted"
-        onPress={router.back}
-        size="icon"
-        variant="ghost"
-      >
-        <ChevronLeftIcon />
-      </Button>
-      <Text
-        accessibilityRole="header"
-        className="flex-1 text-center font-bold text-lg tracking-[2px]"
-      >
-        {t("settings.title")}
-      </Text>
-      <View className="size-10" />
-    </View>
+    <Button
+      accessibilityLabel={t("levels.goBack")}
+      className="h-10 w-10 rounded-full"
+      onPress={router.back}
+      size="icon"
+      variant="ghost"
+    >
+      <ChevronLeftIcon strokeWidth={3} />
+    </Button>
   )
 }
 
-function getSetTarget(updatePlan: (patch: Partial<TrainingPlan>) => void) {
-  return (targetReps: number) => updatePlan({ targetReps })
+function renderSettingsBackButton() {
+  return <SettingsBackButton />
+}
+
+function getSetTarget(
+  updatePlan: (patch: Partial<TrainingPlan>) => void,
+  selected: number
+) {
+  return (index: number) => {
+    if (index === selected) return
+    selected = index
+    hapticHard()
+    updatePlan({ targetReps: goalAtIndex(index) })
+  }
 }
 
 function getTimeChange(
@@ -138,7 +166,10 @@ function getSetPlanBoolean(
   key: "reminderEnabled" | "soundEnabled",
   updatePlan: (patch: Partial<TrainingPlan>) => void
 ) {
-  return (value: boolean) => updatePlan({ [key]: value })
+  return (value: boolean) => {
+    hapticHard()
+    updatePlan({ [key]: value })
+  }
 }
 
 function SettingRow({
@@ -158,7 +189,7 @@ function SettingRow({
     <View className="flex-row items-center justify-between gap-4">
       <SettingIcon size={18} />
       <Text className="flex-1 font-semibold">{label}</Text>
-      <Switch haptics onValueChange={onCheckedChange} value={checked} />
+      <Switch onValueChange={onCheckedChange} value={checked} />
     </View>
   )
 }
@@ -166,16 +197,25 @@ function SettingRow({
 function GoalFields() {
   const { t } = useI18n()
   const { plan, updatePlan } = usePlan()
-  const setTarget = getSetTarget(updatePlan)
+  const targetIndex = nearestGoalIndex(plan.targetReps)
+  const setTarget = getSetTarget(updatePlan, targetIndex)
 
   return (
     <>
       <View className="flex-row items-center gap-4">
         <CrosshairIcon size={18} />
         <Text className="flex-1 font-semibold">{t("plan.dailyGoal")}</Text>
-        <NumericText className="text-xl" value={plan.targetReps} />
+        <NumericText align="end" className="text-xl" value={plan.targetReps} />
       </View>
-      <GoalSlider onChange={setTarget} value={plan.targetReps} />
+      <Slider
+        formatValue={formatGoalIndex}
+        headerClassName="hidden"
+        label={t("accessibility.dailyGoal")}
+        max={LAST_GOAL_INDEX}
+        onValueChange={setTarget}
+        step={1}
+        value={targetIndex}
+      />
     </>
   )
 }
@@ -188,7 +228,7 @@ function PermissionNotice({ state }: { state: ReminderState }) {
   if (state === "ask") {
     return (
       <Button onPress={enableReminders} variant="outline">
-        <BellIcon />
+        <SolidBellIcon />
         {t("plan.allowNotifications")}
       </Button>
     )
@@ -238,7 +278,7 @@ function TimeRow({
         <XIcon />
       </Button>
       <View className="flex-1" />
-      <TimeControl hour={time.hour} minute={time.minute} onChange={change} />
+      <TimeControl onChange={change} value={time} />
     </View>
   )
 }
@@ -247,6 +287,9 @@ function TimesSection() {
   const { t } = useI18n()
   const { plan, updatePlan } = usePlan()
   const times = plan.reminderTimes
+  const timeSlots = times.map(
+    (time, index) => [`training-${index}`, index, time] as const
+  )
   const perSession = repsPerSession(plan.targetReps, times.length)
   const canAdd =
     times.length < MAX_TRAINING_TIMES && times.length < plan.targetReps
@@ -271,21 +314,20 @@ function TimesSection() {
             value={perSession}
           />
         ) : (
-          times.map((time, index) => (
+          timeSlots.map(([id, index, time]) => (
             <TimeControl
-              key={`${time.hour}:${time.minute}`}
-              hour={time.hour}
-              minute={time.minute}
+              key={id}
               onChange={getTimeChange(index, changeTime)}
+              value={time}
             />
           ))
         )}
       </View>
       {hasMultipleTimes ? (
         <View className="gap-2">
-          {times.map((time, index) => (
+          {timeSlots.map(([id, index, time]) => (
             <TimeRow
-              key={`${time.hour}:${time.minute}`}
+              key={id}
               index={index}
               onChange={changeTime}
               onRemove={removeTime}
@@ -303,7 +345,7 @@ function TimesSection() {
             size="sm"
             variant="outline"
           >
-            <PlusIcon />
+            <PlusIcon size={14} />
             {t("plan.addSession")}
           </Button>
         </View>
@@ -321,7 +363,7 @@ function NotificationRows() {
     <>
       <SettingRow
         checked={plan.reminderEnabled}
-        icon={BellIcon}
+        icon={SolidBellIcon}
         label={t("plan.notification")}
         onCheckedChange={setEnabled}
       />
@@ -345,6 +387,25 @@ function SoundRow() {
   )
 }
 
+function LevelsRow() {
+  const { locale, t } = useI18n()
+  const label = t("levels.levels").toLocaleLowerCase(locale)
+
+  return (
+    <Link asChild href="/levels">
+      <Pressable
+        accessibilityLabel={label}
+        className="min-h-11 flex-row items-center gap-4 active:opacity-60"
+        onPress={hapticHard}
+      >
+        <TrophyIcon size={18} />
+        <Text className="flex-1 font-semibold capitalize">{label}</Text>
+        <ChevronRightIcon size={18} />
+      </Pressable>
+    </Link>
+  )
+}
+
 function getReplayOnboarding(router: ReturnType<typeof useRouter>) {
   return () => {
     hapticHard()
@@ -361,11 +422,11 @@ function AppIdentity() {
       accessibilityHint="Long press to replay onboarding"
       accessibilityLabel={`${APP_NAME} version ${APP_VERSION}`}
       accessibilityRole="button"
-      className="items-center gap-1 py-4 active:opacity-60"
+      className="flex-row items-baseline justify-center gap-1 py-4 active:opacity-60"
       delayLongPress={600}
       onLongPress={replayOnboarding}
     >
-      <Text className="font-medium font-mono text-xs tracking-[2px] text-muted-foreground">
+      <Text className="font-heading text-xs text-muted-foreground">
         {APP_NAME}
       </Text>
       <Text className="text-xs text-muted-foreground">v{APP_VERSION}</Text>
@@ -374,43 +435,73 @@ function AppIdentity() {
 }
 
 export default function SettingsPage() {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
+  const title = `${t("settings.title").toLocaleLowerCase(locale)}.`
+  const {
+    active,
+    measure,
+    ref: scrollRef,
+    scrollProps,
+    scrollTo,
+  } = useScrollSections({
+    endThreshold: 0,
+    ids: SETTINGS_SECTION_IDS,
+    offset: SETTINGS_READING_LINE,
+    scrollPadding: SETTINGS_READING_LINE,
+  })
 
   return (
-    <SafeAreaView edges={SCREEN_EDGES} style={styles.screen}>
-      <Animated.ScrollView
+    <>
+      <ScrollView
+        ref={scrollRef}
+        {...scrollProps}
         className="flex-1"
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        style={styles.screen}
       >
-        <SettingsHeader />
-        <Slab>
-          <Overline>{t("plan.trainingSettings")}</Overline>
-          <GoalFields />
-          <Divider />
-          <TimesSection />
-          <Divider />
-          <NotificationRows />
-          <Divider />
-          <SoundRow />
-        </Slab>
-
-        <Slab>
-          <Overline>{t("plan.preferences")}</Overline>
-          <PreferencesSection />
-        </Slab>
-
-        <Connect />
-
-        <View className="flex-row items-center gap-3 rounded-2xl bg-muted p-4">
-          <ShieldCheckIcon />
-          <Text className="flex-1" muted>
-            {t("plan.privacy")}
-          </Text>
+        <View onLayout={measure("training")}>
+          <Slab>
+            <Overline>{t("plan.trainingSettings")}</Overline>
+            <GoalFields />
+            <Divider />
+            <TimesSection />
+            <Divider />
+            <NotificationRows />
+            <Divider />
+            <SoundRow />
+            <Divider />
+            <LevelsRow />
+          </Slab>
         </View>
 
-        <AppIdentity />
-      </Animated.ScrollView>
-    </SafeAreaView>
+        <View onLayout={measure("preferences")}>
+          <Slab>
+            <Overline>{t("plan.preferences")}</Overline>
+            <PreferencesSection />
+          </Slab>
+        </View>
+
+        <View className="gap-4" onLayout={measure("sync")}>
+          <Connect />
+          <AppIdentity />
+        </View>
+      </ScrollView>
+      <EdgeBlur />
+      <WorkoutSectionRail
+        active={active}
+        onValueChange={scrollTo}
+        screen="settings"
+      />
+      <Stack.Screen options={SETTINGS_SCREEN_OPTIONS} />
+      <Stack.Title
+        large
+        largeStyle={SETTINGS_LARGE_TITLE_STYLE}
+        style={SETTINGS_TITLE_STYLE}
+      >
+        {title}
+      </Stack.Title>
+    </>
   )
 }

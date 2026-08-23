@@ -5,6 +5,19 @@ export function formatDuration(durationMs: number) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`
 }
 
+export function formatTotalDuration(durationMs: number) {
+  const totalMinutes = Math.ceil(durationMs / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const units = [
+    days && `${days}d`,
+    hours && `${hours}h`,
+    minutes && `${minutes}m`,
+  ]
+  return units.filter(Boolean).join(" ") || "0m"
+}
+
 export function formatClock(
   hour: number,
   minute: number,

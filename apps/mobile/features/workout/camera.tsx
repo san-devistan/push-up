@@ -1,14 +1,16 @@
-import type { PoseCameraProps } from "@/features/workout/camera.types"
+import type { FaceCameraProps } from "@/features/workout/camera.types"
 import { useI18n } from "@/hooks/use-i18n"
 import { Text } from "panelui-native"
 import { View } from "react-native"
 
-export default function PoseCamera(_: PoseCameraProps) {
+export default function FaceCamera(_: FaceCameraProps) {
   const { t } = useI18n()
 
   return (
-    <View className="flex-1 items-center justify-center bg-black px-8">
-      <Text className="text-center text-white">{t("camera.devBuild")}</Text>
+    <View className="z-10 flex-1 items-center justify-center bg-background px-8">
+      <Text className="text-center text-foreground">
+        {t("camera.devBuild")}
+      </Text>
     </View>
   )
 }

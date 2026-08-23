@@ -2,8 +2,7 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 const failureReason = v.union(
-  v.literal("body_misalignment"),
-  v.literal("incomplete_lockout"),
+  v.literal("incomplete_return"),
   v.literal("insufficient_depth"),
   v.literal("tracking_lost")
 )
@@ -12,8 +11,6 @@ export default defineSchema({
   workoutAttempts: defineTable({
     durationMs: v.number(),
     failureReasons: v.array(failureReason),
-    minBodyAngle: v.number(),
-    minElbowAngle: v.number(),
     sessionId: v.id("workoutSessions"),
     startedAtOffsetMs: v.number(),
     valid: v.boolean(),

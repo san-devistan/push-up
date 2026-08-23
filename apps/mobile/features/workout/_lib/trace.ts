@@ -1,77 +1,54 @@
-export type PoseTrace = {
-  depthTrace?: number[]
-  trace: number[]
+const TRACE_MAX_SAMPLES = 48
+const TRACE_SAMPLE_INTERVAL_MS = 80
+
+export type MotionTrace = {
+  depthTrace: number[]
   tracedAtOffsetMs: number
 }
-
-// 80ms resolves the down/up shape of a ~2s rep; the cap keeps a rep that
-// stalls at the bottom from growing the stored session without bound.
-const TRACE_SAMPLE_INTERVAL_MS = 80
-const TRACE_MAX_SAMPLES = 48
 
 function appendSample(trace: readonly number[], value: number) {
   return trace.length >= TRACE_MAX_SAMPLES ? [...trace] : [...trace, value]
 }
 
-function roundDepth(depthOffset: number) {
-  return Math.round(depthOffset * 1000) / 1000
-}
-
-export function connectTrace(
-  values: readonly number[],
-  previousEnd: number | undefined
-) {
-  const anchor = previousEnd ?? values.at(-1)
-
-  return anchor === undefined ? [] : [anchor, ...values]
+function roundDepth(value: number) {
+  return Math.round(value * 100) / 100
 }
 
 export function startTrace(
-  elbowAngle: number,
-  depthOffset: number | null,
+  depthOffset: number,
   elapsedMs: number
-): PoseTrace {
+): MotionTrace {
   return {
-    ...(depthOffset === null ? {} : { depthTrace: [roundDepth(depthOffset)] }),
-    trace: [Math.round(elbowAngle)],
+    depthTrace: [roundDepth(depthOffset)],
     tracedAtOffsetMs: elapsedMs,
   }
 }
 
 export function sampleTrace(
-  state: PoseTrace,
-  elbowAngle: number,
-  depthOffset: number | null,
+  state: MotionTrace,
+  depthOffset: number,
   elapsedMs: number
-): PoseTrace {
+): MotionTrace {
   return elapsedMs - state.tracedAtOffsetMs < TRACE_SAMPLE_INTERVAL_MS
     ? state
     : {
-        depthTrace:
-          state.depthTrace && depthOffset !== null
-            ? appendSample(state.depthTrace, roundDepth(depthOffset))
-            : undefined,
-        trace: appendSample(state.trace, Math.round(elbowAngle)),
+        depthTrace: appendSample(state.depthTrace, roundDepth(depthOffset)),
         tracedAtOffsetMs: elapsedMs,
       }
 }
 
-/** The closing frame is the lockout, so the curve ends where the rep did. */
 export function closeTrace(
-  state: PoseTrace,
-  elbowAngle: number,
-  depthOffset: number | null,
+  state: MotionTrace,
+  depthOffset: number,
   elapsedMs: number
 ) {
-  if (state.tracedAtOffsetMs === elapsedMs) {
-    return { depthTrace: state.depthTrace, trace: state.trace }
-  }
+  return state.tracedAtOffsetMs === elapsedMs
+    ? state.depthTrace
+    : appendSample(state.depthTrace, roundDepth(depthOffset))
+}
 
-  return {
-    depthTrace:
-      state.depthTrace && depthOffset !== null
-        ? appendSample(state.depthTrace, roundDepth(depthOffset))
-        : undefined,
-    trace: appendSample(state.trace, Math.round(elbowAngle)),
-  }
+export function connectTrace(values: readonly number[], previous?: number) {
+  return previous === undefined || values[0] === previous
+    ? [...values]
+    : [previous, ...values]
 }

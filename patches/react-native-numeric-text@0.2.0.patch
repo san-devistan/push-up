@@ -1,0 +1,162 @@
+diff --git a/lib/module/NumericTextFallback.js b/lib/module/NumericTextFallback.js
+index 935cf947ed8bbd3282ac1fe942e70663ccb55cc3..4b6331ff54684d3ab7b622be7fa6dff2b4c6f0d1 100644
+--- a/lib/module/NumericTextFallback.js
++++ b/lib/module/NumericTextFallback.js
+@@ -8,6 +8,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
+ /** Static fallback for platforms without the native transition renderer. */
+ function NumericTextFallbackImpl(props) {
+   const {
++    align = 'center',
+     value,
+     locale = DEFAULT_LOCALE,
+     style,
+@@ -16,7 +17,9 @@ function NumericTextFallbackImpl(props) {
+   const formatted = formatNumber(value, locale, resolveFormat(props));
+   return /*#__PURE__*/_jsx(Text, {
+     ...accessibilityPropsOf(props),
+-    style: style,
++    style: [style, {
++      textAlign: align
++    }],
+     testID: testID,
+     children: formatted
+   });
+diff --git a/lib/module/NumericTextView.native.js b/lib/module/NumericTextView.native.js
+index 5e90ce2c7adef492d81f7688df19a8463f1ef0bf..06356cb9fcdf71f9bdf93945510e45d556fb919e 100644
+--- a/lib/module/NumericTextView.native.js
++++ b/lib/module/NumericTextView.native.js
+@@ -1,6 +1,7 @@
+ "use strict";
+ 
+ import { memo, useEffect, useRef, useState } from 'react';
++import { StyleSheet } from 'react-native';
+ import NumericTextViewNativeComponent from './NumericTextViewNativeComponent';
+ import { accessibilityPropsOf } from "./accessibilityProps.js";
+ import { measureBox, widest } from "./measureBox.js";
+@@ -16,6 +17,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
+  */
+ function NumericTextViewImpl(props) {
+   const {
++    align = 'center',
+     value,
+     locale = DEFAULT_LOCALE,
+     direction = 'automatic',
+@@ -27,7 +29,13 @@ function NumericTextViewImpl(props) {
+   const text = resolveTextStyle(style);
+   const format = resolveFormat(props);
+   const formatted = formatNumber(value, locale, format);
+-  const box = useShrinkHeldBox(measureBox(formatted, text.fontSize), Math.max(animationDuration, 500) + 400);
++  const targetBox = measureBox(formatted, text.fontSize);
++  const heldBox = useShrinkHeldBox(targetBox, Math.max(animationDuration, 500) + 400);
++  const spareWidth = heldBox.minWidth - targetBox.minWidth;
++  const translateX = align === 'start' ? -spareWidth / 2 : align === 'end' ? spareWidth / 2 : 0;
++  const transform = [...(StyleSheet.flatten(style)?.transform ?? []), {
++    translateX
++  }];
+   return /*#__PURE__*/_jsx(NumericTextViewNativeComponent, {
+     ...accessibilityPropsOf(props),
+     value: value,
+@@ -41,7 +49,9 @@ function NumericTextViewImpl(props) {
+     fontFamily: text.fontFamily,
+     textColor: text.textColor,
+     testID: testID,
+-    style: [style, box]
++    style: [style, heldBox, {
++      transform
++    }]
+   });
+ }
+ function sameBox(a, b) {
+diff --git a/lib/typescript/src/types.d.ts b/lib/typescript/src/types.d.ts
+index b9e4e62a94dfed5140a2a038ef55e63b3558f465..d5cbce28b21b179753017871969bab2e50e29b24 100644
+--- a/lib/typescript/src/types.d.ts
++++ b/lib/typescript/src/types.d.ts
+@@ -49,6 +49,8 @@ export type NumericTextAccessibilityProps = Pick<AccessibilityProps, 'accessible
+ export type NumericTextProps = NumericTextAccessibilityProps & {
+     /** The number to display. Changing it animates; the first render does not. */
+     value: number;
++    /** Anchors the current glyphs while the animation box is holding a wider previous value. */
++    align?: 'start' | 'center' | 'end';
+     /**
+      * BCP-47 tag deciding grouping and decimal marks. Defaults to `'en-US'` rather than the device
+      * locale so a layout does not silently change with the device language.
+diff --git a/src/NumericTextFallback.tsx b/src/NumericTextFallback.tsx
+index 3304c38533b337217b3c0496e501d8fe36a94134..66ca3332760d66a9f0208c88a2751a8c677accf0 100644
+--- a/src/NumericTextFallback.tsx
++++ b/src/NumericTextFallback.tsx
+@@ -6,11 +6,11 @@ import type { NumericTextProps } from './types';
+ 
+ /** Static fallback for platforms without the native transition renderer. */
+ function NumericTextFallbackImpl(props: NumericTextProps) {
+-  const { value, locale = DEFAULT_LOCALE, style, testID } = props;
++  const { align = 'center', value, locale = DEFAULT_LOCALE, style, testID } = props;
+   const formatted = formatNumber(value, locale, resolveFormat(props));
+ 
+   return (
+-    <Text {...accessibilityPropsOf(props)} style={style} testID={testID}>
++    <Text {...accessibilityPropsOf(props)} style={[style, { textAlign: align }]} testID={testID}>
+       {formatted}
+     </Text>
+   );
+diff --git a/src/NumericTextView.native.tsx b/src/NumericTextView.native.tsx
+index 5d6969d1e002fd83bbc82cd52b2a75b809f76747..27d9c65f072b224f3908ebd060cbbf48a916e010 100644
+--- a/src/NumericTextView.native.tsx
++++ b/src/NumericTextView.native.tsx
+@@ -1,4 +1,5 @@
+ import { memo, useEffect, useRef, useState } from 'react';
++import { StyleSheet } from 'react-native';
+ import NumericTextViewNativeComponent from './NumericTextViewNativeComponent';
+ import { accessibilityPropsOf } from './accessibilityProps';
+ import { measureBox, widest, type Box } from './measureBox';
+@@ -20,6 +21,7 @@ import type { NumericTextProps } from './types';
+  */
+ function NumericTextViewImpl(props: NumericTextProps) {
+   const {
++    align = 'center',
+     value,
+     locale = DEFAULT_LOCALE,
+     direction = 'automatic',
+@@ -32,10 +34,18 @@ function NumericTextViewImpl(props: NumericTextProps) {
+   const text = resolveTextStyle(style);
+   const format = resolveFormat(props);
+   const formatted = formatNumber(value, locale, format);
+-  const box = useShrinkHeldBox(
+-    measureBox(formatted, text.fontSize),
++  const targetBox = measureBox(formatted, text.fontSize);
++  const heldBox = useShrinkHeldBox(
++    targetBox,
+     Math.max(animationDuration, 500) + 400
+   );
++  const spareWidth = heldBox.minWidth - targetBox.minWidth;
++  const translateX =
++    align === 'start' ? -spareWidth / 2 : align === 'end' ? spareWidth / 2 : 0;
++  const transform = [
++    ...(StyleSheet.flatten(style)?.transform ?? []),
++    { translateX },
++  ];
+ 
+   return (
+     <NumericTextViewNativeComponent
+@@ -51,7 +61,7 @@ function NumericTextViewImpl(props: NumericTextProps) {
+       fontFamily={text.fontFamily}
+       textColor={text.textColor}
+       testID={testID}
+-      style={[style, box]}
++      style={[style, heldBox, { transform }]}
+     />
+   );
+ }
+diff --git a/src/types.ts b/src/types.ts
+index f36ad861aa9460b2bc88262d1042b2aff89a1479..52d6387f58180de1c35591bd80bffd8aa7d3d99f 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -73,6 +73,9 @@ export type NumericTextProps = NumericTextAccessibilityProps & {
+   /** The number to display. Changing it animates; the first render does not. */
+   value: number;
+ 
++  /** Anchors the current glyphs while the animation box is holding a wider previous value. */
++  align?: 'start' | 'center' | 'end';
++
+   /**
+    * BCP-47 tag deciding grouping and decimal marks. Defaults to `'en-US'` rather than the device
+    * locale so a layout does not silently change with the device language.

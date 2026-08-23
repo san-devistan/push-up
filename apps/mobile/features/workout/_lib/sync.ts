@@ -6,14 +6,11 @@ import {
 
 type PendingSession = ReturnType<typeof listPendingSessions>[number]
 
-// The pose trace stays on device: the Convex attempt validator is a strict
-// object, so an extra field would make every sync fail.
+// Motion traces stay on device; Convex receives only derived attempt data.
 function toSyncedAttempt(attempt: WorkoutAttempt) {
   return {
     durationMs: attempt.durationMs,
     failureReasons: attempt.failureReasons,
-    minBodyAngle: attempt.minBodyAngle,
-    minElbowAngle: attempt.minElbowAngle,
     startedAtOffsetMs: attempt.startedAtOffsetMs,
     valid: attempt.valid,
   }

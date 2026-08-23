@@ -1,0 +1,20 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["pumpr", "facedetector"],
+  "ios": {
+    "iosModuleName": "PumprFaceDetector"
+  },
+  "android": {
+    "androidNamespace": ["pumpr", "facedetector"],
+    "androidCxxLibName": "PumprFaceDetector"
+  },
+  "autolinking": {
+    "AppleFaceDetector": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "AppleFaceDetector"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

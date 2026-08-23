@@ -40,6 +40,22 @@ export function goalAtIndex(index: number) {
   return GOAL_STEPS[Math.min(LAST_GOAL_INDEX, Math.max(0, index))]
 }
 
+/**
+ * The line of context under today's count: how far past the goal, or how the
+ * day stands against yesterday. Null when there is nothing worth saying — the
+ * goal just met, or no yesterday to compare with.
+ */
+export function getDailyPace(reps: number, target: number, yesterday: number) {
+  if (reps > target) {
+    return { delta: reps - target, over: true }
+  }
+  if (reps === target || yesterday === 0) {
+    return null
+  }
+
+  return { delta: reps - yesterday, over: false }
+}
+
 export const MAX_TRAINING_TIMES = 6
 
 export function repsPerSession(total: number, sessions: number) {

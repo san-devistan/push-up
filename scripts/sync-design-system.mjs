@@ -352,16 +352,16 @@ function buildMobileCss(tokens, lightTheme, darkTheme) {
   const themeVars = buildMobileFontVars(tokens.fonts)
   const radiusVars = buildMobileRadiusVars(tokens.radius)
 
-  return `@import "tailwindcss";
-@import "uniwind";
-@import "panelui-native/theme.css";
+  return `@import 'tailwindcss';
+@import 'uniwind';
+@import './theme.css';
 
-@source "./app/**/*.{ts,tsx}";
-@source "./components/**/*.{ts,tsx}";
-@source "./features/**/*.{ts,tsx}";
-@source "./hooks/**/*.{ts,tsx}";
-@source "./lib/**/*.{ts,tsx}";
-@source "./node_modules/panelui-native/src";
+@source './components';
+@source './lib';
+@source './hooks';
+@source './app/**/*.{ts,tsx}';
+@source './features/**/*.{ts,tsx}';
+@source './node_modules/panelui-native/src';
 
 @theme {
 ${buildCssVars(themeVars, 2)}

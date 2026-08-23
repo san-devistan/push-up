@@ -1,6 +1,7 @@
 import type { SetupState } from "./setup.ts"
 
-export const MAX_PHONE_INCLINATION_DEGREES = 20
+export const PHONE_FLAT_TARGET_DEGREES = 90
+export const PHONE_FLAT_TOLERANCE_DEGREES = 15
 
 type GravityVector = {
   x: number
@@ -16,11 +17,18 @@ export function getPhoneInclinationDegrees({ x, y, z }: GravityVector) {
     : (Math.acos(Math.max(-1, Math.min(1, -y / magnitude))) * 180) / Math.PI
 }
 
-export function requireUprightPhone(
+export function isPhoneFlat(degrees: number) {
+  return (
+    Math.abs(degrees - PHONE_FLAT_TARGET_DEGREES) <=
+    PHONE_FLAT_TOLERANCE_DEGREES
+  )
+}
+
+export function requireFlatPhone(
   setup: SetupState,
-  phoneUpright: boolean
+  phoneFlat: boolean
 ): SetupState {
-  return setup.valid && !phoneUpright
-    ? { ...setup, hint: "tiltPhone", valid: false }
+  return setup.valid && !phoneFlat
+    ? { ...setup, hint: "layPhoneFlat", valid: false }
     : setup
 }

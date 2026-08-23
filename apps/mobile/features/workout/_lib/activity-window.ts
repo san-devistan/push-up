@@ -41,6 +41,25 @@ export function getCurrentWeekActivity(
   return fillActivityDays(getMonday(today), DAYS_PER_WEEK, recentDays)
 }
 
+/** Rolling 7-day total and daily shape against the seven days before it. */
+export function getWeeklyComparison(recentDays: readonly ActivityDay[]) {
+  const currentDays = recentDays.slice(-DAYS_PER_WEEK)
+  const previousDays = recentDays.slice(-DAYS_PER_WEEK * 2, -DAYS_PER_WEEK)
+  const data = Array.from({ length: DAYS_PER_WEEK }, (_, index) => ({
+    current: currentDays[index]?.reps ?? 0,
+    day: index + 1,
+    previous: previousDays[index]?.reps ?? 0,
+  }))
+  const current = data.reduce((total, day) => total + day.current, 0)
+  const previous = data.reduce((total, day) => total + day.previous, 0)
+
+  return {
+    current,
+    data,
+    percent: previous > 0 ? ((current - previous) / previous) * 100 : null,
+  }
+}
+
 export function getActivityDaysAgo(date: string, today: number) {
   const value = new Date(`${date}T00:00:00`)
   const current = new Date(today)

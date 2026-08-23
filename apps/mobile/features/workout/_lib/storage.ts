@@ -116,8 +116,7 @@ function migratePlan(value: unknown): TrainingPlan | null {
 
 function isFailureReason(value: unknown) {
   return (
-    value === "body_misalignment" ||
-    value === "incomplete_lockout" ||
+    value === "incomplete_return" ||
     value === "insufficient_depth" ||
     value === "tracking_lost"
   )
@@ -137,10 +136,7 @@ function isAttempt(value: unknown): value is WorkoutAttempt {
     typeof value.durationMs === "number" &&
     Array.isArray(value.failureReasons) &&
     value.failureReasons.every(isFailureReason) &&
-    typeof value.minBodyAngle === "number" &&
-    typeof value.minElbowAngle === "number" &&
     typeof value.startedAtOffsetMs === "number" &&
-    isTrace(value.trace) &&
     typeof value.valid === "boolean"
   )
 }
@@ -243,6 +239,7 @@ export function createWorkoutSession({
   startedAt,
   status,
   targetReps,
+  totalDurationMs,
 }: {
   counterState: CounterState
   endedAt: number
@@ -250,10 +247,11 @@ export function createWorkoutSession({
   startedAt: number
   status: WorkoutStatus
   targetReps: number
+  totalDurationMs: number
 }): WorkoutSession {
   const finalState =
     status === "stopped"
-      ? finishActiveAttempt(counterState, endedAt - startedAt)
+      ? finishActiveAttempt(counterState, totalDurationMs)
       : counterState
 
   return {
@@ -270,7 +268,7 @@ export function createWorkoutSession({
     status,
     targetReps,
     timezoneOffsetMinutes: -new Date(startedAt).getTimezoneOffset(),
-    totalDurationMs: endedAt - startedAt,
+    totalDurationMs,
     validReps: finalState.validReps,
   }
 }

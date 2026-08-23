@@ -8,7 +8,7 @@ Prefer repo-local conventions and skills before introducing new patterns.
 | Area          | Path               | Stack                                                                                           | Notes                                                                                                      |
 | ------------- | ------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Web app       | `apps/web`         | TanStack Start, React 19, TanStack Router, TanStack Query, Tailwind CSS v4, Vite, Convex client | Uses shared web UI from `@workspace/ui`.                                                                   |
-| Mobile app    | `apps/mobile`      | Expo Router, React Native, PanelUI, Uniwind, Convex client                                      | Imports generic native UI directly from PanelUI and styles it through generated mobile theme tokens.       |
+| Mobile app    | `apps/mobile`      | Expo Router, React Native, PanelUI, Uniwind, Convex client                                      | Imports unmodified native UI from PanelUI; CLI-installs components locally before source customization.    |
 | Backend       | `packages/backend` | Convex                                                                                          | Owns Convex schema, functions, generated API exports, auth, email, billing, and backend integration logic. |
 | Web UI system | `packages/ui`      | React 19, shadcn-style components, Tailwind CSS v4, Base UI, lucide-react, `usehooks-ts`        | Source of truth for the web design system and design tokens.                                               |
 | Automation    | `scripts`          | Shell and explicit Node.js scripts                                                              | JavaScript is allowed here for repo tooling.                                                               |
@@ -37,8 +37,10 @@ When explicitly requested:
 
 `packages/ui` owns the canonical web design system, shared design tokens, and
 shadcn-style components. `apps/web` consumes those components through
-`@workspace/ui`. `apps/mobile` imports generic native components directly from
-`panelui-native` and shares the design language through the generated tokens in
+`@workspace/ui`. `apps/mobile` imports unmodified native components directly
+from `panelui-native`. Before changing a PanelUI component's source, install it
+locally with `panelui-cli` and customize the generated file instead of patching
+the package. Mobile shares the design language through the generated tokens in
 `apps/mobile/global.css`; it does not import web React components.
 
 For implementation details, read the local workspace guide before editing UI:

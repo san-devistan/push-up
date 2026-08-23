@@ -1,23 +1,22 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes chart props. */
 
 import {
+  HeatmapChart,
+  buildHeatmapCalendar,
+  type HeatmapCell,
+} from "@/components/ui/heatmap-chart"
+import {
   formatActivityDate,
   getActivityDaysAgo,
 } from "@/features/workout/_lib/activity-window"
+import { DEMO_DATA } from "@/features/workout/_lib/demo"
 import { useI18n } from "@/hooks/use-i18n"
-import {
-  BarChart,
-  HeatmapChart,
-  buildHeatmapCalendar,
-  type BarChartDatum,
-  type HeatmapCell,
-  type HeatmapColumn,
-} from "panelui-native"
-import { useEffect, useRef } from "react"
+import { hapticHard } from "@/lib/haptics"
+import { BarChart, type BarChartDatum } from "panelui-native"
+import { useRef } from "react"
 import { ScrollView, View } from "react-native"
 
 const HEATMAP_WEEK_START = 1
-const EMPTY_HEATMAP_DATA: HeatmapColumn[] = []
 
 type ActivityDay = { date: string; reps: number }
 
@@ -29,6 +28,14 @@ function getShortDay(date: string, locale: string) {
   return parseActivityDate(date).toLocaleDateString(locale, {
     weekday: "short",
   })
+}
+
+function hapticBarSelection(_: number, datum: BarChartDatum | null) {
+  if (datum) hapticHard()
+}
+
+function hapticCellSelection(cell: HeatmapCell | null) {
+  if (cell) hapticHard()
 }
 
 function getDateLabel(
@@ -70,25 +77,29 @@ export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
   }
 
   return (
-    <BarChart
-      accessibilityLabel={t("today.activity")}
-      accessibilityLabelForDatum={labelDatum}
-      aspectRatio={2.5}
-      data={data}
-      minBarLength={2}
-      xDataKey="label"
-    >
-      <BarChart.Grid opacity={0.45} rows={3} />
-      <BarChart.Bar colorIndex={3} dataKey="reps" />
-      <BarChart.XAxis />
-      <BarChart.Tooltip
-        formatValue={(value) =>
-          `${formatNumber(value)} ${t(
-            value === 1 ? "common.rep" : "common.reps"
-          )}`
-        }
-      />
-    </BarChart>
+    <View className="-mx-2.5">
+      <BarChart
+        accessibilityLabel={t("today.activity")}
+        accessibilityLabelForDatum={labelDatum}
+        aspectRatio={2.5}
+        data={data}
+        minBarLength={2}
+        onAccessibilityDatumPress={hapticHard}
+        onActiveIndexChange={hapticBarSelection}
+        xDataKey="label"
+      >
+        <BarChart.Grid opacity={0.45} rows={3} />
+        <BarChart.Bar colorIndex={3} dataKey="reps" />
+        <BarChart.XAxis />
+        <BarChart.Tooltip
+          formatValue={(value) =>
+            `${formatNumber(value)} ${t(
+              value === 1 ? "common.rep" : "common.reps"
+            )}`
+          }
+        />
+      </BarChart>
+    </View>
   )
 }
 
@@ -110,58 +121,65 @@ export function ActivityHeatmap({
     start: entries[0]?.date,
     weekStartDay: HEATMAP_WEEK_START,
   })
-  const weekdayLabels = Array.from({ length: 7 }, (_, index) =>
-    new Date(2024, 0, index + 1).toLocaleDateString(locale, {
-      weekday: "short",
-    })
-  )
 
-  useEffect(() => {
-    scrollView.current?.scrollToEnd({ animated: false })
-  }, [weeks.length])
+  const valueCell = (cell: HeatmapCell) => {
+    const repLabel = t(cell.count === 1 ? "common.rep" : "common.reps")
+    return `${formatNumber(cell.count)} ${repLabel}`
+  }
+
+  const titleCell = (cell: HeatmapCell) =>
+    cell.date ? getDateLabel(cell.date, today, locale, formatNumber, t) : ""
 
   const labelCell = (cell: HeatmapCell) => {
-    const repLabel = t(cell.count === 1 ? "common.rep" : "common.reps")
-    const value = `${formatNumber(cell.count)} ${repLabel}`
+    const value = valueCell(cell)
+    const title = titleCell(cell)
 
-    return cell.date
-      ? `${getDateLabel(cell.date, today, locale, formatNumber, t)}: ${value}`
-      : value
+    return title ? `${title}: ${value}` : value
   }
+  const heatmap = (
+    <HeatmapChart
+      accessibilityLabel={t("today.activity")}
+      accessibilityLabelForDatum={labelCell}
+      className={DEMO_DATA ? "w-[428px]" : undefined}
+      color="--color-chart-3"
+      data={weeks}
+      gap={4}
+      layout={DEMO_DATA ? "fluid" : "fill"}
+      onAccessibilityDatumPress={hapticHard}
+      onActiveCellChange={hapticCellSelection}
+      weekStartDay={HEATMAP_WEEK_START}
+    >
+      <HeatmapChart.XAxis
+        className="mb-0.5"
+        formatLabel={(date) =>
+          date.toLocaleDateString(locale, { month: "short" })
+        }
+      />
+      <HeatmapChart.Cells cornerRadius={3} />
+      <HeatmapChart.Tooltip
+        className="w-[132px]"
+        formatTitle={titleCell}
+        formatValue={valueCell}
+      />
+    </HeatmapChart>
+  )
 
   return (
     <View className="gap-2">
-      <ScrollView
-        horizontal
-        ref={scrollView}
-        showsHorizontalScrollIndicator={false}
-      >
-        <HeatmapChart
-          accessibilityLabel={t("today.activity")}
-          accessibilityLabelForDatum={labelCell}
-          binSize={14}
-          color="--color-chart-3"
-          data={weeks}
-          gap={4}
-          weekStartDay={HEATMAP_WEEK_START}
+      {DEMO_DATA ? (
+        <ScrollView
+          horizontal
+          onContentSizeChange={() =>
+            scrollView.current?.scrollToEnd({ animated: false })
+          }
+          ref={scrollView}
+          showsHorizontalScrollIndicator={false}
         >
-          <HeatmapChart.XAxis
-            formatLabel={(date) =>
-              date.toLocaleDateString(locale, { month: "short" })
-            }
-          />
-          <HeatmapChart.YAxis labels={weekdayLabels} width={28} />
-          <HeatmapChart.Cells cornerRadius={3} />
-          <HeatmapChart.Tooltip formatLabel={labelCell} />
-        </HeatmapChart>
-      </ScrollView>
-      <HeatmapChart data={EMPTY_HEATMAP_DATA}>
-        <HeatmapChart.Legend
-          lessLabel={t("charts.less")}
-          moreLabel={t("charts.more")}
-          swatchSize={10}
-        />
-      </HeatmapChart>
+          {heatmap}
+        </ScrollView>
+      ) : (
+        heatmap
+      )}
     </View>
   )
 }

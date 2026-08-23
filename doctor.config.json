@@ -1,12 +1,19 @@
 {
   "$schema": "https://react.doctor/schema/config.json",
   "ignore": {
-    "files": ["**/.output/**"],
+    "files": [
+      "**/.output/**",
+      "components/ui/**",
+      "hooks/use-back-handler.ts",
+      "hooks/use-direction.ts",
+      "lib/cn.ts",
+      "lib/native.ts",
+      "lib/time.ts"
+    ],
     "overrides": [
       {
         "files": [
           "components/ui/**",
-          "apps/mobile/components/ui/**",
           "packages/ui/src/components/**",
           "src/components/**"
         ],
@@ -53,6 +60,7 @@
       {
         "files": [
           "**/features/workout/camera.tsx",
+          "**/features/workout/camera.ios.tsx",
           "**/features/workout/_components/time-control.tsx"
         ],
         "rules": ["deslop/unused-export"]
@@ -60,6 +68,10 @@
       {
         "files": ["**/features/workout/camera.native.tsx"],
         "rules": ["react-hooks-js/todo"]
+      },
+      {
+        "files": ["**/features/tracking/body/**"],
+        "rules": ["deslop/unused-file", "react-hooks-js/todo"]
       }
     ]
   }

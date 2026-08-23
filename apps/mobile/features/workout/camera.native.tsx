@@ -1,183 +1,105 @@
-import { LandmarksOverlay } from "@/features/workout/_components/camera-overlay"
-import {
-  getDepthGuideY,
-  getPoseMetrics,
-  isDepthReached,
-  PUSHUP_THRESHOLDS,
-  type PoseLandmark,
-} from "@/features/workout/_lib/counter"
-import type { PoseCameraProps } from "@/features/workout/camera.types"
+import { Button } from "@/components/ui/button"
+import type {
+  FaceCameraProps,
+  FaceObservation,
+} from "@/features/workout/camera.types"
 import { useI18n } from "@/hooks/use-i18n"
-import { translate } from "@/lib/i18n"
-import { Button, Text } from "panelui-native"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Text } from "panelui-native"
+import { useEffect, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import {
-  nitroPoseExercises,
-  type ExerciseConfig,
-} from "react-native-nitro-pose-exercises"
-import {
   Camera,
-  useAsyncRunner,
   useCameraDevice,
   useCameraPermission,
-  useFrameOutput,
 } from "react-native-vision-camera"
+import {
+  type Face,
+  useFaceDetectorOutput,
+} from "react-native-vision-camera-face-detector"
 
-const DETECTION_CONFIG = {
-  angles: [],
-  cameraAngle: "front",
-  formRules: [],
-  holdDurationMs: 0,
-  name: "Push-Up Detection",
-  phases: [],
-  postureFamily: "horizontalProne",
-  repSequence: [],
-  type: "rep",
-  visibilityThreshold: PUSHUP_THRESHOLDS.visibility,
-} satisfies ExerciseConfig
-
-const CAMERA_RESOLUTION = { height: 360, width: 640 } as const
-
+const OBSERVATION_INTERVAL_MS = 100
 const styles = StyleSheet.create({
-  cameraMessage: { color: "#ffffff" },
-  cameraSurface: { backgroundColor: "#000000" },
+  messageSurface: { zIndex: 10 },
 })
-type PoseOverlay = {
-  depthGuideY: number | null
-  depthReached: boolean
-  landmarks: readonly PoseLandmark[]
+
+function toObservation(face: Face): FaceObservation {
+  return {
+    frameHeight: face.frameHeight,
+    frameWidth: face.frameWidth,
+    height: face.bounds.height,
+    rollAngle: face.rollAngle,
+    width: face.bounds.width,
+    yawAngle: face.yawAngle,
+  }
 }
 
-export default function PoseCamera({
+export default function FaceCamera({
   isActive,
   onError,
-  onLandmarks,
-  showDepthGuide = true,
-  showSetupGuides = false,
-}: PoseCameraProps) {
+  onFace,
+}: FaceCameraProps) {
   "use no memo"
 
-  const { language, t } = useI18n()
+  const { t } = useI18n()
   const { hasPermission, requestPermission } = useCameraPermission()
   const device = useCameraDevice("front")
-  const asyncRunner = useAsyncRunner()
   const errorCallback = useRef(onError)
-  const landmarksCallback = useRef(onLandmarks)
-  const [initialized, setInitialized] = useState(false)
-  const [overlay, setOverlay] = useState<PoseOverlay>({
-    depthGuideY: null,
-    depthReached: false,
-    landmarks: [],
-  })
-  const isIos = process.env.EXPO_OS === "ios"
+  const faceCallback = useRef(onFace)
+  const lastObservationAt = useRef(0)
 
   useEffect(() => {
     errorCallback.current = onError
   }, [onError])
 
   useEffect(() => {
-    landmarksCallback.current = onLandmarks
-  }, [onLandmarks])
+    faceCallback.current = onFace
+  }, [onFace])
 
   useEffect(() => {
-    if (!hasPermission) {
-      void requestPermission()
-    }
+    if (!hasPermission) void requestPermission()
   }, [hasPermission, requestPermission])
 
-  useEffect(() => {
-    let mounted = true
+  const [handleFacesDetected] = useState(() => (faces: Face[]) => {
+    const now = Date.now()
+    if (now - lastObservationAt.current < OBSERVATION_INTERVAL_MS) return
 
-    void nitroPoseExercises
-      .initialize("")
-      .then(() => {
-        if (!mounted) {
-          return false
-        }
-
-        nitroPoseExercises.loadExercise(DETECTION_CONFIG)
-        nitroPoseExercises.startSession(0, 0)
-        setInitialized(true)
-        return true
-      })
-      .catch(() =>
-        errorCallback.current(translate(language, "camera.poseStartError"))
-      )
-
-    return () => {
-      mounted = false
-      nitroPoseExercises.release()
-    }
-  }, [language])
-
-  useEffect(() => {
-    if (!initialized) {
-      return undefined
-    }
-
-    const interval = setInterval(() => {
-      const detectedLandmarks = nitroPoseExercises.landmarks
-      const metrics = getPoseMetrics(detectedLandmarks)
-      const calibratedDepth =
-        metrics && metrics.elbowAngle >= PUSHUP_THRESHOLDS.top
-          ? getDepthGuideY(detectedLandmarks)
-          : null
-
-      setOverlay((current) => {
-        const depthGuideY = calibratedDepth ?? current.depthGuideY
-
-        return {
-          depthGuideY,
-          depthReached: isDepthReached(detectedLandmarks, depthGuideY),
-          landmarks: detectedLandmarks,
-        }
-      })
-      landmarksCallback.current(detectedLandmarks)
-    }, 100)
-
-    return () => clearInterval(interval)
-  }, [initialized])
-
-  const frameOutput = useFrameOutput({
-    dropFramesWhileBusy: true,
-    pixelFormat: "yuv",
-    targetResolution: CAMERA_RESOLUTION,
-    onFrame(frame) {
-      "worklet"
-      const accepted = asyncRunner.runAsync(() => {
-        "worklet"
-        try {
-          if (isIos) {
-            nitroPoseExercises.processFrameIOS(frame)
-          } else {
-            nitroPoseExercises.processFrameAndroid(frame)
-          }
-        } finally {
-          frame.dispose()
-        }
-      })
-
-      if (!accepted) {
-        frame.dispose()
-      }
-    },
+    lastObservationAt.current = now
+    const face = faces.length === 1 ? faces[0] : undefined
+    faceCallback.current(face ? toObservation(face) : null)
   })
-  const cameraOutputs = useMemo(
-    () => (initialized ? [frameOutput] : []),
-    [frameOutput, initialized]
+  const [handleError] = useState(
+    () => (error: Error) => errorCallback.current(error.message)
   )
-  const requestCameraPermission = useCallback(() => {
-    void requestPermission()
+  const permissionCallback = useRef(requestPermission)
+
+  useEffect(() => {
+    permissionCallback.current = requestPermission
   }, [requestPermission])
+
+  const [requestCameraPermission] = useState(
+    () => () => void permissionCallback.current()
+  )
+  const faceDetectorOutput = useFaceDetectorOutput({
+    cameraFacing: "front",
+    minFaceSize: 0.1,
+    onError: handleError,
+    onFacesDetected: handleFacesDetected,
+    outputResolution: "preview",
+    performanceMode: "fast",
+    runClassifications: false,
+    runContours: false,
+    runLandmarks: false,
+    trackingEnabled: true,
+  })
+  const [outputs] = useState(() => [faceDetectorOutput])
 
   if (!hasPermission) {
     return (
       <View
-        className="flex-1 items-center justify-center gap-4 px-8"
-        style={styles.cameraSurface}
+        className="flex-1 items-center justify-center gap-4 bg-background px-8"
+        style={styles.messageSurface}
       >
-        <Text className="text-center" style={styles.cameraMessage}>
+        <Text className="text-center text-foreground">
           {t("camera.accessRequired")}
         </Text>
         <Button onPress={requestCameraPermission}>{t("camera.allow")}</Button>
@@ -188,10 +110,10 @@ export default function PoseCamera({
   if (!device) {
     return (
       <View
-        className="flex-1 items-center justify-center px-8"
-        style={styles.cameraSurface}
+        className="flex-1 items-center justify-center bg-background px-8"
+        style={styles.messageSurface}
       >
-        <Text className="text-center" style={styles.cameraMessage}>
+        <Text className="text-center text-foreground">
           {t("camera.unavailable")}
         </Text>
       </View>
@@ -199,23 +121,18 @@ export default function PoseCamera({
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View className="flex-1 bg-background">
       <Camera
         device={device}
-        isActive={isActive && initialized}
+        isActive={isActive}
         mirrorMode="on"
+        onError={handleError}
         orientationSource="interface"
-        outputs={cameraOutputs}
+        outputs={outputs}
         resizeMode="cover"
         style={StyleSheet.absoluteFill}
       />
-      <LandmarksOverlay
-        depthGuideY={overlay.depthGuideY}
-        depthReached={overlay.depthReached}
-        landmarks={overlay.landmarks}
-        showDepthGuide={showDepthGuide}
-        showSetupGuides={showSetupGuides}
-      />
+      <View className="absolute inset-0 bg-background" pointerEvents="none" />
     </View>
   )
 }

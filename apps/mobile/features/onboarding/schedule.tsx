@@ -1,225 +1,94 @@
-import {
-  NUMERIC_TEXT_SLOT,
-  NumericPhrase,
-  NumericText,
-} from "@/components/numeric-text"
+import { SolidBellIcon } from "@/components/icons"
+import { TimePicker, type TimeValue } from "@/components/ui/time-picker"
 import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
-import { Slab } from "@/features/workout/_components/figures"
-import TimeControl from "@/features/workout/_components/time-control"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
-import {
-  MAX_TRAINING_TIMES,
-  repsPerSession,
-} from "@/features/workout/_lib/goal"
-import type {
-  TrainingPlan,
-  TrainingTime,
-} from "@/features/workout/_lib/storage"
-import {
-  BellIcon,
-  Button,
-  ClockIcon,
-  PlusIcon,
-  Text,
-  XIcon,
-} from "panelui-native"
-import { View } from "react-native"
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-  ReduceMotion,
-} from "react-native-reanimated"
-import { useCSSVariable } from "uniwind"
+import { formatClock } from "@/features/workout/_lib/format"
+import type { TrainingPlan } from "@/features/workout/_lib/storage"
+import { useI18n } from "@/hooks/use-i18n"
+import { hapticHard } from "@/lib/haptics"
+import { Switch, Text } from "panelui-native"
+import { useState } from "react"
+import { StyleSheet, View } from "react-native"
 
-const LIST_ENTER = FadeInDown.duration(180).reduceMotion(ReduceMotion.System)
-const LIST_EXIT = FadeOutUp.duration(140).reduceMotion(ReduceMotion.System)
-
-function nextTrainingTime(times: readonly TrainingTime[]): TrainingTime {
-  const last = times.at(-1) ?? { hour: 8, minute: 0 }
-  return { hour: (last.hour + 4) % 24, minute: last.minute }
-}
-
-function getSetClockFormat(
-  format: "12" | "24",
-  setClockFormat: (format: "12" | "24") => void
-) {
-  return () => setClockFormat(format)
-}
+const DEFAULT_TRAINING_TIME = { hour: 18, minute: 30 }
+const styles = StyleSheet.create({
+  time: { fontSize: 96, lineHeight: 120 },
+})
 
 function getChangeTime(
-  index: number,
   plan: TrainingPlan,
   updatePlan: (patch: Partial<TrainingPlan>) => void
 ) {
-  return (hour: number, minute: number) =>
-    updatePlan({
-      reminderTimes: plan.reminderTimes.map((item, at) =>
-        at === index ? { hour, minute } : item
-      ),
-    })
+  return (time: TimeValue) =>
+    updatePlan({ reminderTimes: [time, ...plan.reminderTimes.slice(1)] })
 }
 
-function getRemoveTime(
-  index: number,
-  plan: TrainingPlan,
+function getSetReminderEnabled(
   updatePlan: (patch: Partial<TrainingPlan>) => void
 ) {
-  return () =>
-    updatePlan({
-      reminderTimes: plan.reminderTimes.filter((_, at) => at !== index),
-    })
-}
-
-function getAddTime(
-  plan: TrainingPlan,
-  updatePlan: (patch: Partial<TrainingPlan>) => void
-) {
-  return () =>
-    updatePlan({
-      reminderTimes: [
-        ...plan.reminderTimes,
-        nextTrainingTime(plan.reminderTimes),
-      ],
-    })
+  return (reminderEnabled: boolean) => {
+    hapticHard()
+    updatePlan({ reminderEnabled })
+  }
 }
 
 export default function ScheduleStep() {
-  const { clockFormat, setClockFormat } = usePreferences()
-  const { enableReminders, plan, reminderState, updatePlan } = usePlan()
-  const canAdd =
-    plan.reminderTimes.length < MAX_TRAINING_TIMES &&
-    plan.reminderTimes.length < plan.targetReps
-  const perSession = repsPerSession(plan.targetReps, plan.reminderTimes.length)
-  const mutedForeground = useCSSVariable("--color-muted-foreground")
-  const primary = useCSSVariable("--color-primary")
+  const { clockFormat } = usePreferences()
+  const { locale, t } = useI18n()
+  const { plan, updatePlan } = usePlan()
+  const time = plan.reminderTimes[0] ?? DEFAULT_TRAINING_TIME
+  const [previewTime, setPreviewTime] = useState(time)
+  const setReminderEnabled = getSetReminderEnabled(updatePlan)
 
   return (
-    <View className="flex-1 gap-6">
+    <View className="flex-1 gap-8">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Decide when the reps happen.
+          Pick your training time.
         </Text>
-        <NumericPhrase
-          className="text-lg text-muted-foreground"
-          containerClassName="flex-wrap"
-          template={`Add sessions and we will split your ${NUMERIC_TEXT_SLOT} reps between them.`}
-          textClassName="text-lg text-muted-foreground"
-          value={plan.targetReps}
-        />
+        <Text className="text-lg text-muted-foreground">
+          Choose a time you can keep every day.
+        </Text>
+        <View className="flex-row items-center justify-between pt-2">
+          <View className="flex-row items-center gap-2">
+            <SolidBellIcon size={18} />
+            <Text className="font-semibold">{t("plan.notification")}</Text>
+          </View>
+          <Switch
+            onValueChange={setReminderEnabled}
+            value={plan.reminderEnabled}
+          />
+        </View>
       </View>
 
-      <Slab>
-        <View className="flex-row items-center gap-3">
-          <ClockIcon />
-          <Text className="flex-1 font-semibold">Clock</Text>
-          <View className="flex-row rounded-xl bg-background p-1">
-            {(["12", "24"] as const).map((format) => (
-              <Button
-                key={format}
-                onPress={getSetClockFormat(format, setClockFormat)}
-                size="sm"
-                variant={clockFormat === format ? "primary" : "ghost"}
-              >
-                <NumericText
-                  className={
-                    clockFormat === format
-                      ? "text-sm text-primary-foreground"
-                      : "text-sm text-foreground"
-                  }
-                  value={Number(format)}
-                />
-                <Text
-                  className={
-                    clockFormat === format
-                      ? "font-semibold text-sm text-primary-foreground"
-                      : "font-semibold text-sm text-foreground"
-                  }
-                >
-                  h
-                </Text>
-              </Button>
-            ))}
-          </View>
+      <View className="flex-1">
+        <View className="flex-1 items-center justify-center">
+          <Text
+            adjustsFontSizeToFit
+            className="text-center font-heading text-foreground tabular-nums"
+            numberOfLines={1}
+            style={styles.time}
+          >
+            {formatClock(
+              previewTime.hour,
+              previewTime.minute,
+              locale,
+              clockFormat
+            )}
+          </Text>
         </View>
-
-        <View className="h-px bg-border" />
-
-        <View className="gap-3">
-          {plan.reminderTimes.map((time, index) => (
-            <Animated.View
-              className="flex-row items-center gap-3"
-              entering={LIST_ENTER}
-              exiting={LIST_EXIT}
-              key={`${time.hour}:${time.minute}`}
-            >
-              <View className="size-9 items-center justify-center rounded-full bg-primary/15">
-                <NumericText
-                  className="text-xs text-primary"
-                  value={index + 1}
-                />
-              </View>
-              <NumericPhrase
-                className="text-sm text-muted-foreground"
-                containerClassName="flex-1"
-                template={`${NUMERIC_TEXT_SLOT} reps`}
-                textClassName="text-sm text-muted-foreground"
-                value={perSession}
-              />
-              <TimeControl
-                hour={time.hour}
-                minute={time.minute}
-                onChange={getChangeTime(index, plan, updatePlan)}
-              />
-              {plan.reminderTimes.length > 1 ? (
-                <Button
-                  accessibilityLabel={`Remove session ${index + 1}`}
-                  className="h-9 w-9"
-                  onPress={getRemoveTime(index, plan, updatePlan)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <XIcon
-                    color={
-                      typeof mutedForeground === "string"
-                        ? mutedForeground
-                        : undefined
-                    }
-                  />
-                </Button>
-              ) : null}
-            </Animated.View>
-          ))}
-          {canAdd ? (
-            <Button
-              onPress={getAddTime(plan, updatePlan)}
-              size="sm"
-              variant="outline"
-            >
-              <PlusIcon />
-              Add session
-            </Button>
-          ) : null}
-        </View>
-      </Slab>
-
-      <Slab className="gap-3">
-        <View className="flex-row items-center gap-3">
-          <BellIcon color={typeof primary === "string" ? primary : undefined} />
-          <View className="flex-1 gap-1">
-            <Text className="font-semibold">Training reminders</Text>
-            <Text className="text-sm text-muted-foreground">
-              {reminderState === "on"
-                ? "Reminders are ready."
-                : "Get a nudge at each training time."}
-            </Text>
-          </View>
-        </View>
-        {reminderState !== "on" ? (
-          <Button onPress={enableReminders} variant="outline">
-            Allow notifications
-          </Button>
-        ) : null}
-      </Slab>
+        <TimePicker
+          className="w-full px-1"
+          hourCycle={clockFormat === "24" ? 24 : 12}
+          layout="ruler"
+          locale={locale}
+          onPreviewValueChange={setPreviewTime}
+          onValueChange={getChangeTime(plan, updatePlan)}
+          presentation="inline"
+          readout="none"
+          value={time}
+        />
+      </View>
     </View>
   )
 }

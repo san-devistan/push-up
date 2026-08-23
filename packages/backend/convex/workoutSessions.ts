@@ -9,8 +9,7 @@ import {
 } from "./workoutActivity"
 
 const failureReason = v.union(
-  v.literal("body_misalignment"),
-  v.literal("incomplete_lockout"),
+  v.literal("incomplete_return"),
   v.literal("insufficient_depth"),
   v.literal("tracking_lost")
 )
@@ -18,8 +17,6 @@ const failureReason = v.union(
 const attempt = v.object({
   durationMs: v.number(),
   failureReasons: v.array(failureReason),
-  minBodyAngle: v.number(),
-  minElbowAngle: v.number(),
   startedAtOffsetMs: v.number(),
   valid: v.boolean(),
 })
@@ -39,8 +36,6 @@ function validateSession(args: {
   activeRepetitionTimeMs: number
   attempts: ReadonlyArray<{
     durationMs: number
-    minBodyAngle: number
-    minElbowAngle: number
     startedAtOffsetMs: number
   }>
   clientSessionId: string
@@ -103,8 +98,6 @@ function validateSession(args: {
       args.totalDurationMs,
       "startedAtOffsetMs"
     )
-    assertFiniteRange(item.minBodyAngle, 0, 180, "minBodyAngle")
-    assertFiniteRange(item.minElbowAngle, 0, 180, "minElbowAngle")
   }
 }
 

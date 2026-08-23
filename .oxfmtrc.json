@@ -47,6 +47,12 @@
           "functions": ["cn", "cva"]
         }
       }
+    },
+    {
+      "files": ["apps/mobile/global.css"],
+      "options": {
+        "singleQuote": true
+      }
     }
   ],
   "ignorePatterns": [
@@ -64,6 +70,12 @@
     "dist/**",
     "node_modules/**",
     "pnpm-lock.yaml",
+    "apps/mobile/components/ui/**",
+    "apps/mobile/hooks/use-back-handler.ts",
+    "apps/mobile/hooks/use-direction.ts",
+    "apps/mobile/lib/cn.ts",
+    "apps/mobile/lib/native.ts",
+    "apps/mobile/lib/time.ts",
     "apps/web/src/routeTree.gen.*",
     "packages/backend/convex/_generated/**"
   ]

@@ -1,15 +1,19 @@
-import {
-  NUMERIC_TEXT_SLOT,
-  NumericPhrase,
-  NumericText,
-} from "@/components/numeric-text"
+import { EdgeBlur } from "@/components/edge-blur"
+import { FlameIcon, SettingsIcon } from "@/components/icons"
+import { NUMERIC_TEXT_SLOT, NumericPhrase } from "@/components/numeric-text"
+import { Button } from "@/components/ui/button"
+import { Tabs } from "@/components/ui/tabs"
 import WorkoutAvatar from "@/features/workout/_components/avatar.dom"
 import { BadgeGrid } from "@/features/workout/_components/badges"
 import {
   ActivityHeatmap,
   DailyColumns,
 } from "@/features/workout/_components/charts"
-import { Meter, Overline, Slab } from "@/features/workout/_components/figures"
+import { DailyGoal } from "@/features/workout/_components/daily-goal"
+import ExpressionGallery from "@/features/workout/_components/expression-gallery.dom"
+import { Meter, Slab } from "@/features/workout/_components/figures"
+import WorkoutSectionRail from "@/features/workout/_components/section-rail"
+import StartButton from "@/features/workout/_components/start-button"
 import { TodayStats } from "@/features/workout/_components/today-stats"
 import { useActivity } from "@/features/workout/_hooks/use-activity"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
@@ -18,33 +22,33 @@ import { getCurrentWeekActivity } from "@/features/workout/_lib/activity-window"
 import { getLevel } from "@/features/workout/_lib/gamification"
 import { useI18n } from "@/hooks/use-i18n"
 import { hapticHard } from "@/lib/haptics"
-import { Link, useRouter } from "expo-router"
-import {
-  Button,
-  CheckIcon,
-  InfoIcon,
-  MenuIcon,
-  SparklesIcon,
-  Text,
-} from "panelui-native"
+import { FONT_FAMILY } from "@/lib/theme"
+import { Link, Stack } from "expo-router"
+import { Text } from "panelui-native"
+import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import { useState } from "react"
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native"
+import { Pressable, StyleSheet, View } from "react-native"
 import Animated, { FadeInUp } from "react-native-reanimated"
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
-const SCREEN_EDGES = ["top"] as const
-type ActivityRange = "month" | "week"
-
-const ACTIVITY_RANGES = ["week", "month"] as const
 const EMPTY_ACTIVITY_DAYS = [] as const
+const HOME_SECTION_IDS = ["overview", "goal", "level", "activity", "stats"]
 const NUMBER_ENTERING = FadeInUp.duration(240)
+const HEADER_FONT_FAMILY =
+  process.env.EXPO_OS === "ios" ? "Anton-Regular" : FONT_FAMILY.heading
+const HOME_SCREEN_OPTIONS = {
+  headerLargeTitleShadowVisible: false,
+  headerShadowVisible: false,
+  headerShown: true,
+  headerTransparent: true,
+  scrollEdgeEffects: { top: "hidden" },
+  title: "",
+} as const
+const HOME_TITLE_STYLE = {
+  fontFamily: HEADER_FONT_FAMILY,
+  fontSize: 32,
+  lineHeight: 40,
+} as const
 
 const styles = StyleSheet.create({
   content: {
@@ -53,172 +57,121 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  dailyGoalNumber: { fontSize: 44, lineHeight: 50 },
-  dailyGoalSuffix: { fontSize: 22, lineHeight: 28 },
-  dailyGoalTarget: { fontSize: 22, lineHeight: 28 },
-  floatingAction: {
-    borderRadius: 999,
-    height: 56,
-    left: 48,
-    position: "absolute",
-    right: 48,
-    zIndex: 10,
+  expressionGallery: { height: 2540, width: "100%" },
+  headerTitle: {
+    height: 44,
+    justifyContent: "center",
+    width: 100,
   },
-  goalAvatar: {
+  levelValue: { marginStart: -14, transform: [{ translateY: 0 }] },
+  totalHero: {
+    alignItems: "stretch",
+    alignSelf: "stretch",
+    flexDirection: "row",
+  },
+  totalHeroAvatar: {
     backgroundColor: "transparent",
-    flexShrink: 0,
-    height: 88,
-    width: 88,
+    flex: 1,
   },
   screen: { flex: 1 },
-  totalHeroNumber: { fontSize: 72, lineHeight: 78 },
+  totalHeroNumber: {
+    fontSize: 72,
+    lineHeight: 88,
+    marginBottom: -16,
+  },
 })
 
-const GOAL_AVATAR_DOM_PROPS = {
+const TOTAL_HERO_AVATAR_DOM_PROPS = {
   scrollEnabled: false,
-  style: styles.goalAvatar,
+  style: styles.totalHeroAvatar,
 }
-
-function getStartSession(router: ReturnType<typeof useRouter>) {
-  return () => router.push("/session")
+const EXPRESSION_GALLERY_DOM_PROPS = {
+  contentInsetAdjustmentBehavior: "never" as const,
+  scrollEnabled: false,
+  style: styles.expressionGallery,
 }
-
-function getFloatingActionStyle(bottom: number): StyleProp<ViewStyle> {
-  return [styles.floatingAction, { bottom }]
-}
-
-function StreakChip({ days }: { days: number }) {
-  const { formatNumber, t } = useI18n()
-  const primary = useCSSVariable("--color-primary")
-
-  return (
-    <View className="flex-row items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5">
-      <SparklesIcon color={typeof primary === "string" ? primary : undefined} />
-      <NumericText
-        accessibilityLabel={`${formatNumber(days)} ${t(days === 1 ? "common.day" : "common.days")}`}
-        className="text-sm"
-        value={days}
-      />
-    </View>
-  )
-}
+const SHOW_LEVEL_CARD = false
 
 function SettingsButton() {
   const { t } = useI18n()
+  const foregroundValue = useCSSVariable("--color-foreground")
+  const foreground =
+    typeof foregroundValue === "string" ? foregroundValue : undefined
 
   return (
     <Link asChild href="/settings">
       <Button
         accessibilityLabel={t("settings.title")}
-        className="h-9 w-9 rounded-full bg-muted"
+        className="h-9 w-9 rounded-full"
         size="icon"
         variant="ghost"
       >
-        <MenuIcon />
+        <View className="h-6 w-6 items-center justify-center">
+          <SettingsIcon color={foreground} fill={foreground} size={24} />
+          <View
+            className="absolute top-2.5 left-2.5 h-1 w-1 rounded-full bg-background"
+            pointerEvents="none"
+          />
+        </View>
       </Button>
     </Link>
   )
 }
 
-function GoalCompleteMark() {
-  const { t } = useI18n()
-  const primary = useCSSVariable("--color-primary")
+function HomeHeaderLeft() {
+  return (
+    <View style={styles.headerTitle}>
+      <Text accessibilityRole="header" style={HOME_TITLE_STYLE}>
+        pumpr.
+      </Text>
+    </View>
+  )
+}
+
+function Streak() {
+  const { activity } = useActivity()
+  const { formatNumber, t } = useI18n()
+  const foregroundValue = useCSSVariable("--color-foreground")
+  const foreground =
+    typeof foregroundValue === "string" ? foregroundValue : undefined
+  const days = activity?.currentStreak ?? 0
 
   return (
-    <View
-      accessibilityLabel={t("today.dailyGoalCompleted")}
-      className="flex-row items-center gap-1"
-    >
-      <CheckIcon
-        color={typeof primary === "string" ? primary : undefined}
-        size={14}
-      />
-      <Text className="font-mono text-xs tracking-[3px] uppercase">
-        {t("today.done")}
+    <View className="flex-row items-center">
+      <FlameIcon color={foreground} fill={foreground} size={24} />
+      <Text
+        accessibilityLabel={`${formatNumber(days)} ${t(days === 1 ? "common.day" : "common.days")}`}
+        className="pt-1 font-heading text-2xl"
+      >
+        {formatNumber(days)}
       </Text>
     </View>
   )
 }
 
 function TotalHero({ activity }: { activity: Activity | undefined }) {
-  const { t } = useI18n()
+  const { formatNumber, t } = useI18n()
+  const { plan } = usePlan()
+  const goalCompleted = (activity?.todayReps ?? 0) >= plan.targetReps
 
   return (
-    <View className="gap-1 px-1 py-2">
-      <Text className="font-heading text-sm text-foreground">
-        {t("today.totalPushups")}
-      </Text>
-      <NumericText
-        className="text-foreground"
-        style={styles.totalHeroNumber}
-        value={activity?.totalPushups ?? 0}
+    <View style={styles.totalHero}>
+      <View className="my-4 ml-2 flex-1 items-start">
+        <Text
+          className="font-heading text-foreground"
+          style={styles.totalHeroNumber}
+        >
+          {formatNumber(activity?.totalPushups ?? 0)}
+        </Text>
+        <Text className="font-heading text-base text-foreground">
+          {t("today.totalPushups")}
+        </Text>
+      </View>
+      <WorkoutAvatar
+        animation={goalCompleted ? "celebrate" : "idle"}
+        dom={TOTAL_HERO_AVATAR_DOM_PROPS}
       />
     </View>
-  )
-}
-
-function DailyGoalCard({ activity }: { activity: Activity | undefined }) {
-  const { t } = useI18n()
-  const { plan } = usePlan()
-  const todayReps = activity?.todayReps ?? 0
-  const goalCompleted = todayReps >= plan.targetReps
-
-  return (
-    <Slab className="gap-3">
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1 gap-3">
-          <View className="flex-row items-center justify-between gap-2">
-            <Overline>{t("plan.dailyGoal")}</Overline>
-            {goalCompleted ? (
-              <Animated.View entering={NUMBER_ENTERING} key={todayReps}>
-                <GoalCompleteMark />
-              </Animated.View>
-            ) : null}
-          </View>
-          <View className="flex-row items-end">
-            <NumericText style={styles.dailyGoalNumber} value={todayReps} />
-            <Text
-              className="text-muted-foreground"
-              style={styles.dailyGoalSuffix}
-            >
-              /
-            </Text>
-            <NumericText
-              className="text-muted-foreground"
-              style={styles.dailyGoalTarget}
-              value={plan.targetReps}
-            />
-          </View>
-        </View>
-        <WorkoutAvatar
-          animation={goalCompleted ? "celebrate" : "idle"}
-          dom={GOAL_AVATAR_DOM_PROPS}
-        />
-      </View>
-      <Meter percent={(todayReps / Math.max(1, plan.targetReps)) * 100} />
-    </Slab>
-  )
-}
-
-function LevelInfoButton() {
-  const { t } = useI18n()
-  const mutedForeground = useCSSVariable("--color-muted-foreground")
-
-  return (
-    <Link asChild href="/levels">
-      <Button
-        accessibilityLabel={t("today.openLevels")}
-        className="h-9 w-9 rounded-full bg-background dark:bg-muted"
-        size="icon"
-        variant="ghost"
-      >
-        <InfoIcon
-          color={
-            typeof mutedForeground === "string" ? mutedForeground : undefined
-          }
-        />
-      </Button>
-    </Link>
   )
 }
 
@@ -233,137 +186,122 @@ function LevelCard({ activity }: { activity: Activity | undefined }) {
   })
 
   return (
-    <Slab>
-      <View className="flex-row items-start justify-between gap-3">
-        <Animated.View
-          className="flex-1"
-          entering={NUMBER_ENTERING}
-          key={level}
-        >
-          <NumericPhrase
-            className="text-2xl"
-            template={t("today.level", { level: NUMERIC_TEXT_SLOT })}
-            textClassName="text-2xl font-bold"
-            value={level}
-          />
-        </Animated.View>
-        <LevelInfoButton />
-      </View>
-      <Meter percent={percent} />
-      <BadgeGrid badges={milestones} />
-    </Slab>
-  )
-}
-
-function setActivityRange(
-  setRange: (range: ActivityRange) => void,
-  range: ActivityRange
-) {
-  return () => {
-    hapticHard()
-    setRange(range)
-  }
-}
-
-function ActivityRangeToggle({
-  range,
-  setRange,
-}: {
-  range: ActivityRange
-  setRange: (range: ActivityRange) => void
-}) {
-  const { t } = useI18n()
-
-  return (
-    <View className="flex-row rounded-full bg-background p-1 dark:bg-muted">
-      {ACTIVITY_RANGES.map((item) => (
-        <Pressable
-          accessibilityRole="button"
-          className={
-            range === item
-              ? "rounded-full bg-border px-3 py-1.5 dark:bg-background"
-              : "rounded-full px-3 py-1.5"
-          }
-          key={item}
-          onPress={setActivityRange(setRange, item)}
-        >
-          <Text className="font-semibold text-xs">
-            {t(item === "week" ? "today.week" : "today.oneMonth")}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <Link asChild href="/levels">
+      <Pressable
+        accessibilityLabel={t("today.openLevels")}
+        onPress={hapticHard}
+      >
+        <Slab>
+          <View className="flex-row items-center gap-4">
+            <Animated.View
+              className="shrink-0 items-start"
+              entering={NUMBER_ENTERING}
+              key={level}
+            >
+              <NumericPhrase
+                className="font-heading text-2xl"
+                containerClassName="items-end"
+                style={styles.levelValue}
+                template={t("today.level", { level: NUMERIC_TEXT_SLOT })}
+                textClassName="font-heading text-2xl"
+                value={level}
+              />
+            </Animated.View>
+            <Meter className="flex-1" percent={percent} />
+          </View>
+          <BadgeGrid badges={milestones} />
+        </Slab>
+      </Pressable>
+    </Link>
   )
 }
 
 function ActivitySection({ activity }: { activity: Activity | undefined }) {
   const { t } = useI18n()
-  const [range, setRange] = useState<ActivityRange>("week")
   const [today] = useState(Date.now)
   const recentDays = activity?.recentDays ?? EMPTY_ACTIVITY_DAYS
   const dailyDays = getCurrentWeekActivity(today, recentDays)
 
   return (
-    <Slab>
-      <View className="flex-row items-center justify-between gap-4">
-        <Overline>{t("today.activity")}</Overline>
-        <ActivityRangeToggle range={range} setRange={setRange} />
-      </View>
-      {range === "week" ? (
-        <DailyColumns days={dailyDays} />
-      ) : (
-        <ActivityHeatmap recentDays={recentDays} today={today} />
-      )}
+    <Slab className="gap-4 pt-3 pr-3 pb-5 pl-5">
+      <Tabs className="gap-4" defaultValue="week" onValueChange={hapticHard}>
+        <View className="flex-row items-center justify-between gap-4">
+          <Text className="font-mono text-xs text-muted-foreground">
+            {t("today.activity")}
+          </Text>
+          <Tabs.List className="w-32">
+            <Tabs.Trigger value="week">{t("today.week")}</Tabs.Trigger>
+            <Tabs.Trigger value="month">{t("today.month")}</Tabs.Trigger>
+          </Tabs.List>
+        </View>
+        <Tabs.Content value="week">
+          <DailyColumns days={dailyDays} />
+        </Tabs.Content>
+        <Tabs.Content value="month">
+          <ActivityHeatmap recentDays={recentDays} today={today} />
+        </Tabs.Content>
+      </Tabs>
     </Slab>
-  )
-}
-
-function StartButton() {
-  const { t } = useI18n()
-  const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const startSession = getStartSession(router)
-  const floatingActionStyle = getFloatingActionStyle(
-    Math.max(insets.bottom - 16, 12)
-  )
-
-  return (
-    <Button
-      accessibilityLabel={t("today.startSession")}
-      labelClassName="font-heading lowercase"
-      onPress={startSession}
-      style={floatingActionStyle}
-    >
-      {t("today.startSession")}
-    </Button>
   )
 }
 
 export default function TodayPage() {
   const { activity } = useActivity()
+  const {
+    active,
+    measure,
+    ref: scrollRef,
+    scrollProps,
+    scrollTo,
+  } = useScrollSections({ ids: HOME_SECTION_IDS })
 
   return (
-    <SafeAreaView edges={SCREEN_EDGES} style={styles.screen}>
+    <View style={styles.screen}>
       <Animated.ScrollView
+        ref={scrollRef}
+        {...scrollProps}
         className="flex-1"
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
-        <View className="flex-row items-center justify-between gap-3 px-1">
-          <Text accessibilityRole="header" className="font-heading text-2xl">
-            pumpr.
-          </Text>
-          <View className="flex-row items-center gap-2">
-            <StreakChip days={activity?.currentStreak ?? 0} />
-            <SettingsButton />
-          </View>
+        <View onLayout={measure("overview")}>
+          <TotalHero activity={activity} />
         </View>
-        <TotalHero activity={activity} />
-        <DailyGoalCard activity={activity} />
-        <LevelCard activity={activity} />
-        <ActivitySection activity={activity} />
-        <TodayStats activity={activity} />
+        <View onLayout={measure("goal")}>
+          <DailyGoal activity={activity} />
+        </View>
+        <View onLayout={measure("level")}>
+          {SHOW_LEVEL_CARD ? <LevelCard activity={activity} /> : null}
+        </View>
+        <View onLayout={measure("activity")}>
+          <ActivitySection activity={activity} />
+        </View>
+        <View onLayout={measure("stats")}>
+          <TodayStats activity={activity} />
+        </View>
+        <ExpressionGallery dom={EXPRESSION_GALLERY_DOM_PROPS} />
       </Animated.ScrollView>
+      <EdgeBlur />
+      <WorkoutSectionRail
+        active={active}
+        onValueChange={scrollTo}
+        screen="home"
+      />
+      <Stack.Screen options={HOME_SCREEN_OPTIONS} />
+      <Stack.Toolbar placement="left">
+        <Stack.Toolbar.View hidesSharedBackground>
+          <HomeHeaderLeft />
+        </Stack.Toolbar.View>
+      </Stack.Toolbar>
+      <Stack.Toolbar placement="right">
+        <Stack.Toolbar.View hidesSharedBackground>
+          <Streak />
+        </Stack.Toolbar.View>
+        <Stack.Toolbar.View>
+          <SettingsButton />
+        </Stack.Toolbar.View>
+      </Stack.Toolbar>
       <StartButton />
-    </SafeAreaView>
+    </View>
   )
 }

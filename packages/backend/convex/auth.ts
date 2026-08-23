@@ -80,6 +80,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
     },
     socialProviders: { ...appleProvider(), ...googleProvider() },
     trustedOrigins: [
+      "pumpr://",
       "pushup://",
       "https://accounts.google.com",
       "https://appleid.apple.com",

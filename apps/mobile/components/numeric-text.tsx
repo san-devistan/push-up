@@ -45,8 +45,10 @@ function NumericText({ className, locale, style, ...props }: NumericTextProps) {
 }
 
 function NumericPhrase({
+  align,
   className,
   containerClassName,
+  style,
   template,
   textClassName,
   textStyle,
@@ -64,6 +66,8 @@ function NumericPhrase({
 
   const before = template.slice(0, slot)
   const after = template.slice(slot + NUMERIC_TEXT_SLOT.length)
+  const numberAlign =
+    align ?? (before && !after ? "start" : after && !before ? "end" : "center")
 
   return (
     <View className={cn("flex-row items-center", containerClassName)}>
@@ -72,7 +76,17 @@ function NumericPhrase({
           {before}
         </Text>
       ) : null}
-      <NumericText className={className} {...props} />
+      <NumericText
+        align={numberAlign}
+        className={cn(
+          className,
+          "-translate-y-px",
+          before && "-ml-[0.31em]",
+          after && "-mr-[0.31em]"
+        )}
+        style={style}
+        {...props}
+      />
       {after ? (
         <Text className={textClassName} style={textStyle}>
           {after}

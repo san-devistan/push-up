@@ -104,7 +104,7 @@ function getShareMessage(
     style: "percent",
   })
 
-  return `${reps} ${translate(language, "share.pushups")} · ${success} ${translate(language, "common.success")} · ${formatDuration(session.totalDurationMs)} · PUMPRS`
+  return `${reps} ${translate(language, "share.pushups")} · ${success} ${translate(language, "common.success")} · ${formatDuration(session.totalDurationMs)} · pumpr.`
 }
 
 async function capturePerformanceCard(
@@ -118,7 +118,7 @@ async function capturePerformanceCard(
   }
 
   return captureRef(card, {
-    fileName: `pumprs-${session.localDate}${suffix}`,
+    fileName: `pumpr-${session.localDate}${suffix}`,
     format: "png",
     result: "tmpfile",
   })
@@ -133,7 +133,7 @@ async function sharePerformanceCard(
   if (!card || !(await Sharing.isAvailableAsync())) {
     await NativeShare.share({
       message: getShareMessage(session, successRate, language),
-      title: `PUMPRS — ${translate(language, "share.share")}`,
+      title: `pumpr. — ${translate(language, "share.share")}`,
     })
     return
   }

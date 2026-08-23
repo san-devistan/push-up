@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 
-import { formatClock } from "./format.ts"
+import { formatClock, formatTotalDuration } from "./format.ts"
 import {
+  getDailyPace,
   goalAtIndex,
   GOAL_STEPS,
   LAST_GOAL_INDEX,
@@ -47,8 +48,18 @@ assert.equal(repsPerSession(30, 4), 8)
 assert.equal(repsPerSession(10, 3), 4)
 assert.equal(repsPerSession(1, 3), 1)
 assert.equal(repsPerSession(30, 0), 30)
+assert.deepEqual(getDailyPace(24, 20, 30), { delta: 4, over: true })
+assert.equal(getDailyPace(20, 20, 30), null)
+assert.equal(getDailyPace(5, 20, 0), null)
+assert.deepEqual(getDailyPace(12, 20, 8), { delta: 4, over: false })
+assert.deepEqual(getDailyPace(5, 20, 8), { delta: -3, over: false })
+assert.equal(getDailyPace(0, 20, 8)?.delta, -8)
+
 assert.equal(formatClock(19, 30, "en-US", "12"), "7:30 PM")
 assert.equal(formatClock(19, 30, "en-US", "24"), "19:30")
+assert.equal(formatTotalDuration(3_723_000), "1h 3m")
+assert.equal(formatTotalDuration(90_123_000), "1d 1h 3m")
+assert.equal(formatTotalDuration(3_600_000), "1h")
 
 for (const total of [1, 7, 10, 45, 200]) {
   for (const sessions of [1, 2, 3, 4, 5, 6]) {

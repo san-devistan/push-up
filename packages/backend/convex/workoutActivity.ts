@@ -48,6 +48,7 @@ function totalsOf(sessions: readonly ActivitySession[]) {
     averageRepMs: attempts === 0 ? 0 : Math.round(activeMs / attempts),
     bestSessionReps,
     successRate: attempts === 0 ? 0 : Math.round((pushups / attempts) * 100),
+    totalActiveMs: activeMs,
     totalAttempts: attempts,
     totalPushups: pushups,
     totalSessions: sessions.length,
@@ -101,12 +102,16 @@ export function summarizeActivity(
   visibleDays = 16 * 7
 ) {
   const repsByDay = new Map<string, number>()
+  let todayAttempts = 0
 
   for (const session of sessions) {
     repsByDay.set(
       session.localDate,
       (repsByDay.get(session.localDate) ?? 0) + session.validReps
     )
+    if (session.localDate === today) {
+      todayAttempts += session.validReps + session.invalidReps
+    }
   }
 
   const recentDays = Array.from({ length: visibleDays }, (_, index) => {
@@ -119,6 +124,7 @@ export function summarizeActivity(
     ...streaksOf(repsByDay, today),
     bestDayReps: Math.max(0, ...repsByDay.values()),
     recentDays,
+    todayAttempts,
     todayReps: repsByDay.get(today) ?? 0,
     weeks: weeksOf(recentDays),
   }

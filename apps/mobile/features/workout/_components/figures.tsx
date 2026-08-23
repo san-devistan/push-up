@@ -1,9 +1,11 @@
+import type { IconProps } from "@/components/icons"
 import { NumericText, type NumericTextProps } from "@/components/numeric-text"
 import { useI18n } from "@/hooks/use-i18n"
 import { cn } from "@/lib/utils"
-import { Card, Progress, Text, type IconProps } from "panelui-native"
+import { Progress, Surface, Text } from "panelui-native"
 import type { ComponentType, ReactNode, Ref } from "react"
 import { StyleSheet, View, type ViewProps } from "react-native"
+import { useCSSVariable } from "uniwind"
 
 const styles = StyleSheet.create({
   heroSurfaceDark: {
@@ -20,7 +22,6 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
   },
-  slab: { borderCurve: "continuous", borderRadius: 20 },
   statListValue: { maxWidth: "58%" },
 })
 
@@ -62,7 +63,7 @@ export function Overline({
   return (
     <Text
       className={cn(
-        "font-mono text-xs tracking-[3px] uppercase",
+        "font-mono text-xs",
         tone === "primary" ? "text-primary" : "text-muted-foreground"
       )}
     >
@@ -91,24 +92,44 @@ export function Meter({
 type StatListItem = {
   children: ReactNode
   icon: ComponentType<IconProps>
+  iconSolid?: boolean
   label: string
 }
 
 type StatNumberProps = Pick<
   NumericTextProps,
-  "format" | "maximumFractionDigits" | "minimumFractionDigits" | "value"
+  | "align"
+  | "format"
+  | "maximumFractionDigits"
+  | "minimumFractionDigits"
+  | "value"
 > & { suffix?: string }
 
 export function StatsDivider() {
   return <View className="h-px bg-border dark:bg-foreground/20" />
 }
 
-export function StatsListRow({ children, icon, label }: StatListItem) {
+export function StatsListRow({
+  children,
+  icon,
+  iconSolid,
+  label,
+}: StatListItem) {
   const StatIcon = icon
+  const foregroundValue = useCSSVariable("--color-foreground")
+  const backgroundValue = useCSSVariable("--color-background")
+  const foreground =
+    typeof foregroundValue === "string" ? foregroundValue : undefined
+  const background =
+    typeof backgroundValue === "string" ? backgroundValue : undefined
 
   return (
-    <View className="flex-row items-center gap-4">
-      <StatIcon size={18} />
+    <View className="flex-row items-center gap-2.5">
+      <StatIcon
+        color={iconSolid ? foreground : background}
+        fill={foreground}
+        size={18}
+      />
       <Text className="flex-1 font-semibold">{label}</Text>
       <View
         className="shrink flex-row items-end justify-end"
@@ -120,15 +141,15 @@ export function StatsListRow({ children, icon, label }: StatListItem) {
   )
 }
 
-export function StatPlaceholder() {
-  return <Text className="font-heading text-base">-</Text>
-}
-
 export function StatNumber({ suffix, ...props }: StatNumberProps) {
   return (
     <>
-      <NumericText className="text-base" {...props} />
-      {suffix ? <Text className="font-heading text-base">{suffix}</Text> : null}
+      <NumericText align="end" className="text-base" {...props} />
+      {suffix ? (
+        <Text className="-ml-1 font-heading text-base">
+          {suffix.trimStart()}
+        </Text>
+      ) : null}
     </>
   )
 }
@@ -144,7 +165,9 @@ export function StatsList({
 
   return (
     <Slab>
-      <Overline>{title ?? t("common.stats")}</Overline>
+      <Text className="font-mono text-xs text-muted-foreground">
+        {title ?? t("common.stats")}
+      </Text>
       {children}
     </Slab>
   )
@@ -158,13 +181,8 @@ export function Slab({
   className?: string
 }) {
   return (
-    <Card
-      className="gap-0 border-transparent bg-muted py-0 shadow-none dark:border-border dark:bg-card"
-      style={styles.slab}
-    >
-      <Card.Content className={cn("gap-4 p-5", className)}>
-        {children}
-      </Card.Content>
-    </Card>
+    <Surface elevated padding="none">
+      <View className={cn("gap-4 p-5", className)}>{children}</View>
+    </Surface>
   )
 }
