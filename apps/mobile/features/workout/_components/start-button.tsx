@@ -43,6 +43,7 @@ export default function StartButton() {
         className="rounded-full bg-foreground"
         labelClassName="font-heading lowercase text-lg text-background"
         onPress={startSession}
+        sfx="success"
         style={floatingStyle}
       >
         {label}

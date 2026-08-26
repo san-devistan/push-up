@@ -152,8 +152,9 @@ const tabsVariants = tv({
     variant: {
       // A raised chip travelling inside a recessed track.
       segmented: {
-        list: 'rounded-full bg-background p-1 dark:bg-muted',
-        indicator: 'bottom-1 top-1 rounded-full bg-border dark:bg-background',
+        list: 'rounded-full bg-foreground/[0.06] p-1 dark:bg-foreground/[0.08]',
+        indicator:
+          'bottom-1 top-1 rounded-full bg-foreground/[0.14] dark:bg-foreground/[0.18]',
         trigger: 'rounded-full py-1.5',
         label: 'font-semibold text-xs',
       },
@@ -202,7 +203,6 @@ const tabsVariants = tv({
     },
   },
   compoundVariants: [
-    { variant: 'segmented', active: false, class: { label: 'text-foreground' } },
     { variant: 'pill', active: true, class: { label: 'text-primary-foreground' } },
     // A pill is as wide as what is inside it. Equal shares would give every
     // closed tab the width of the open one, which is the layout this variant
@@ -649,14 +649,6 @@ function TabsPager({
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const measured = event.nativeEvent.layout;
     if (measured.width > 0) setWidth(measured.width);
-
-    if (__DEV__ && measured.width > 0 && measured.height === 0) {
-      console.warn(
-        '[PanelUI] <Tabs swipeable> has no height to fill, so its panels have nowhere ' +
-          'to be laid out. Give the tab set a height — `className="flex-1"` on <Tabs>, ' +
-          'or a fixed height — the same as any pager needs.'
-      );
-    }
   }, []);
 
   /*

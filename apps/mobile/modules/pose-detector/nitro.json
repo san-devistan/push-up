@@ -1,0 +1,24 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["pumpr", "posedetector"],
+  "ios": {
+    "iosModuleName": "PumprPoseDetector"
+  },
+  "android": {
+    "androidNamespace": ["pumpr", "posedetector"],
+    "androidCxxLibName": "pumprposedetector"
+  },
+  "autolinking": {
+    "PumprPoseDetector": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "PumprPoseDetector"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "PumprPoseDetector"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}

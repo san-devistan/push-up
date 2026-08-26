@@ -1,9 +1,9 @@
-import type { FaceCameraProps } from "@/features/workout/camera.types"
+import type { TrackingCameraProps } from "@/features/workout/camera.types"
 import { useI18n } from "@/hooks/use-i18n"
 import { Text } from "panelui-native"
 import { View } from "react-native"
 
-export default function FaceCamera(_: FaceCameraProps) {
+export default function TrackingCamera(_: TrackingCameraProps) {
   const { t } = useI18n()
 
   return (

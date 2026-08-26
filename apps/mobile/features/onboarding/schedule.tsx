@@ -5,7 +5,7 @@ import { usePlan } from "@/features/workout/_hooks/use-plan"
 import { formatClock } from "@/features/workout/_lib/format"
 import type { TrainingPlan } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
+import { hapticFeedback } from "@/lib/haptics"
 import { Switch, Text } from "panelui-native"
 import { useState } from "react"
 import { StyleSheet, View } from "react-native"
@@ -27,7 +27,7 @@ function getSetReminderEnabled(
   updatePlan: (patch: Partial<TrainingPlan>) => void
 ) {
   return (reminderEnabled: boolean) => {
-    hapticHard()
+    hapticFeedback(reminderEnabled ? "toggle-on" : "toggle-off")
     updatePlan({ reminderEnabled })
   }
 }

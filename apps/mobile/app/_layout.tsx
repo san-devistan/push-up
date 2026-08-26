@@ -5,6 +5,7 @@ import {
   usePreferences,
 } from "@/features/preferences/_hooks/use-preferences"
 import { PlanProvider } from "@/features/workout/_hooks/use-plan"
+import { RecapProvider } from "@/features/workout/_hooks/use-recap"
 import { syncPendingSessions } from "@/features/workout/_lib/sync"
 import globalCss from "@/global.css"
 import { authClient, isAuthConfigured } from "@/lib/auth-client"
@@ -17,7 +18,6 @@ import { ConvexReactClient, useMutation } from "convex/react"
 import { useFonts } from "expo-font"
 import * as Network from "expo-network"
 import { Stack, ThemeProvider } from "expo-router"
-import * as ScreenOrientation from "expo-screen-orientation"
 import * as SplashScreen from "expo-splash-screen"
 import { StatusBar } from "expo-status-bar"
 import { IconColorProvider, PanelUIProvider } from "panelui-native"
@@ -35,36 +35,6 @@ const convex = convexUrl
       unsavedChangesWarning: false,
     })
   : null
-
-let didWarnMissingConvexUrl = false
-let didWarnFontLoadError = false
-
-function warnMissingConvexUrl() {
-  if (didWarnMissingConvexUrl) {
-    return
-  }
-
-  didWarnMissingConvexUrl = true
-  console.warn(
-    "EXPO_PUBLIC_CONVEX_URL is not set. Convex is disabled for apps/mobile; set it when this app needs the Convex backend."
-  )
-}
-
-function warnFontLoadError(error: Error) {
-  if (didWarnFontLoadError) {
-    return
-  }
-
-  didWarnFontLoadError = true
-  console.warn(
-    "Mobile fonts failed to load; mobile will fall back to system fonts.",
-    error
-  )
-}
-
-if (!convex) {
-  warnMissingConvexUrl()
-}
 
 const stackScreenOptions = { headerShown: false } as const
 const homeScreenOptions = { freezeOnBlur: true, gestureEnabled: false } as const
@@ -116,7 +86,6 @@ function AnonymousSession() {
 
       if (error) {
         requested.current = false
-        console.warn("Could not create the anonymous profile", error)
       }
     }
 
@@ -137,16 +106,6 @@ export default function RootLayout() {
   const [fontsLoaded, fontLoadError] = useFonts(mobileFonts)
 
   useEffect(() => {
-    void ScreenOrientation.lockAsync(
-      ScreenOrientation.OrientationLock.PORTRAIT_UP
-    )
-  }, [])
-
-  useEffect(() => {
-    if (fontLoadError) {
-      warnFontLoadError(fontLoadError)
-    }
-
     if (fontsLoaded || fontLoadError) {
       void SplashScreen.hideAsync()
     }
@@ -177,10 +136,12 @@ function RootProviders() {
     >
       <OptionalConvexProvider>
         <PlanProvider>
-          <ThemeProvider value={NAV_THEME[colorScheme]}>
-            <RootStack />
-            <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-          </ThemeProvider>
+          <RecapProvider>
+            <ThemeProvider value={NAV_THEME[colorScheme]}>
+              <RootStack />
+              <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+            </ThemeProvider>
+          </RecapProvider>
         </PlanProvider>
       </OptionalConvexProvider>
     </PanelProviders>

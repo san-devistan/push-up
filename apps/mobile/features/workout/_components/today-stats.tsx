@@ -8,6 +8,7 @@ import {
   ZapIcon,
 } from "@/components/icons"
 import type { NumericTextProps } from "@/components/numeric-text"
+import { Surface } from "@/components/ui/surface"
 import { Overline, Slab } from "@/features/workout/_components/figures"
 import type { Activity } from "@/features/workout/_lib/activity"
 import { getWeeklyComparison } from "@/features/workout/_lib/activity-window"
@@ -17,7 +18,7 @@ import { useI18n } from "@/hooks/use-i18n"
 import { cn } from "@/lib/utils"
 import MaskedView from "@react-native-masked-view/masked-view"
 import { BlurView } from "expo-blur"
-import { AreaChart, GridItem, Kpi, Surface, Text } from "panelui-native"
+import { AreaChart, GridItem, Kpi, Text } from "panelui-native"
 import { Fragment, type ComponentType, type ReactNode } from "react"
 import { StyleSheet, View } from "react-native"
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg"
@@ -66,7 +67,7 @@ function StatBackdrop({ children }: { children: ReactNode }) {
 }
 
 function getCalories(activity: Activity | undefined) {
-  return activity ? getEstimatedCalories(activity.todayAttempts) : null
+  return getEstimatedCalories(activity?.todayAttempts || 0)
 }
 
 function useThemeColor(name: string) {
@@ -289,7 +290,7 @@ function MetricsGrid({ activity }: { activity: Activity | undefined }) {
       <MetricTile icon={ZapIcon} label={t("today.calories")}>
         <MetricValue
           maximumFractionDigits={1}
-          minimumFractionDigits={calories !== null && calories < 10 ? 1 : 0}
+          minimumFractionDigits={calories > 0 && calories < 10 ? 1 : 0}
           suffix="kcal"
           value={calories}
         />

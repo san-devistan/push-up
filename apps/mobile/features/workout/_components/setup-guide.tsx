@@ -1,32 +1,11 @@
 import { SpeechBubble } from "@/components/speech-bubble"
 import type { PhoneInclinationDisplay } from "@/features/workout/_hooks/use-phone-inclination"
+import { getSetupGuidance } from "@/features/workout/_lib/guidance"
 import type { SetupFraming } from "@/features/workout/_lib/setup"
 import { useI18n } from "@/hooks/use-i18n"
-import type { TranslationKey } from "@/lib/i18n"
 import { StyleSheet, View } from "react-native"
 
-import WorkoutAvatar from "./avatar.dom"
-
-type Guidance = {
-  expression: Parameters<typeof WorkoutAvatar>[0]["expression"]
-  message: TranslationKey
-}
-
-const FRAMING_GUIDANCE = {
-  close: { expression: "suspicious-right", message: "setup.tooClose" },
-  far: { expression: "suspicious-right", message: "setup.tooFar" },
-  "off-center": {
-    expression: "far-right-glance",
-    message: "setup.reposition",
-  },
-  ready: { expression: "eyes-closed", message: "setup.perfect" },
-  unknown: { expression: "shy-downward", message: "setup.noFace" },
-} as const satisfies Record<SetupFraming, Guidance>
-
-const PHONE_GUIDANCE = {
-  expression: "skeptical-left",
-  message: "hint.layPhoneFlat",
-} as const satisfies Guidance
+import WorkoutAvatar from "./avatar"
 
 const styles = StyleSheet.create({
   avatar: {
@@ -59,10 +38,10 @@ export default function SetupGuide({
   phone: PhoneInclinationDisplay
 }) {
   const { t } = useI18n()
-  const guidance =
-    framing !== "unknown" && phone.type === "available" && !phone.flat
-      ? PHONE_GUIDANCE
-      : FRAMING_GUIDANCE[framing]
+  const guidance = getSetupGuidance(
+    framing,
+    phone.type === "available" ? phone.flat : null
+  )
 
   return (
     <View pointerEvents="none" style={styles.root}>
@@ -71,7 +50,7 @@ export default function SetupGuide({
           dom={AVATAR_DOM_PROPS}
           expression={guidance.expression}
         />
-        <SpeechBubble className="absolute top-1 -right-3 max-w-52">
+        <SpeechBubble className="absolute top-1 -right-3">
           {t(guidance.message)}
         </SpeechBubble>
       </View>

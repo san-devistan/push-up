@@ -65,7 +65,7 @@ import { useBackHandler } from '@/hooks/use-back-handler';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Text, type TextProps, textChildren } from '@/components/ui/text';
 import { cn } from '@/lib/cn';
-import { hapticHard } from '@/lib/haptics';
+import { hapticFeedback } from '@/lib/haptics';
 
 /** Gap between the trigger and the panel. */
 const DEFAULT_OFFSET = 8;
@@ -579,7 +579,7 @@ function PopoverContent({
             onPress={
               dismissible
                 ? () => {
-                    hapticHard();
+                    hapticFeedback('close');
                     setOpen(false);
                   }
                 : undefined

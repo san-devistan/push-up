@@ -1,0 +1,7 @@
+{
+  "name": "pumpr-pose-detector",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/spec.nitro.ts",
+  "react-native": "src/spec.nitro.ts"
+}

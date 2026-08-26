@@ -1,0 +1,39 @@
+diff --git a/dist/index.js b/dist/index.js
+index 8904b2d28a25ff635ec9fa46f43150d26e9dea74..cbab076f41666eaed92774b3cda0a3a72b16d722 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -5,7 +5,11 @@ import { jsx as v, jsxs as y } from "react/jsx-runtime";
+ var b = /* @__PURE__ */ new WeakSet(), x = 420, S = e + 2, C = () => ({
+ 	random: Math.random,
+ 	reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+-}), w = (e) => {
++}), R0 = (e, t, n) => {
++	if (t.status === "playing") return !0;
++	let r = e.expressions[t.activeExpression]?.motion;
++	return t.status === "stopped" && !n.reduceMotion && r !== void 0 && (r.eyes !== "none" || r.body !== "none");
++}, w = (e) => {
+ 	b.add(e);
+ }, T = (e) => {
+ 	if (b.has(e)) return;
+@@ -115,18 +119,19 @@ function k({ definition: e, ref: d, animation: b, expression: w, defaultAnimatio
+ 	]), f(() => {
+ 		F?.(J.activeExpression);
+ 	}, [J.activeExpression, F]), f(() => {
+-		if (J.status !== "playing") return;
++		if (!R0(e, J, C())) return;
+ 		let n = 0, r = (i) => {
+ 			let a = G.current;
+ 			if (!a) return;
+ 			let o = C(), s = t(e, a, i, o);
+ 			G.current = s, E(a, s) || Y(s), a.status === "playing" && s.status === "stopped" && a.activeAnimation && W.current !== a.activeAnimation && (W.current = a.activeAnimation, P?.(a.activeAnimation));
+ 			let c = Z(s, i, o);
+-			X(c), s.status === "playing" && (n = requestAnimationFrame(r));
++			X(c), R0(e, s, o) && (n = requestAnimationFrame(r));
+ 		};
+ 		return n = requestAnimationFrame(r), () => cancelAnimationFrame(n);
+ 	}, [
+ 		e,
++		J.activeExpression,
+ 		J.status,
+ 		P
+ 	]);

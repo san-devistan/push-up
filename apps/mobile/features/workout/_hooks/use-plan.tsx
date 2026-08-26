@@ -10,6 +10,7 @@ import {
   type TrainingPlan,
 } from "@/features/workout/_lib/storage"
 import type { Language } from "@/lib/i18n"
+import { setSfxEnabled } from "@/lib/sfx"
 import * as React from "react"
 
 type PlanContextValue = {
@@ -85,6 +86,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     void syncDailyReminder(loadPlan(), language).then(setReminderState)
   }, [language])
+
+  React.useEffect(() => setSfxEnabled(plan.soundEnabled), [plan.soundEnabled])
 
   const enableReminders = getEnableReminders(
     language,

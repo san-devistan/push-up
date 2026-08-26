@@ -28,7 +28,5 @@ export function requireFlatPhone(
   setup: SetupState,
   phoneFlat: boolean
 ): SetupState {
-  return setup.valid && !phoneFlat
-    ? { ...setup, hint: "layPhoneFlat", valid: false }
-    : setup
+  return !phoneFlat ? { ...setup, hint: "layPhoneFlat", valid: false } : setup
 }

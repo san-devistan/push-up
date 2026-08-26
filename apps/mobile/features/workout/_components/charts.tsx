@@ -1,5 +1,6 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes chart props. */
 
+import { BarChart, type BarChartDatum } from "@/components/ui/bar-chart"
 import {
   HeatmapChart,
   buildHeatmapCalendar,
@@ -10,13 +11,15 @@ import {
   getActivityDaysAgo,
 } from "@/features/workout/_lib/activity-window"
 import { DEMO_DATA } from "@/features/workout/_lib/demo"
+import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
-import { BarChart, type BarChartDatum } from "panelui-native"
+import { selectionTick } from "@/lib/haptics"
 import { useRef } from "react"
 import { ScrollView, View } from "react-native"
 
 const HEATMAP_WEEK_START = 1
+const LIGHT_HEATMAP_OPACITY = [0.08, 0.22, 0.38, 0.56, 0.72]
+const DARK_HEATMAP_OPACITY = [0.1, 0.3, 0.48, 0.66, 0.84]
 
 type ActivityDay = { date: string; reps: number }
 
@@ -31,11 +34,11 @@ function getShortDay(date: string, locale: string) {
 }
 
 function hapticBarSelection(_: number, datum: BarChartDatum | null) {
-  if (datum) hapticHard()
+  if (datum) selectionTick()
 }
 
 function hapticCellSelection(cell: HeatmapCell | null) {
-  if (cell) hapticHard()
+  if (cell) selectionTick()
 }
 
 function getDateLabel(
@@ -84,7 +87,7 @@ export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
         aspectRatio={2.5}
         data={data}
         minBarLength={2}
-        onAccessibilityDatumPress={hapticHard}
+        onAccessibilityDatumPress={selectionTick}
         onActiveIndexChange={hapticBarSelection}
         xDataKey="label"
       >
@@ -110,6 +113,7 @@ export function ActivityHeatmap({
   recentDays: readonly ActivityDay[]
   today: number
 }) {
+  const colorScheme = useColorScheme()
   const { formatNumber, locale, t } = useI18n()
   const scrollView = useRef<ScrollView>(null)
   const entries = recentDays.map((day) => ({
@@ -143,9 +147,13 @@ export function ActivityHeatmap({
       className={DEMO_DATA ? "w-[428px]" : undefined}
       color="--color-chart-3"
       data={weeks}
+      emptyColor="--color-foreground"
       gap={4}
       layout={DEMO_DATA ? "fluid" : "fill"}
-      onAccessibilityDatumPress={hapticHard}
+      levelOpacity={
+        colorScheme === "dark" ? DARK_HEATMAP_OPACITY : LIGHT_HEATMAP_OPACITY
+      }
+      onAccessibilityDatumPress={selectionTick}
       onActiveCellChange={hapticCellSelection}
       weekStartDay={HEATMAP_WEEK_START}
     >

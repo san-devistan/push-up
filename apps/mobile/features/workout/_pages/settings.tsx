@@ -4,11 +4,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CrosshairIcon,
-  MicIcon,
   PlusIcon,
   RepeatIcon,
   SolidBellIcon,
   TrophyIcon,
+  Volume2Icon,
   XIcon,
   type IconProps,
 } from "@/components/icons"
@@ -39,7 +39,7 @@ import type {
   TrainingTime,
 } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
+import { hapticFeedback, hapticForward, selectionTick } from "@/lib/haptics"
 import { FONT_FAMILY } from "@/lib/theme"
 import Constants from "expo-constants"
 import { Link, Stack, useRouter } from "expo-router"
@@ -71,7 +71,7 @@ const SETTINGS_SCREEN_OPTIONS = {
   headerShadowVisible: false,
   headerShown: true,
   headerTransparent: true,
-  scrollEdgeEffects: { top: "hidden" },
+  scrollEdgeEffects: { top: "soft" },
 } as const
 const SETTINGS_TITLE_STYLE = {
   fontFamily: HEADER_FONT_FAMILY,
@@ -120,7 +120,7 @@ function getSetTarget(
   return (index: number) => {
     if (index === selected) return
     selected = index
-    hapticHard()
+    selectionTick()
     updatePlan({ targetReps: goalAtIndex(index) })
   }
 }
@@ -167,7 +167,10 @@ function getSetPlanBoolean(
   updatePlan: (patch: Partial<TrainingPlan>) => void
 ) {
   return (value: boolean) => {
-    hapticHard()
+    hapticFeedback(
+      value ? "toggle-on" : "toggle-off",
+      key === "soundEnabled" ? true : undefined
+    )
     updatePlan({ [key]: value })
   }
 }
@@ -380,8 +383,8 @@ function SoundRow() {
   return (
     <SettingRow
       checked={plan.soundEnabled}
-      icon={MicIcon}
-      label={t("plan.soundFeedback")}
+      icon={Volume2Icon}
+      label={t("plan.soundEffects")}
       onCheckedChange={setSound}
     />
   )
@@ -396,7 +399,7 @@ function LevelsRow() {
       <Pressable
         accessibilityLabel={label}
         className="min-h-11 flex-row items-center gap-4 active:opacity-60"
-        onPress={hapticHard}
+        onPress={hapticForward}
       >
         <TrophyIcon size={18} />
         <Text className="flex-1 font-semibold capitalize">{label}</Text>
@@ -408,7 +411,7 @@ function LevelsRow() {
 
 function getReplayOnboarding(router: ReturnType<typeof useRouter>) {
   return () => {
-    hapticHard()
+    hapticFeedback("long-press")
     router.push("/onboarding")
   }
 }

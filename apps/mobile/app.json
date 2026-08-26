@@ -3,7 +3,7 @@
     "name": "pumpr.",
     "slug": "pumpr",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pumpr",
     "userInterfaceStyle": "automatic",
@@ -65,17 +65,24 @@
         }
       ],
       [
-        "expo-media-library",
+        "react-native-share",
         {
-          "photosPermission": false,
-          "savePhotosPermission": "Allow pumpr. to save transparent performance PNGs.",
-          "granularPermissions": ["photo"]
+          "ios": ["instagram", "instagram-stories"],
+          "android": ["com.instagram.android"]
         }
       ],
       "expo-web-browser",
       "expo-secure-store",
       "expo-apple-authentication",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

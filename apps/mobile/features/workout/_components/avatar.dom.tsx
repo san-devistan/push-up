@@ -3,6 +3,7 @@
 import definition from "@/features/workout/_components/pumpr.avatar.json"
 import { createAvatar } from "@bible-strong/avatar-react"
 import type { DOMProps } from "expo/dom"
+import { useEffect } from "react"
 
 const PumprAvatar = createAvatar(definition)
 
@@ -48,11 +49,19 @@ const DOCUMENT_STYLES = `
 export default function WorkoutAvatar({
   animation,
   expression,
+  onReady,
 }: {
   animation?: keyof typeof definition.animations
   dom?: DOMProps
   expression?: keyof typeof definition.expressions
+  onReady?: () => Promise<void>
 }) {
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => void onReady?.())
+
+    return () => cancelAnimationFrame(frame)
+  }, [onReady])
+
   return (
     <>
       <style>{DOCUMENT_STYLES}</style>

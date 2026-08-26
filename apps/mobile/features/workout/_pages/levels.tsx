@@ -3,6 +3,7 @@ import { CheckIcon, ChevronLeftIcon } from "@/components/icons"
 import { NUMERIC_TEXT_SLOT, NumericPhrase } from "@/components/numeric-text"
 import { Accordion } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Surface } from "@/components/ui/surface"
 import { Timeline } from "@/components/ui/timeline"
 import WorkoutSectionRail from "@/features/workout/_components/section-rail"
 import { useActivity } from "@/features/workout/_hooks/use-activity"
@@ -17,7 +18,7 @@ import { useI18n } from "@/hooks/use-i18n"
 import { FONT_FAMILY } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { Stack, useRouter } from "expo-router"
-import { Badge, Surface, Text } from "panelui-native"
+import { Badge, Text } from "panelui-native"
 import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import { ScrollView, StyleSheet, View } from "react-native"
 
@@ -52,7 +53,7 @@ const LEVELS_SCREEN_OPTIONS = {
   headerShadowVisible: false,
   headerShown: true,
   headerTransparent: true,
-  scrollEdgeEffects: { top: "hidden" },
+  scrollEdgeEffects: { top: "soft" },
 } as const
 const LEVELS_TITLE_STYLE = {
   fontFamily: HEADER_FONT_FAMILY,

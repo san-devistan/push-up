@@ -5,10 +5,9 @@ import {
   type MotionTrace,
 } from "./trace.ts"
 
-export const FACE_COUNTER_THRESHOLDS = {
+export const COUNTER_THRESHOLDS = {
   bottom: 1.35,
   leaveTop: 1.12,
-  minimumAttemptMs: 450,
   recoveryMaxTrackingGapMs: 750,
   returnTop: 1.08,
 } as const
@@ -28,6 +27,7 @@ export type WorkoutAttempt = {
 
 type ActiveAttempt = MotionTrace & {
   maxTrackingGapMs: number
+  poseVerified: boolean
   reachedBottom: boolean
   startedAtOffsetMs: number
   trackingLostAtOffsetMs: number | null
@@ -47,9 +47,17 @@ export function createCounterState(): CounterState {
   return { activeAttempt: null, attempts: [], validReps: 0 }
 }
 
+export function getPushupDepthProgress(depthRatio: number) {
+  const progress =
+    (depthRatio - COUNTER_THRESHOLDS.returnTop) /
+    (COUNTER_THRESHOLDS.bottom - COUNTER_THRESHOLDS.returnTop)
+
+  return Math.max(0, Math.min(1, progress))
+}
+
 export function recordTrackingLoss(
   state: CounterState,
-  lastFaceAtOffsetMs: number
+  lastTrackingAtOffsetMs: number
 ): CounterState {
   if (!state.activeAttempt) return state
 
@@ -58,7 +66,7 @@ export function recordTrackingLoss(
     activeAttempt: {
       ...state.activeAttempt,
       trackingLostAtOffsetMs:
-        state.activeAttempt.trackingLostAtOffsetMs ?? lastFaceAtOffsetMs,
+        state.activeAttempt.trackingLostAtOffsetMs ?? lastTrackingAtOffsetMs,
     },
   }
 }
@@ -76,21 +84,16 @@ function closeTrackingGap(attempt: ActiveAttempt, elapsedMs: number) {
   }
 }
 
-function createFailureReasons(
-  attempt: ActiveAttempt,
-  durationMs: number
-): FailureReason[] {
+function createFailureReasons(attempt: ActiveAttempt): FailureReason[] {
   const reasons: FailureReason[] = []
 
-  if (
-    !attempt.reachedBottom ||
-    durationMs < FACE_COUNTER_THRESHOLDS.minimumAttemptMs
-  ) {
+  if (!attempt.reachedBottom) {
     reasons.push("insufficient_depth")
   }
 
   if (
-    attempt.maxTrackingGapMs > FACE_COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
+    !attempt.poseVerified ||
+    attempt.maxTrackingGapMs > COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
   ) {
     reasons.push("tracking_lost")
   }
@@ -98,17 +101,16 @@ function createFailureReasons(
   return reasons
 }
 
-export function processFaceScale(
+export function processDepthRatio(
   state: CounterState,
-  faceScale: number,
-  topScale: number,
-  elapsedMs: number
+  depthRatio: number,
+  elapsedMs: number,
+  poseVerified: boolean
 ): { event: CounterEvent; state: CounterState } {
-  const scaleRatio = faceScale / topScale
-  const depthOffset = scaleRatio - FACE_COUNTER_THRESHOLDS.bottom
+  const depthOffset = depthRatio - COUNTER_THRESHOLDS.bottom
 
   if (!state.activeAttempt) {
-    if (scaleRatio < FACE_COUNTER_THRESHOLDS.leaveTop) {
+    if (depthRatio < COUNTER_THRESHOLDS.leaveTop) {
       return { event: { type: "none" }, state }
     }
 
@@ -118,7 +120,8 @@ export function processFaceScale(
         ...state,
         activeAttempt: {
           maxTrackingGapMs: 0,
-          reachedBottom: scaleRatio >= FACE_COUNTER_THRESHOLDS.bottom,
+          poseVerified,
+          reachedBottom: depthRatio >= COUNTER_THRESHOLDS.bottom,
           startedAtOffsetMs: elapsedMs,
           trackingLostAtOffsetMs: null,
           ...startTrace(depthOffset, elapsedMs),
@@ -134,11 +137,12 @@ export function processFaceScale(
   }
   const activeAttempt = {
     ...traced,
+    poseVerified: traced.poseVerified || poseVerified,
     reachedBottom:
-      traced.reachedBottom || scaleRatio >= FACE_COUNTER_THRESHOLDS.bottom,
+      traced.reachedBottom || depthRatio >= COUNTER_THRESHOLDS.bottom,
   }
 
-  if (scaleRatio > FACE_COUNTER_THRESHOLDS.returnTop) {
+  if (depthRatio > COUNTER_THRESHOLDS.returnTop) {
     return {
       event: { type: "none" },
       state: { ...state, activeAttempt },
@@ -146,7 +150,7 @@ export function processFaceScale(
   }
 
   const durationMs = Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs)
-  const failureReasons = createFailureReasons(activeAttempt, durationMs)
+  const failureReasons = createFailureReasons(activeAttempt)
   const attempt = {
     depthTrace: closeTrace(activeAttempt, depthOffset, elapsedMs),
     durationMs,
@@ -181,8 +185,8 @@ export function finishActiveAttempt(
   ]
 
   if (
-    activeAttempt.maxTrackingGapMs >
-    FACE_COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
+    !activeAttempt.poseVerified ||
+    activeAttempt.maxTrackingGapMs > COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
   ) {
     failureReasons.push("tracking_lost")
   }

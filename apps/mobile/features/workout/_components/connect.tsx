@@ -13,7 +13,7 @@ import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
 import { Text } from "panelui-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
-import { StyleSheet, View } from "react-native"
+import { Alert, StyleSheet, View } from "react-native"
 import Svg, { Path } from "react-native-svg"
 
 const MARK_SIZE = 18
@@ -173,10 +173,11 @@ function getSignOutAction(
 function getDeleteDataAction(
   clearRemoteData: () => Promise<unknown>,
   errorMessage: string,
+  language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>
 ) {
-  return () => {
+  const deleteData = () => {
     setError(null)
     setPending("delete")
     void clearRemoteData()
@@ -184,6 +185,20 @@ function getDeleteDataAction(
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
+
+  return () =>
+    Alert.alert(
+      translate(language, "connect.deleteTitle"),
+      translate(language, "connect.deleteBody"),
+      [
+        { style: "cancel", text: translate(language, "common.cancel") },
+        {
+          onPress: deleteData,
+          style: "destructive",
+          text: translate(language, "common.delete"),
+        },
+      ]
+    )
 }
 
 export function ConnectProviders({
@@ -254,7 +269,7 @@ export function ConnectProviders({
 }
 
 export function Connect() {
-  const { t } = useI18n()
+  const { language, t } = useI18n()
   const { data: authSession } = authClient.useSession()
   const clearRemoteData = useMutation(api.workoutSessions.clear)
   const [error, setError] = useState<string | null>(null)
@@ -268,6 +283,7 @@ export function Connect() {
   const deleteData = getDeleteDataAction(
     () => clearRemoteData({}),
     t("connect.couldNotDelete"),
+    language,
     setError,
     setPending
   )

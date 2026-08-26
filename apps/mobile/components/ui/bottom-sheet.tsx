@@ -45,7 +45,7 @@ import { Scrim } from '@/components/ui/scrim';
 import { Text, textChildren } from '@/components/ui/text';
 import { useBackHandler } from '@/hooks/use-back-handler';
 import { cn } from '@/lib/cn';
-import { impactKnock } from '@/lib/haptics';
+import { hapticFeedback } from '@/lib/haptics';
 
 /**
  * One spring for the whole surface, in Apple's two designer parameters rather
@@ -436,7 +436,7 @@ function BottomSheetContent({
             translateY.value = withSpring(0, { ...SPRING, velocity: event.velocityY });
             // It caught rather than went. Fired here, at the moment the sheet
             // commits to staying, not when it finishes arriving.
-            runOnJS(impactKnock)();
+            runOnJS(hapticFeedback)('snap');
           }
         }),
     // Rebuilt only when one of these changes. Built inline it would be a new
@@ -549,7 +549,7 @@ function BottomSheetContent({
             onPress={
               dismissible
                 ? () => {
-                    impactKnock();
+                    hapticFeedback('close');
                     close();
                   }
                 : undefined
@@ -610,7 +610,7 @@ function BottomSheetContent({
                   accessibilityRole="button"
                   accessibilityLabel="Close"
                   onPress={() => {
-                    impactKnock();
+                    hapticFeedback('close');
                     close();
                   }}
                   hitSlop={8}

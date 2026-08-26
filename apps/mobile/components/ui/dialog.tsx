@@ -18,7 +18,7 @@ import { Scrim } from '@/components/ui/scrim';
 import { Text, type TextProps, textChildren } from '@/components/ui/text';
 import { useBackHandler } from '@/hooks/use-back-handler';
 import { cn } from '@/lib/cn';
-import { hapticHard } from '@/lib/haptics';
+import { hapticFeedback } from '@/lib/haptics';
 
 interface DialogContextValue {
   open: boolean;
@@ -86,6 +86,8 @@ export interface DialogContentProps extends ViewProps {
   className?: string;
   /** Tap on the backdrop closes the dialog. Default true. */
   dismissible?: boolean;
+  /** Play the close SFX when dismissed from the backdrop. */
+  dismissSfx?: boolean;
   /**
    * Frost the screen behind the dialog instead of dimming it. Uses `expo-blur`
    * when installed and falls back to the dim when it is not, so it is safe to
@@ -101,6 +103,7 @@ export interface DialogContentProps extends ViewProps {
 function DialogContent({
   className,
   dismissible = true,
+  dismissSfx = true,
   blur = false,
   children,
   ...props
@@ -131,7 +134,7 @@ function DialogContent({
           onPress={
             dismissible
               ? () => {
-                  hapticHard();
+                  hapticFeedback('close', dismissSfx);
                   setOpen(false);
                 }
               : undefined

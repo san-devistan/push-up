@@ -61,6 +61,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { G, Line as SvgLine, Rect } from 'react-native-svg';
 import { useCSSVariable } from 'uniwind';
+import { Surface } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { ChartAccessibilityData, type ChartAccessibilityProps } from '@/components/ui/chart-accessibility';
 import { cn } from '@/lib/cn';
@@ -1069,12 +1070,12 @@ function HeatmapTooltip({
       </GestureDetector>
 
       {activeCell && label ? (
-        <View
+        <Surface
+          bordered
+          elevated
           pointerEvents="none"
-          className={cn(
-            'absolute rounded-xl border border-border bg-popover px-2.5 py-1.5 shadow-lg',
-            className
-          )}
+          padding="none"
+          className={cn('absolute rounded-xl px-2.5 py-1.5', className)}
           style={{
             top: anchorY,
             [flipped ? 'right' : 'left']: flipped ? grid.width - anchorX : anchorX,
@@ -1104,7 +1105,7 @@ function HeatmapTooltip({
               {label}
             </Text>
           )}
-        </View>
+        </Surface>
       ) : null}
     </>
   );

@@ -10,7 +10,8 @@ import { Text, textChildren } from '@/components/ui/text';
 import { cn } from '@/lib/cn';
 import { IconColorProvider } from '@/components/ui/icons';
 import { getNativeUI, getSwiftUIModifiers } from '@/lib/native';
-import { hapticHard } from '@/lib/haptics';
+import { hapticFeedback } from '@/lib/haptics';
+import type { SfxCue } from '@/lib/sfx';
 import { Spinner } from '@/components/ui/spinner';
 
 const buttonVariants = tv({
@@ -25,7 +26,7 @@ const buttonVariants = tv({
   variants: {
     variant: {
       primary: {
-        root: 'border-primary bg-primary shadow-sm',
+        root: 'bg-primary shadow-sm',
         label: 'text-primary-foreground',
         spinner: 'border-primary-foreground/32 border-t-primary-foreground',
       },
@@ -172,6 +173,8 @@ export interface ButtonProps
   endContent?: ReactNode;
   /** Extra classes for the label when children is a string. */
   labelClassName?: string;
+  /** SFX played alongside haptics, or false for haptics only. */
+  sfx?: SfxCue | false;
   /**
    * Render the platform's own button instead of this one. Requires the
    * optional `@expo/ui` package; without it this prop does nothing.
@@ -317,6 +320,7 @@ export const Button = forwardRef<View, ButtonProps>(
       native,
       systemImage,
       glass = false,
+      sfx,
       accessibilityState,
       onPress,
       ...props
@@ -356,10 +360,11 @@ export const Button = forwardRef<View, ButtonProps>(
     const themedColor = useCSSVariable(CONTENT_COLOR_VAR[resolvedVariant ?? 'primary']);
     const contentColor =
       typeof themedColor === 'string' ? themedColor : undefined;
-    const hapticPress: ButtonProps['onPress'] = onPress
+    const sfxCue = sfx === false ? 'press' : (sfx ?? 'press');
+    const hapticPress: ButtonProps['onPress'] = onPress || sfx
       ? (event) => {
-          hapticHard();
-          onPress(event);
+          hapticFeedback(sfxCue, sfx !== false);
+          onPress?.(event);
         }
       : undefined;
 

@@ -76,8 +76,9 @@ import Animated, {
 import { tv, type VariantProps } from 'tailwind-variants';
 import { useCSSVariable } from 'uniwind';
 import { CheckIcon, IconColorProvider } from '@/components/ui/icons';
+import { Surface } from '@/components/ui/surface';
 import { Text, textChildren } from '@/components/ui/text';
-import { impactKnock, selectionTick } from '@/lib/haptics';
+import { hapticHard, hapticSuccess } from '@/lib/haptics';
 import {
   DEFAULT_AUTO_RESET_DELAY,
   fillDuration,
@@ -166,9 +167,10 @@ const progressButtonVariants = tv({
         fillLabel: 'text-background',
       },
       destructive: {
-        label: 'text-destructive',
-        fill: 'bg-destructive',
-        fillLabel: 'text-destructive-solid-foreground',
+        root: 'border-0 bg-transparent',
+        label: 'text-white',
+        fill: 'bg-black/20',
+        fillLabel: 'text-white',
       },
       success: {
         label: 'text-success',
@@ -334,7 +336,7 @@ const ProgressButtonRoot = forwardRef<View, ProgressButtonProps>(function Progre
     if (!isControlled) setInternalCompleted(true);
     onCompletedChange?.(true);
     onComplete?.();
-    if (haptics) impactKnock();
+    if (haptics) hapticSuccess();
   }, [isControlled, onComplete, onCompletedChange, haptics]);
 
   /*
@@ -366,7 +368,7 @@ const ProgressButtonRoot = forwardRef<View, ProgressButtonProps>(function Progre
    */
   const begin = useCallback(() => {
     if (disabled || completed) return;
-    if (haptics) selectionTick();
+    if (haptics) hapticHard();
     runOnUI(() => {
       'worklet';
       cancelAnimation(progress);
@@ -554,6 +556,14 @@ const ProgressButtonRoot = forwardRef<View, ProgressButtonProps>(function Progre
         onLayout={onLayout}
         className={slots.root({ className })}
       >
+        {variant === 'destructive' ? (
+          <Surface
+            className="absolute inset-0 rounded-full"
+            padding="none"
+            pointerEvents="none"
+            variant="destructive"
+          />
+        ) : null}
         {body}
       </Pressable>
     </ProgressButtonContext.Provider>
@@ -629,7 +639,8 @@ export interface ProgressButtonDoneProps extends ViewProps {
  */
 function ProgressButtonDone({ className, children, ...props }: ProgressButtonDoneProps) {
   const { done, completed, variant, slots } = useProgressButtonContext('ProgressButton.Done');
-  const tint = useCSSVariable(DONE_TINT[variant]);
+  const resolvedTint = useCSSVariable(DONE_TINT[variant]);
+  const tint = variant === 'destructive' ? '#ffffff' : resolvedTint;
 
   /*
    * It carries the fill's own colour and covers the button edge to edge.

@@ -3,7 +3,7 @@ import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import type { TimeControlProps } from "@/features/workout/_components/time-control.types"
 import { formatClock } from "@/features/workout/_lib/format"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
+import { hapticOpen } from "@/lib/haptics"
 import { Text } from "panelui-native"
 import { Pressable } from "react-native"
 
@@ -31,7 +31,7 @@ export default function TimeControl({ onChange, value }: TimeControlProps) {
         accessibilityLabel={label}
         accessibilityRole="button"
         className="active:opacity-60"
-        onPress={hapticHard}
+        onPress={hapticOpen}
       >
         <Text className="font-heading text-2xl tabular-nums">{label}</Text>
       </Pressable>

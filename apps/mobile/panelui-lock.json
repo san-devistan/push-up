@@ -132,6 +132,18 @@
     "lib/date.ts": {
       "item": "date",
       "digest": "sha256:3c9d1b865d87e56922e2d6e1b8fac5c3a28ba658e737b0a0c1990d0bd7f42829"
+    },
+    "components/ui/surface.tsx": {
+      "item": "surface",
+      "digest": "sha256:8cd5cb8307862ba0222f6544a6f730a7f09457fae186b9697ada4bca874b0f0a"
+    },
+    "components/ui/bar-chart.tsx": {
+      "item": "bar-chart",
+      "digest": "sha256:8e3fad2d53d2096d88a53f89d94c04e993a38d6cc09c29b059860e9ae1cdb8a1"
+    },
+    "lib/chart.ts": {
+      "item": "chart",
+      "digest": "sha256:7c6d7fa6ea5caa083197b8602543e43983c436c4660decd56484ffa47586a17d"
     }
   },
   "roots": {
@@ -186,6 +198,15 @@
       "chart-accessibility",
       "cn",
       "date",
+      "text",
+      "use-direction"
+    ],
+    "surface": ["surface"],
+    "bar-chart": [
+      "bar-chart",
+      "chart",
+      "chart-accessibility",
+      "cn",
       "text",
       "use-direction"
     ]

@@ -1,13 +1,12 @@
+import { PhysicalCameraTrace } from "@/components/camera-trace"
 import { CheckIcon } from "@/components/icons"
 import { NumericText } from "@/components/numeric-text"
 import { SpeechBubble } from "@/components/speech-bubble"
 import { Button } from "@/components/ui/button"
-import TrackingIllustration, {
-  PhysicalCameraTrace,
-} from "@/features/onboarding/_components/tracking-illustration"
+import TrackingIllustration from "@/features/onboarding/_components/tracking-illustration"
 import ScheduleStep from "@/features/onboarding/schedule"
 import { completeOnboarding } from "@/features/onboarding/storage"
-import WorkoutAvatar from "@/features/workout/_components/avatar.dom"
+import WorkoutAvatar from "@/features/workout/_components/avatar"
 import { ConnectProviders } from "@/features/workout/_components/connect"
 import { Slab } from "@/features/workout/_components/figures"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
@@ -19,7 +18,7 @@ import {
 import type { TrainingPlan } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
 import { authClient } from "@/lib/auth-client"
-import { hapticHard } from "@/lib/haptics"
+import { selectionTick } from "@/lib/haptics"
 import { useRouter } from "expo-router"
 import { Slider, Text } from "panelui-native"
 import { useState, type Dispatch, type SetStateAction } from "react"
@@ -160,7 +159,7 @@ function getSetTarget(
   return (index: number) => {
     if (index === selected) return
     selected = index
-    hapticHard()
+    selectionTick()
     updatePlan({ targetReps: goalAtIndex(index) })
   }
 }
@@ -217,8 +216,8 @@ function CameraStep() {
           Your phone counts every rep.
         </Text>
         <Text className="text-lg text-muted-foreground">
-          pumpr. uses face tracking to count your push-ups. Place your phone
-          flat on the ground with the camera facing you.
+          pumpr. uses on-device pose tracking to count your push-ups. Place your
+          phone flat on the ground with the camera facing you.
         </Text>
       </View>
 
@@ -293,6 +292,7 @@ export default function OnboardingSetup() {
               labelClassName="font-heading lowercase text-lg text-background"
               onPress={next}
               size="lg"
+              sfx={step === STEP_COUNT - 1 ? "success" : undefined}
             >
               {action}
             </Button>

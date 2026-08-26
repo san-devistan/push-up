@@ -51,7 +51,7 @@ import Animated, {
 import { tv } from 'tailwind-variants';
 import { ChevronDownIcon } from '@/components/ui/icons';
 import { Text, type TextProps, textChildren } from '@/components/ui/text';
-import { hapticHard } from '@/lib/haptics';
+import { hapticFeedback } from '@/lib/haptics';
 
 export type AccordionVariant =
   | 'default'
@@ -297,7 +297,7 @@ const AccordionTrigger = forwardRef<View, AccordionTriggerProps>(
         disabled={triggerDisabled}
         className={trigger({ className })}
         onPress={(event) => {
-          hapticHard();
+          hapticFeedback(isExpanded ? 'collapse' : 'expand');
           onPress?.(event);
           toggle(value);
         }}

@@ -1,21 +1,41 @@
-import { PauseIcon, PlayIcon, XIcon } from "@/components/icons"
+import { PhysicalCameraTrace } from "@/components/camera-trace"
+import { PauseIcon, PlayIcon } from "@/components/icons"
 import { NumericText } from "@/components/numeric-text"
+import { SpeechBubble } from "@/components/speech-bubble"
 import { Button } from "@/components/ui/button"
+import { Surface } from "@/components/ui/surface"
 import {
   useSession,
   type SessionPhase,
 } from "@/features/workout/_hooks/use-session"
+import {
+  getRepExpression,
+  getTrackingGuidance,
+} from "@/features/workout/_lib/guidance"
+import type { TrainingHint } from "@/features/workout/_lib/setup"
 import type {
   TrainingPlan,
   WorkoutSession,
 } from "@/features/workout/_lib/storage"
-import FaceCamera from "@/features/workout/camera"
+import TrackingCamera from "@/features/workout/camera"
 import { useI18n } from "@/hooks/use-i18n"
 import { Text } from "panelui-native"
-import { StyleSheet, View, useWindowDimensions } from "react-native"
+import { useEffect } from "react"
+import { StyleSheet, View } from "react-native"
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated"
 import { SafeAreaView } from "react-native-safe-area-context"
 
+import WorkoutAvatar from "./avatar"
+import { ActiveScore } from "./score"
 import SetupGuide from "./setup-guide"
+import { StopControl } from "./stop-control"
 
 const TOP_EDGE = ["top"] as const
 const BOTTOM_EDGE = ["bottom"] as const
@@ -25,15 +45,6 @@ const styles = StyleSheet.create({
     left: 0,
     position: "absolute",
     right: 0,
-  },
-  control: {
-    backgroundColor: "rgba(45, 47, 46, 0.9)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    borderCurve: "continuous",
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 72,
-    width: 72,
   },
   countdown: {
     color: "#ffffff",
@@ -50,15 +61,20 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  depthGlow: {
+    bottom: 0,
+    experimental_backgroundImage:
+      "radial-gradient(circle at 50% 48%, rgba(49,159,93,0) 0%, rgba(49,159,93,0.12) 46%, rgba(49,159,93,0.68) 100%)",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
   errorBanner: {
     left: 24,
     position: "absolute",
     right: 24,
     top: 96,
-  },
-  goalLabel: {
-    fontSize: 18,
-    letterSpacing: 1.2,
   },
   invalidToast: {
     alignSelf: "center",
@@ -68,37 +84,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   invalidToastLabel: { color: "#09090b" },
-  sessionCenter: {
-    alignItems: "center",
-    bottom: 180,
-    justifyContent: "center",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 120,
-  },
-  stopButton: {
-    backgroundColor: "#e60000",
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    borderCurve: "continuous",
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 80,
-    width: 80,
-  },
+  preparingBorder: { borderCurve: "continuous" },
   timer: {
     alignItems: "center",
-    backgroundColor: "rgba(45, 47, 46, 0.9)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    borderCurve: "continuous",
-    borderRadius: 999,
-    borderWidth: 1,
     flex: 1,
     height: 72,
     justifyContent: "center",
   },
   timerLabel: {
-    color: "rgba(255, 255, 255, 0.62)",
     fontSize: 24,
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.5,
@@ -108,8 +101,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0,
+    zIndex: 20,
   },
+  trainingAvatar: {
+    backgroundColor: "transparent",
+    height: 96,
+    width: 96,
+  },
+  trainingAvatarFrame: { height: 96, width: 96 },
 })
+const TRAINING_AVATAR_DOM_PROPS = {
+  scrollEnabled: false,
+  style: styles.trainingAvatar,
+}
 
 function formatSessionTime(durationMs: number) {
   const totalSeconds = Math.floor(durationMs / 1000)
@@ -123,11 +127,78 @@ function formatSessionTime(durationMs: number) {
   )}.${String(hundredths).padStart(2, "0")}`
 }
 
-function getCountStyle(width: number) {
-  return {
-    fontSize: Math.min(220, width * 0.5),
-    lineHeight: Math.min(232, width * 0.53),
-  }
+function DepthGlow({ progress }: { progress: number }) {
+  const reducedMotion = useReducedMotion()
+  const depth = useSharedValue(0)
+
+  useEffect(() => {
+    depth.set(
+      reducedMotion ? progress : withTiming(progress, { duration: 120 })
+    )
+  }, [depth, progress, reducedMotion])
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: depth.get() * 0.72,
+  }))
+
+  return (
+    <Animated.View
+      className="absolute inset-0"
+      pointerEvents="none"
+      style={animatedStyle}
+    >
+      <View pointerEvents="none" style={styles.depthGlow} />
+    </Animated.View>
+  )
+}
+
+function TrainingAvatar({
+  hint,
+  validReps,
+}: {
+  hint: TrainingHint | null
+  validReps: number
+}) {
+  const { t } = useI18n()
+  const reducedMotion = useReducedMotion()
+  const guidance = getTrackingGuidance(hint)
+  const expression = guidance?.expression ?? getRepExpression(validReps)
+
+  return (
+    <SafeAreaView
+      edges={TOP_EDGE}
+      pointerEvents="none"
+      style={styles.topSafeArea}
+    >
+      <View className="w-full flex-row items-center justify-end gap-2 px-5 pt-2">
+        {guidance ? (
+          <Animated.View
+            accessibilityLabel={t(guidance.message)}
+            accessibilityLiveRegion="assertive"
+            accessible
+            className="min-w-0 flex-1 items-end"
+            entering={reducedMotion ? undefined : FadeInDown.duration(180)}
+            exiting={reducedMotion ? undefined : FadeOutUp.duration(140)}
+            key={guidance.message}
+          >
+            <SpeechBubble
+              className="max-w-full"
+              tail="right"
+              textClassName="text-xl leading-6"
+            >
+              {t(guidance.message)}
+            </SpeechBubble>
+          </Animated.View>
+        ) : null}
+        <View style={styles.trainingAvatarFrame}>
+          <WorkoutAvatar
+            dom={TRAINING_AVATAR_DOM_PROPS}
+            expression={expression}
+          />
+        </View>
+      </View>
+    </SafeAreaView>
+  )
 }
 
 function CenterOverlay({
@@ -166,25 +237,6 @@ function InvalidToast({ message }: { message: string | null }) {
   ) : null
 }
 
-function ActiveScore({ count, target }: { count: number; target: number }) {
-  const { t } = useI18n()
-  const { width } = useWindowDimensions()
-  const countStyle = getCountStyle(width)
-
-  return (
-    <View style={styles.sessionCenter}>
-      <Text className="text-muted-foreground" style={styles.goalLabel}>
-        {t("session.goal")} {target}
-      </Text>
-      <NumericText
-        className="text-foreground"
-        style={countStyle}
-        value={count}
-      />
-    </View>
-  )
-}
-
 export default function SessionScreen({
   onComplete,
   plan,
@@ -197,27 +249,24 @@ export default function SessionScreen({
   const { t } = useI18n()
   const session = useSession({ onComplete, plan, targetReps })
   const running = session.phase === "active" || session.phase === "paused"
+  const trackingHint = session.phase === "active" ? session.trackingHint : null
+  const showCameraGuidance =
+    session.phase === "positioning" || trackingHint !== null
 
   return (
     <View className="flex-1 bg-background">
-      <FaceCamera
+      <TrackingCamera
         isActive
         onError={session.onCameraError}
-        onFace={session.onFace}
+        onObservation={session.onObservation}
       />
+      {showCameraGuidance ? <PhysicalCameraTrace /> : null}
 
       {running ? (
-        <SafeAreaView edges={TOP_EDGE} style={styles.topSafeArea}>
-          <View className="items-end px-5 pt-3">
-            <View
-              className={
-                session.faceTracked
-                  ? "size-2.5 rounded-full bg-primary"
-                  : "size-2.5 rounded-full bg-muted-foreground/30"
-              }
-            />
-          </View>
-        </SafeAreaView>
+        <>
+          <DepthGlow progress={session.depthProgress} />
+          <TrainingAvatar hint={trackingHint} validReps={session.validReps} />
+        </>
       ) : (
         <SetupGuide
           framing={session.setupFraming}
@@ -236,37 +285,41 @@ export default function SessionScreen({
           <InvalidToast message={session.toast} />
           {running ? (
             <View className="w-full max-w-md flex-row items-center gap-3">
-              <View style={styles.timer}>
-                <Text style={styles.timerLabel}>
+              <Surface
+                className="rounded-full"
+                padding="none"
+                style={styles.timer}
+              >
+                <Text
+                  className="text-muted-foreground"
+                  style={styles.timerLabel}
+                >
                   {formatSessionTime(session.elapsedMs)}
                 </Text>
-              </View>
+              </Surface>
               <Button
                 accessibilityLabel={t(
                   session.phase === "paused"
                     ? "session.resume"
                     : "session.pause"
                 )}
+                className="h-[72px] w-[72px] shrink-0 rounded-full border-0 bg-transparent"
                 onPress={session.togglePause}
                 size="icon"
-                style={styles.control}
                 variant="ghost"
               >
+                <Surface
+                  className="absolute inset-0 rounded-full"
+                  padding="none"
+                  pointerEvents="none"
+                />
                 {session.phase === "paused" ? (
-                  <PlayIcon color="#ffffff" fill="#ffffff" size={30} />
+                  <PlayIcon size={30} />
                 ) : (
-                  <PauseIcon color="#ffffff" size={30} />
+                  <PauseIcon size={30} />
                 )}
               </Button>
-              <Button
-                accessibilityLabel={t("session.stop")}
-                onPress={session.stop}
-                size="icon"
-                style={styles.stopButton}
-                variant="ghost"
-              >
-                <XIcon color="#ffffff" size={36} strokeWidth={3} />
-              </Button>
+              <StopControl onPress={session.stop} />
             </View>
           ) : (
             <Button
@@ -274,12 +327,20 @@ export default function SessionScreen({
               labelClassName="font-heading lowercase text-lg text-background"
               onPress={session.stop}
               size="lg"
+              sfx={false}
             >
               {t("session.stop")}
             </Button>
           )}
         </View>
       </SafeAreaView>
+      {showCameraGuidance ? (
+        <View
+          className="absolute inset-0 rounded-[52px] border-[7px] border-foreground"
+          pointerEvents="none"
+          style={styles.preparingBorder}
+        />
+      ) : null}
     </View>
   )
 }

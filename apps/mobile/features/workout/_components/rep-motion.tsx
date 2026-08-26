@@ -1,9 +1,8 @@
 import { connectTrace } from "@/features/workout/_lib/trace"
-import { useI18n } from "@/hooks/use-i18n"
 import { THEME } from "@/lib/theme"
 import { useState } from "react"
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native"
-import Svg, { Line, Polyline, Text as SvgText } from "react-native-svg"
+import Svg, { Line, Polyline } from "react-native-svg"
 
 const PLOT_HEIGHT = 112
 const PLOT_PADDING = 6
@@ -94,7 +93,6 @@ function getMeasure(setWidth: (width: number) => void) {
 }
 
 export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
-  const { t } = useI18n()
   const [width, setWidth] = useState(0)
   const traced = getTracedAttempts(attempts)
 
@@ -102,7 +100,6 @@ export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
 
   const mapY = getDepthPlotY(traced)
   const targetY = mapY(0)
-  const targetLabelY = targetY < 18 ? targetY + 14 : targetY - 6
   const lines = width > 0 ? toRepLines(traced, width, mapY) : []
 
   return (
@@ -117,15 +114,6 @@ export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
           y1={targetY}
           y2={targetY}
         />
-        <SvgText
-          fill={THEME.dark.mutedForeground}
-          fontSize={9}
-          fontWeight="700"
-          x={4}
-          y={targetLabelY}
-        >
-          {t("camera.targetDepth")}
-        </SvgText>
         {lines.map((line) => (
           <Polyline
             fill="none"

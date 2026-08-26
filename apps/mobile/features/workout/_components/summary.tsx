@@ -1,264 +1,307 @@
+/* eslint-disable react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes the local recap-stage handlers. */
 import {
-  CalendarIcon,
-  ChevronLeftIcon,
-  CircleArrowUpRightIcon,
-  CircleXIcon,
-  ClockIcon,
+  FlameIcon,
+  InstagramIcon,
   ShareNodesIcon,
-  SparklesIcon,
+  TrophyIcon,
+  type IconProps,
 } from "@/components/icons"
+import { NumericText } from "@/components/numeric-text"
 import { Button } from "@/components/ui/button"
-import {
-  StatNumber,
-  StatsDivider,
-  StatsList,
-  StatsListRow,
-} from "@/features/workout/_components/figures"
+import { Dialog } from "@/components/ui/dialog"
+import { Surface } from "@/components/ui/surface"
 import {
   PerformanceCard,
   useSharePerformance,
 } from "@/features/workout/_components/share"
-import { getEstimatedCalories } from "@/features/workout/_lib/calories"
-import type { FailureReason } from "@/features/workout/_lib/counter"
-import type { WorkoutSession } from "@/features/workout/_lib/storage"
-import { useColorScheme } from "@/hooks/use-color-scheme"
-import { useI18n } from "@/hooks/use-i18n"
-import { GLASS_TINT } from "@/lib/glass"
-import type { TranslationKey } from "@/lib/i18n"
-import { BlurView } from "expo-blur"
-import { Text } from "panelui-native"
-import { Fragment } from "react"
+import { usePlan } from "@/features/workout/_hooks/use-plan"
+import { useRecap } from "@/features/workout/_hooks/use-recap"
 import {
-  ScrollView,
-  StyleSheet,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+  getActivityAfterSession,
+  type Activity,
+} from "@/features/workout/_lib/activity"
+import { getEstimatedCalories } from "@/features/workout/_lib/calories"
+import { getLevel } from "@/features/workout/_lib/gamification"
+import type { WorkoutSession } from "@/features/workout/_lib/storage"
+import { useI18n } from "@/hooks/use-i18n"
+import { playSfx } from "@/lib/sfx"
+import { Text } from "panelui-native"
+import { useEffect, useState, type ComponentType } from "react"
+import { StyleSheet, View } from "react-native"
+import Animated, { FadeInDown, ReduceMotion } from "react-native-reanimated"
+import { useCSSVariable } from "uniwind"
 
-const FAILURE_REASONS = [
-  "incomplete_return",
-  "insufficient_depth",
-  "tracking_lost",
-] as const satisfies readonly FailureReason[]
-const SCREEN_EDGES = ["top", "bottom"] as const
-const FAILURE_LABEL_KEYS = {
-  incomplete_return: "summary.failureReturn",
-  insufficient_depth: "summary.failureDepth",
-  tracking_lost: "summary.failureTracking",
-} satisfies Record<FailureReason, TranslationKey>
-const PERCENT_FORMAT = { maximumFractionDigits: 0, style: "percent" } as const
-const TWO_DIGIT_FORMAT = { minimumIntegerDigits: 2 } as const
 const styles = StyleSheet.create({
-  actionBar: {
-    bottom: 0,
-    flexDirection: "row",
-    gap: 12,
-    left: 0,
-    overflow: "hidden",
-    paddingBottom: 28,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    position: "absolute",
-    right: 0,
-  },
-  content: {
-    flexGrow: 1,
-    gap: 16,
-    paddingBottom: 120,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  homeAction: {
-    borderCurve: "continuous",
-    borderRadius: 18,
-    height: 60,
-    width: 60,
-  },
-  shareAction: {
-    borderCurve: "continuous",
-    borderRadius: 18,
+  action: {
     flex: 1,
     height: 60,
   },
-  screen: { flex: 1 },
+  progressValue: { fontSize: 36, lineHeight: 44 },
 })
 
-function getActionBarStyle(backgroundColor: string): StyleProp<ViewStyle> {
-  return [styles.actionBar, { backgroundColor }]
-}
-
-function getSessionStats(session: WorkoutSession) {
-  const successRate = session.attempts.length
-    ? Math.round((session.validReps / session.attempts.length) * 100)
-    : 0
-  const averageRepMs = session.attempts.length
-    ? Math.round(session.activeRepetitionTimeMs / session.attempts.length)
-    : 0
-  const failedReps = session.attempts.filter((attempt) => !attempt.valid).length
-  const failureCounts: Record<FailureReason, number> = {
-    incomplete_return: 0,
-    insufficient_depth: 0,
-    tracking_lost: 0,
+function getOpenChange(onDone: () => void) {
+  return (open: boolean) => {
+    if (!open) onDone()
   }
-
-  for (const attempt of session.attempts) {
-    for (const reason of attempt.failureReasons) {
-      failureCounts[reason] += 1
-    }
-  }
-
-  return { averageRepMs, failedReps, failureCounts, successRate }
 }
 
-function FailedRepSummary({
-  failedReps,
-  failureCounts,
-}: {
-  failedReps: number
-  failureCounts: Record<FailureReason, number>
-}) {
-  const { t } = useI18n()
-  const failures = FAILURE_REASONS.filter((reason) => failureCounts[reason] > 0)
-
-  if (failures.length === 0) {
-    return <StatNumber value={failedReps} />
-  }
-
-  return (
-    <>
-      <StatNumber value={failedReps} />
-      <Text className="font-heading text-base"> (</Text>
-      {failures.map((reason, index) => (
-        <Fragment key={reason}>
-          {index > 0 ? (
-            <Text className="font-heading text-base">, </Text>
-          ) : null}
-          <Text className="font-heading text-base">
-            {t(FAILURE_LABEL_KEYS[reason])}
-          </Text>
-          {failureCounts[reason] > 1 ? (
-            <>
-              <Text className="font-heading text-base"> x</Text>
-              <StatNumber value={failureCounts[reason]} />
-            </>
-          ) : null}
-        </Fragment>
-      ))}
-      <Text className="font-heading text-base">)</Text>
-    </>
-  )
-}
-
-function DurationNumber({ durationMs }: { durationMs: number }) {
-  const totalSeconds = Math.round(durationMs / 1000)
-
-  return (
-    <>
-      <StatNumber value={Math.floor(totalSeconds / 60)} />
-      <Text className="font-heading text-base">:</Text>
-      <StatNumber format={TWO_DIGIT_FORMAT} value={totalSeconds % 60} />
-    </>
-  )
-}
-
-export default function SummaryScreen({
+function RecapCard({
   onDone,
   session,
+  streak,
 }: {
   onDone: () => void
   session: WorkoutSession
+  streak: number
 }) {
   const { t } = useI18n()
-  const { averageRepMs, failedReps, failureCounts, successRate } =
-    getSessionStats(session)
-  const estimatedCalories = getEstimatedCalories(session.attempts.length)
-  const { backgroundRef, share, sharing, transparentRef } = useSharePerformance(
-    session,
-    successRate
-  )
-  const colorScheme = useColorScheme()
+  const foregroundValue = useCSSVariable("--color-foreground")
+  const foreground =
+    typeof foregroundValue === "string" ? foregroundValue : undefined
+  const successRate = session.attempts.length
+    ? Math.round((session.validReps / session.attempts.length) * 100)
+    : 0
+  const {
+    backgroundRef,
+    shareBackground,
+    shareInstagram,
+    sharing,
+    transparentRef,
+  } = useSharePerformance(session, successRate)
+  const handleOpenChange = getOpenChange(onDone)
 
   return (
-    <SafeAreaView edges={SCREEN_EDGES} style={styles.screen}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
+    <Dialog open onOpenChange={handleOpenChange}>
+      <Dialog.Content
+        accessibilityLabel={t("session.sharePerformance")}
+        blur
+        className="gap-3 border-0 bg-transparent p-0 shadow-none"
+        dismissSfx={false}
       >
         <PerformanceCard
           backgroundRef={backgroundRef}
-          calories={estimatedCalories}
+          calories={getEstimatedCalories(session.attempts.length)}
           session={session}
+          streak={streak}
           successRate={successRate}
           transparentRef={transparentRef}
         />
-
-        <StatsList>
-          <StatsListRow
-            icon={CircleArrowUpRightIcon}
-            label={t("common.successRate")}
+        <View className="w-full flex-row gap-3">
+          <Button
+            accessibilityLabel={t("share.shareBackground")}
+            className="rounded-full border-0 bg-transparent"
+            disabled={sharing !== null}
+            onPress={shareBackground}
+            size="icon"
+            style={styles.action}
+            variant="ghost"
           >
-            <StatNumber format={PERCENT_FORMAT} value={successRate / 100} />
-          </StatsListRow>
-          <StatsDivider />
-          <StatsListRow icon={CircleXIcon} label={t("common.failedReps")}>
-            <FailedRepSummary
-              failedReps={failedReps}
-              failureCounts={failureCounts}
+            <Surface
+              className="absolute inset-0 rounded-full"
+              padding="none"
+              pointerEvents="none"
             />
-          </StatsListRow>
-          <StatsDivider />
-          <StatsListRow icon={ClockIcon} label={t("common.avgRep")}>
-            <StatNumber
-              maximumFractionDigits={1}
-              minimumFractionDigits={1}
-              suffix={t("time.secondsShort")}
-              value={averageRepMs / 1000}
+            <ShareNodesIcon color={foreground} size={24} />
+          </Button>
+          <Button
+            accessibilityLabel="Instagram Stories"
+            className="rounded-full border-0 bg-transparent"
+            disabled={sharing !== null}
+            onPress={shareInstagram}
+            size="icon"
+            style={styles.action}
+            variant="ghost"
+          >
+            <Surface
+              className="absolute inset-0 rounded-full"
+              padding="none"
+              pointerEvents="none"
             />
-          </StatsListRow>
-          <StatsDivider />
-          <StatsListRow icon={CalendarIcon} label={t("common.duration")}>
-            <DurationNumber durationMs={session.totalDurationMs} />
-          </StatsListRow>
-          <StatsDivider />
-          <StatsListRow icon={SparklesIcon} label={t("common.calories")}>
-            <StatNumber
-              maximumFractionDigits={1}
-              minimumFractionDigits={estimatedCalories < 10 ? 1 : 0}
-              suffix=" kcal"
-              value={estimatedCalories}
-            />
-          </StatsListRow>
-        </StatsList>
-      </ScrollView>
+            <InstagramIcon color={foreground} size={24} />
+          </Button>
+        </View>
+      </Dialog.Content>
+    </Dialog>
+  )
+}
 
-      <BlurView
-        intensity={24}
-        style={getActionBarStyle(GLASS_TINT[colorScheme])}
-        tint={colorScheme}
+function levelOf(activity: Activity, dailyGoal: number) {
+  return getLevel({
+    bestStreak: activity.bestStreak,
+    dailyGoal,
+    recentDays: activity.recentDays,
+    totalReps: activity.totalPushups,
+  }).level
+}
+
+function ProgressionStat({
+  delay,
+  icon: Icon,
+  label,
+  value,
+}: {
+  delay: number
+  icon: ComponentType<IconProps>
+  label: string
+  value: number
+}) {
+  const foregroundValue = useCSSVariable("--color-foreground")
+  const foreground =
+    typeof foregroundValue === "string" ? foregroundValue : undefined
+
+  return (
+    <Animated.View
+      className="flex-1 items-center gap-1"
+      entering={FadeInDown.duration(220)
+        .delay(delay)
+        .reduceMotion(ReduceMotion.System)}
+    >
+      <Icon color={foreground} size={22} />
+      <NumericText
+        align="center"
+        direction="up"
+        reduceMotion="system"
+        style={styles.progressValue}
+        value={value}
+      />
+      <Text className="font-mono text-xs text-muted-foreground">{label}</Text>
+    </Animated.View>
+  )
+}
+
+function ProgressionCard({
+  after,
+  before,
+  onDone,
+  session,
+}: {
+  after: Activity
+  before: Activity
+  onDone: () => void
+  session: WorkoutSession
+}) {
+  const { plan } = usePlan()
+  const { t } = useI18n()
+  const beforeLevel = levelOf(before, plan.targetReps)
+  const afterLevel = levelOf(after, plan.targetReps)
+  const levelIncreased = afterLevel > beforeLevel
+  const streakIncreased = after.currentStreak > before.currentStreak
+  const [revealed, setRevealed] = useState(false)
+  const handleOpenChange = getOpenChange(onDone)
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setRevealed(true)
+      if (levelIncreased) playSfx("achievement", session.soundEnabled)
+    }, 240)
+
+    return () => clearTimeout(timeout)
+  }, [levelIncreased, session.soundEnabled])
+
+  return (
+    <Dialog open onOpenChange={handleOpenChange}>
+      <Dialog.Content
+        accessibilityLabel={t("session.backToday")}
+        blur
+        className="gap-3 border-0 bg-transparent p-0 shadow-none"
+        dismissSfx={false}
       >
-        <Button
-          accessibilityLabel={t("session.backToday")}
-          className="bg-muted dark:bg-card"
-          onPress={onDone}
-          size="icon"
-          style={styles.homeAction}
-          variant="ghost"
-        >
-          <ChevronLeftIcon size={24} />
+        <Surface className="w-full" elevated padding="lg">
+          <View className="w-full flex-row gap-4">
+            {streakIncreased ? (
+              <ProgressionStat
+                delay={80}
+                icon={FlameIcon}
+                label={t("common.streak")}
+                value={revealed ? after.currentStreak : before.currentStreak}
+              />
+            ) : null}
+            {levelIncreased ? (
+              <ProgressionStat
+                delay={160}
+                icon={TrophyIcon}
+                label={t("today.level", { level: "" }).trim()}
+                value={revealed ? afterLevel : beforeLevel}
+              />
+            ) : null}
+          </View>
+        </Surface>
+        <Button className="rounded-full" onPress={onDone} size="lg">
+          {t("session.backToday")}
         </Button>
-        <Button
-          disabled={sharing}
-          labelClassName="font-bold text-lg"
-          onPress={share}
-          style={styles.shareAction}
-          variant="primary"
-        >
-          <ShareNodesIcon size={22} />
-          {sharing ? t("session.preparing") : t("session.sharePerformance")}
-        </Button>
-      </BlurView>
-    </SafeAreaView>
+      </Dialog.Content>
+    </Dialog>
+  )
+}
+
+function RecapFlow({
+  activity,
+  before,
+  onReveal,
+  onSettle,
+  session,
+}: {
+  activity: Activity | undefined
+  before: Activity | undefined
+  onReveal: (activity: Activity) => void
+  onSettle: () => void
+  session: WorkoutSession
+}) {
+  const { plan } = usePlan()
+  const [stage, setStage] = useState<"progression" | "share">("share")
+  const after = getActivityAfterSession(before, activity, session)
+  const hasAchievement =
+    before &&
+    after &&
+    (after.currentStreak > before.currentStreak ||
+      levelOf(after, plan.targetReps) > levelOf(before, plan.targetReps))
+  const finish = () => (after ? onReveal(after) : onSettle())
+  const finishShare = () => {
+    if (
+      session.status === "completed" &&
+      session.validReps > 0 &&
+      hasAchievement
+    ) {
+      setStage("progression")
+      return
+    }
+
+    finish()
+  }
+
+  return stage === "share" ? (
+    <RecapCard
+      onDone={finishShare}
+      session={session}
+      streak={after?.currentStreak ?? before?.currentStreak ?? 0}
+    />
+  ) : before && after ? (
+    <ProgressionCard
+      after={after}
+      before={before}
+      onDone={finish}
+      session={session}
+    />
+  ) : null
+}
+
+export default function SummaryOverlay({
+  activity,
+}: {
+  activity: Activity | undefined
+}) {
+  const { reveal, settle, state } = useRecap()
+
+  if (state.type !== "presenting") return null
+
+  return (
+    <RecapFlow
+      activity={activity}
+      before={state.before}
+      key={state.session.id}
+      onReveal={reveal}
+      onSettle={settle}
+      session={state.session}
+    />
   )
 }

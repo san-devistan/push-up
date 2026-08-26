@@ -7,12 +7,23 @@ import {
 } from "@/features/workout/_lib/gamification"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
-import { GridItem, RingChart, Text, type RingDatum } from "panelui-native"
-import { useCallback, useMemo, useState } from "react"
+import { selectionTick } from "@/lib/haptics"
+import {
+  GridItem,
+  RingChart,
+  Text,
+  type RingChartHandle,
+  type RingDatum,
+} from "panelui-native"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
-import { useSharedValue } from "react-native-reanimated"
+import {
+  createAnimatedComponent,
+  FadeInDown,
+  ReduceMotion,
+  useSharedValue,
+} from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { useCSSVariable } from "uniwind"
 
@@ -23,9 +34,15 @@ const MILESTONE_RING_GAP = 4
 const MILESTONE_HOLD_MS = 180
 /** Past this a tick per rep is thinner than the gap between ticks. */
 const COUNTABLE_REPS = 30
-
+const AnimatedText = createAnimatedComponent(Text)
+const VALUE_ENTERING = FadeInDown.duration(240)
+  .withInitialValues({ opacity: 0, transform: [{ translateY: 4 }] })
+  .reduceMotion(ReduceMotion.System)
 const styles = StyleSheet.create({
-  centerNumber: { fontSize: 40, lineHeight: 52 },
+  centerNumber: {
+    fontSize: 40,
+    lineHeight: 52,
+  },
   centerTarget: { fontSize: 16 },
   levelNumber: { fontSize: 32, lineHeight: 40 },
   ringGesture: { height: RING_SIZE, width: RING_SIZE },
@@ -50,15 +67,21 @@ function GoalRing({
   const success = useThemeColor("--color-success")
   const color = done ? success : primary
   const label = t("plan.dailyGoal")
+  const ringRef = useRef<RingChartHandle>(null)
   const data = useMemo(
     () => [{ label, maxValue: target, value: reps }],
     [label, reps, target]
   )
+
+  useEffect(() => ringRef.current?.replay(), [reps])
+
   const renderCenter = useCallback(
     () => (
       <View className="items-center">
-        <Text
+        <AnimatedText
           className="font-heading text-foreground"
+          entering={VALUE_ENTERING}
+          key={reps}
           style={styles.centerNumber}
         >
           {formatNumber(reps)}
@@ -66,9 +89,9 @@ function GoalRing({
             className="font-heading text-muted-foreground"
             style={styles.centerTarget}
           >
-            /{formatNumber(target)}
+            {` /${formatNumber(target)}`}
           </Text>
-        </Text>
+        </AnimatedText>
         <Text className="-mt-2 font-heading text-[10px] leading-3 tracking-[1px] text-muted-foreground">
           {t("common.reps").toLocaleLowerCase()}
         </Text>
@@ -89,9 +112,7 @@ function GoalRing({
       }
       className="w-36"
       data={data}
-      /* Remounting replays the sweep: the arc closing a little further is the
-         payoff for coming back from a session, and Today never unmounts. */
-      key={reps}
+      ref={ringRef}
       size={RING_SIZE}
       strokeWidth={RING_STROKE}
     >
@@ -143,7 +164,7 @@ function MilestoneRings({
   )
   const focus = (index: number) => {
     setActiveIndex(index)
-    hapticHard()
+    selectionTick()
   }
   const clear = () => setActiveIndex(-1)
   const focusAt = (x: number, y: number) => {

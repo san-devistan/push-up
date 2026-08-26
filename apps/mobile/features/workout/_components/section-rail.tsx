@@ -3,7 +3,7 @@ import {
   START_BUTTON_HEIGHT,
 } from "@/features/workout/_lib/floating-controls"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
+import { hapticFeedback, selectionTick } from "@/lib/haptics"
 import { SectionRail } from "panelui-native"
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -25,7 +25,6 @@ const SECTIONS = {
   home: [
     { label: "today.totalPushups", value: "overview" },
     { label: "plan.dailyGoal", value: "goal" },
-    { label: "levels.levels", value: "level" },
     { label: "today.activity", value: "activity" },
     { label: "common.stats", value: "stats" },
   ],
@@ -44,13 +43,13 @@ function getOverlayStyle(bottom: number): StyleProp<ViewStyle> {
 
 function getValueChange(onValueChange: (value: string) => void) {
   return (value: string) => {
-    hapticHard()
+    selectionTick()
     onValueChange(value)
   }
 }
 
 function hapticOnOpen(open: boolean) {
-  if (open) hapticHard()
+  if (open) hapticFeedback("open")
 }
 
 export default function WorkoutSectionRail({

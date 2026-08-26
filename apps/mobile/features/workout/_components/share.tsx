@@ -1,35 +1,23 @@
-import { NumericText } from "@/components/numeric-text"
-import { HeroSurface } from "@/features/workout/_components/figures"
+import { Surface } from "@/components/ui/surface"
 import { RepMotionChart } from "@/features/workout/_components/rep-motion"
+import { ShareStat } from "@/features/workout/_components/share-metrics"
 import {
-  ShareDuration,
-  SharePercent,
-  ShareScore,
-  ShareStat,
-} from "@/features/workout/_components/share-metrics"
-import { formatDuration } from "@/features/workout/_lib/format"
+  formatDuration,
+  formatTotalDuration,
+} from "@/features/workout/_lib/format"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
 import { formatNumber, translate, type Language } from "@/lib/i18n"
-import { THEME } from "@/lib/theme"
-import * as MediaLibrary from "expo-media-library"
 import * as Sharing from "expo-sharing"
 import { Text } from "panelui-native"
 import { useRef, useState } from "react"
-import {
-  Alert,
-  Share as NativeShare,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native"
+import { Alert, Share as NativeShare, StyleSheet, View } from "react-native"
 import { captureRef, releaseCapture } from "react-native-view-shot"
 
-// The preview backdrop inverts the app scheme, so the ink has to invert with
-// it — and since the capture itself is transparent, every glyph carries a
-// shadow in the opposite tone to survive being laid over a photo.
+// The card ink follows Surface's scheme. Since the capture itself is
+// transparent, every glyph carries a shadow in the opposite tone to survive
+// being laid over a photo.
 const INK = {
   onDark: {
     line: "rgba(255, 255, 255, 0.22)",
@@ -53,24 +41,20 @@ function createCardStyles(ink: (typeof INK)["onDark"]) {
   }
 
   return StyleSheet.create({
-    goalDone: { color: THEME.dark.primary, ...glyphShadow },
     label: { color: ink.muted, ...glyphShadow },
     rule: { backgroundColor: ink.line, height: 1 },
     scoreNumber: {
       color: ink.strong,
-      fontSize: 76,
+      fontSize: 78,
       fontVariant: ["tabular-nums"],
-      lineHeight: 80,
+      lineHeight: 96,
       ...glyphShadow,
     },
-    statDivider: { backgroundColor: ink.line, width: 1 },
     statValue: { color: ink.strong, ...glyphShadow },
-    track: { backgroundColor: ink.line, borderRadius: 5, height: 10 },
   })
 }
 
-// Keyed by surface tone: the app's dark
-// scheme gets the light surface, so the ink flips with it.
+// Keyed by Surface's resolved tone.
 const CARD_STYLES = {
   dark: createCardStyles(INK.onDark),
   light: createCardStyles(INK.onLight),
@@ -79,15 +63,146 @@ const CARD_STYLES = {
 const styles = StyleSheet.create({
   // Padding keeps the glyph shadows inside the capture bounds.
   card: { padding: 14 },
-  trackFill: {
-    backgroundColor: THEME.dark.primary,
-    borderRadius: 5,
-    height: 10,
+  scoreColumn: { flex: 44 },
+  shareCapture: {
+    left: -10_000,
+    position: "absolute",
+    top: 0,
+    width: "100%",
   },
+  statsColumn: { flex: 54 },
 })
 
-function getTrackFillStyle(percent: number): StyleProp<ViewStyle> {
-  return StyleSheet.compose(styles.trackFill, { width: `${percent}%` })
+function PerformanceOverview({
+  calories,
+  cardStyles,
+  session,
+  streak,
+  successRate,
+}: {
+  calories: number
+  cardStyles: ReturnType<typeof createCardStyles>
+  session: WorkoutSession
+  streak: number
+  successRate: number
+}) {
+  const { formatNumber: formatLocalizedNumber, t } = useI18n()
+
+  return (
+    <View className="gap-3">
+      <Text className="font-heading text-3xl" style={cardStyles.statValue}>
+        pumpr.
+      </Text>
+      <View className="flex-row items-stretch gap-1">
+        <View
+          className="min-w-0 items-center justify-center"
+          style={styles.scoreColumn}
+        >
+          <View className="items-start">
+            <Text
+              adjustsFontSizeToFit
+              className="font-heading"
+              numberOfLines={1}
+              style={cardStyles.scoreNumber}
+            >
+              {formatLocalizedNumber(session.validReps)}
+            </Text>
+            <Text
+              className="-mt-5 font-heading text-base"
+              style={cardStyles.label}
+            >
+              {t("share.pushups")}
+            </Text>
+          </View>
+        </View>
+        <View
+          className="min-w-0 justify-center gap-4"
+          style={styles.statsColumn}
+        >
+          <View className="flex-row gap-2">
+            <ShareStat
+              cardStyles={cardStyles}
+              label={t("common.streak")}
+              unit={t(streak === 1 ? "common.day" : "common.days")}
+              value={formatLocalizedNumber(streak)}
+            />
+            <ShareStat
+              cardStyles={cardStyles}
+              label={t("common.calories")}
+              unit="kcal"
+              value={formatLocalizedNumber(calories, {
+                maximumFractionDigits: 1,
+                minimumFractionDigits: calories < 10 ? 1 : 0,
+              })}
+            />
+          </View>
+          <View className="flex-row gap-2">
+            <ShareStat
+              cardStyles={cardStyles}
+              label={t("common.success")}
+              value={formatLocalizedNumber(successRate / 100, {
+                maximumFractionDigits: 0,
+                style: "percent",
+              })}
+            />
+            <ShareStat
+              cardStyles={cardStyles}
+              compactUnits
+              label={t("common.duration")}
+              value={formatTotalDuration(session.totalDurationMs)}
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  )
+}
+
+function PerformanceCardContent({
+  calories,
+  cardStyles,
+  contentRef,
+  session,
+  streak,
+  successRate,
+}: {
+  calories: number
+  cardStyles: ReturnType<typeof createCardStyles>
+  contentRef?: React.RefObject<View | null>
+  session: WorkoutSession
+  streak: number
+  successRate: number
+}) {
+  const { t } = useI18n()
+
+  return (
+    <View
+      className="gap-3"
+      collapsable={false}
+      ref={contentRef}
+      style={styles.card}
+    >
+      <PerformanceOverview
+        calories={calories}
+        cardStyles={cardStyles}
+        session={session}
+        streak={streak}
+        successRate={successRate}
+      />
+
+      {session.attempts.length > 0 ? (
+        <>
+          <View style={cardStyles.rule} />
+          <View className="gap-1">
+            <Text className="font-mono text-[10px]" style={cardStyles.label}>
+              {t("share.repMotion")}
+            </Text>
+            <RepMotionChart attempts={session.attempts} />
+          </View>
+        </>
+      ) : null}
+    </View>
+  )
 }
 
 function getShareMessage(
@@ -151,39 +266,29 @@ async function sharePerformanceCard(
   }
 }
 
-async function saveTransparentPerformanceCard(
+async function shareInstagramStory(
   card: View | null,
-  session: WorkoutSession,
+  appId: string,
   language: Language
 ) {
-  const permission = await MediaLibrary.requestPermissionsAsync(true, ["photo"])
-
-  if (!permission.granted) {
-    Alert.alert(
-      translate(language, "share.photosTitle"),
-      translate(language, "share.photosBody")
-    )
-    return
+  if (!card) {
+    throw new Error(translate(language, "share.cardUnavailable"))
   }
 
-  const captureUri = await capturePerformanceCard(
-    card,
-    session,
-    "-transparent",
-    language
-  )
+  const [stickerImage, { default: SocialShare, Social }] = await Promise.all([
+    captureRef(card, { format: "png", result: "data-uri" }),
+    import("react-native-share"),
+  ])
 
-  try {
-    await MediaLibrary.Asset.create(captureUri)
-  } finally {
-    releaseCapture(captureUri)
-  }
-
-  Alert.alert(
-    translate(language, "share.pngTitle"),
-    translate(language, "share.pngBody")
-  )
+  await SocialShare.shareSingle({
+    appId,
+    social: Social.InstagramStories,
+    stickerImage,
+    useInternalStorage: true,
+  })
 }
+
+type ShareTarget = "background" | "instagram"
 
 export function useSharePerformance(
   session: WorkoutSession,
@@ -191,150 +296,106 @@ export function useSharePerformance(
 ) {
   const { language, t } = useI18n()
   const backgroundRef = useRef<View>(null)
-  const [sharing, setSharing] = useState(false)
+  const [sharing, setSharing] = useState<ShareTarget | null>(null)
   const transparentRef = useRef<View>(null)
 
-  function run(action: () => Promise<void>, errorTitle: string) {
+  function run(
+    target: ShareTarget,
+    action: () => Promise<void>,
+    errorTitle: string
+  ) {
     if (sharing) return
 
-    setSharing(true)
+    setSharing(target)
     void action()
       .catch(() => Alert.alert(errorTitle, t("share.tryAgain")))
-      .finally(() => setSharing(false))
+      .finally(() => setSharing(null))
   }
 
-  function share() {
-    if (sharing) return
-
-    Alert.alert(t("share.share"), t("share.choose"), [
-      {
-        onPress: () =>
-          run(
-            () =>
-              sharePerformanceCard(
-                backgroundRef.current,
-                session,
-                successRate,
-                language
-              ),
-            t("share.couldNotShare")
-          ),
-        text: t("share.shareBackground"),
-      },
-      {
-        onPress: () =>
-          run(
-            () =>
-              saveTransparentPerformanceCard(
-                transparentRef.current,
-                session,
-                language
-              ),
-            t("share.couldNotSave")
-          ),
-        text: t("share.saveTransparent"),
-      },
-      { style: "cancel", text: t("common.cancel") },
-    ])
+  function shareBackground() {
+    run(
+      "background",
+      () =>
+        sharePerformanceCard(
+          backgroundRef.current,
+          session,
+          successRate,
+          language
+        ),
+      t("share.couldNotShare")
+    )
   }
 
-  return { backgroundRef, share, sharing, transparentRef }
+  function shareInstagram() {
+    const appId = process.env.EXPO_PUBLIC_META_APP_ID
+
+    if (!appId) {
+      Alert.alert(t("share.couldNotShare"), t("share.tryAgain"))
+      return
+    }
+
+    run(
+      "instagram",
+      () => shareInstagramStory(transparentRef.current, appId, language),
+      t("share.couldNotShare")
+    )
+  }
+
+  return {
+    backgroundRef,
+    shareBackground,
+    shareInstagram,
+    sharing,
+    transparentRef,
+  }
 }
 
 export function PerformanceCard({
   backgroundRef,
   calories,
   session,
+  streak,
   successRate,
   transparentRef,
 }: {
   backgroundRef: React.RefObject<View | null>
   calories: number
   session: WorkoutSession
+  streak: number
   successRate: number
   transparentRef: React.RefObject<View | null>
 }) {
-  const { t } = useI18n()
-  const tone = useColorScheme() === "dark" ? "light" : "dark"
-  const cardStyles = CARD_STYLES[tone]
-  const percent = Math.min(
-    100,
-    (session.validReps / Math.max(1, session.targetReps)) * 100
-  )
+  const cardStyles = CARD_STYLES[useColorScheme()]
 
   return (
-    <HeroSurface className="p-2" ref={backgroundRef} tone={tone}>
-      <View
-        className="gap-5"
+    <View className="w-full">
+      <Surface
+        className="bg-background"
         collapsable={false}
-        ref={transparentRef}
-        style={styles.card}
+        padding="sm"
+        pointerEvents="none"
+        ref={backgroundRef}
+        style={styles.shareCapture}
+        variant="transparent"
       >
-        <View>
-          <View className="-mb-1 flex-row justify-end">
-            <Text
-              className="font-heading text-[11px]"
-              style={cardStyles.statValue}
-            >
-              pumpr.
-            </Text>
-          </View>
-          <ShareScore
-            cardStyles={cardStyles}
-            percent={percent}
-            reps={session.validReps}
-          />
-          <View style={cardStyles.track}>
-            <View style={getTrackFillStyle(percent)} />
-          </View>
-        </View>
-
-        <View style={cardStyles.rule} />
-
-        {session.attempts.length > 0 ? (
-          <>
-            <View className="gap-2">
-              <Text
-                className="font-mono text-[10px] tracking-[2px] uppercase"
-                style={cardStyles.label}
-              >
-                {t("share.repMotion")}
-              </Text>
-              <RepMotionChart attempts={session.attempts} />
-            </View>
-            <View style={cardStyles.rule} />
-          </>
-        ) : null}
-
-        <View className="flex-row gap-4">
-          <ShareStat cardStyles={cardStyles} label={t("common.duration")}>
-            <ShareDuration
-              cardStyles={cardStyles}
-              durationMs={session.totalDurationMs}
-            />
-          </ShareStat>
-          <View style={cardStyles.statDivider} />
-          <ShareStat cardStyles={cardStyles} label={t("common.success")}>
-            <SharePercent cardStyles={cardStyles} value={successRate / 100} />
-          </ShareStat>
-          <View style={cardStyles.statDivider} />
-          <ShareStat cardStyles={cardStyles} label={t("common.calories")}>
-            <NumericText
-              className="text-base"
-              maximumFractionDigits={1}
-              minimumFractionDigits={calories < 10 ? 1 : 0}
-              style={cardStyles.statValue}
-              value={calories}
-            />
-            <Text
-              className="font-heading text-base"
-              style={cardStyles.statValue}
-            >
-              {" kcal"}
-            </Text>
-          </ShareStat>
-        </View>
-      </View>
-    </HeroSurface>
+        <PerformanceCardContent
+          calories={calories}
+          cardStyles={cardStyles}
+          session={session}
+          streak={streak}
+          successRate={successRate}
+        />
+      </Surface>
+      <Surface padding="sm">
+        <PerformanceCardContent
+          calories={calories}
+          cardStyles={cardStyles}
+          contentRef={transparentRef}
+          session={session}
+          streak={streak}
+          successRate={successRate}
+        />
+      </Surface>
+    </View>
   )
 }

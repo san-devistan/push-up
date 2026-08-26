@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "podspecPath": "PumprPoseDetector.podspec"
+  },
+  "android": {
+    "gradlePath": "android/build.gradle"
+  }
+}

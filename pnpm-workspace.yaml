@@ -20,4 +20,5 @@ allowBuilds:
   msw: false
 
 patchedDependencies:
+  "@bible-strong/avatar-react@0.1.0": patches/@bible-strong__avatar-react@0.1.0.patch
   react-native-numeric-text@0.2.0: patches/react-native-numeric-text@0.2.0.patch

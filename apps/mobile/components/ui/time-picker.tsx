@@ -1229,6 +1229,7 @@ function TimePickerRoot({
                 <Button
                   className="mt-1 w-full rounded-2xl bg-foreground active:bg-foreground/90"
                   labelClassName="font-heading lowercase text-background"
+                  sfx="success"
                 >
                   done.
                 </Button>
@@ -1257,6 +1258,7 @@ function TimePickerRoot({
       <Button
         className="-mb-6 w-full rounded-2xl bg-foreground active:bg-foreground/90"
         labelClassName="font-heading lowercase text-background"
+        sfx="success"
       >
         done.
       </Button>

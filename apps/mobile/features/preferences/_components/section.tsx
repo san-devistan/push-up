@@ -11,7 +11,7 @@ import type {
   LanguagePreference,
 } from "@/features/preferences/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticHard } from "@/lib/haptics"
+import { hapticFeedback } from "@/lib/haptics"
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "@/lib/i18n"
 import { Select, Text } from "panelui-native"
 import type { ComponentType } from "react"
@@ -44,8 +44,8 @@ function getChoiceChange<T extends string>(
   }
 }
 
-function hapticOnOpenChange() {
-  hapticHard()
+function hapticOnOpenChange(open: boolean) {
+  hapticFeedback(open ? "open" : "close")
 }
 
 function PreferenceChoiceRow<T extends string>({

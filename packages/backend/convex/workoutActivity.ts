@@ -51,7 +51,7 @@ function totalsOf(sessions: readonly ActivitySession[]) {
     totalActiveMs: activeMs,
     totalAttempts: attempts,
     totalPushups: pushups,
-    totalSessions: sessions.length,
+    totalSessions: sessions.filter((session) => session.validReps > 0).length,
   }
 }
 

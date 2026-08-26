@@ -1,6 +1,7 @@
+import { playSfx, type SfxCue } from "@/lib/sfx"
 import * as Haptics from "expo-haptics"
 
-export function hapticHard() {
+function vibrateHard() {
   if (process.env.EXPO_OS === "ios") {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
   } else if (process.env.EXPO_OS === "android") {
@@ -8,7 +9,27 @@ export function hapticHard() {
   }
 }
 
-export const hapticSuccess = hapticHard
-export const hapticFailure = hapticHard
-export const impactKnock = hapticHard
-export const selectionTick = hapticHard
+export function hapticFeedback(cue: SfxCue, soundEnabled?: boolean) {
+  vibrateHard()
+  playSfx(cue, soundEnabled)
+}
+
+export function hapticHard() {
+  hapticFeedback("press")
+}
+
+export function hapticSuccess() {
+  hapticFeedback("success")
+}
+
+export function hapticForward() {
+  hapticFeedback("forward")
+}
+
+export function hapticOpen() {
+  hapticFeedback("open")
+}
+
+export function selectionTick() {
+  vibrateHard()
+}

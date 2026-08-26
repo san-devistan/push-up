@@ -1,17 +1,12 @@
-import type { FaceObservation } from "@/features/workout/camera.types"
+export type SetupFraming = "ready" | "unknown"
 
-const FACE_SCALE_RANGE = { maximum: 0.6, minimum: 0.16 } as const
-const MAX_HEAD_TURN_DEGREES = 35
+export type SetupHint = "bodyCamera" | "layPhoneFlat" | "startTop"
+export type TrainingHint = Exclude<SetupHint, "startTop">
 
-export type SetupFraming = "close" | "far" | "off-center" | "ready" | "unknown"
-
-export type SetupHint =
-  | "centerFace"
-  | "faceCamera"
-  | "layPhoneFlat"
-  | "moveBack"
-  | "moveCloser"
-  | "startTop"
+type TrainingSignals = {
+  depth: number | null
+  poseVerified: boolean
+}
 
 export type SetupState = {
   framing: SetupFraming
@@ -19,44 +14,21 @@ export type SetupState = {
   valid: boolean
 }
 
-export function getFaceScale(face: FaceObservation | null) {
-  if (
-    !face ||
-    face.frameHeight <= 0 ||
-    face.frameWidth <= 0 ||
-    face.height <= 0 ||
-    face.width <= 0
-  ) {
-    return null
-  }
-
-  return Math.sqrt(
-    (face.height * face.width) / (face.frameHeight * face.frameWidth)
-  )
+export function getTrackingSetupState(trackingAvailable: boolean): SetupState {
+  return trackingAvailable
+    ? { framing: "ready", hint: "startTop", valid: true }
+    : { framing: "unknown", hint: "bodyCamera", valid: false }
 }
 
-export function getFaceSetupState(
-  face: FaceObservation | null,
-  scale: number | null
-): SetupState {
-  if (!face || scale === null) {
-    return { framing: "unknown", hint: "faceCamera", valid: false }
+export function getActiveTrackingHint(
+  phoneFlat: boolean,
+  signals: TrainingSignals | null
+): TrainingHint | null {
+  if (!phoneFlat) return "layPhoneFlat"
+
+  if (signals === null || signals.depth === null || !signals.poseVerified) {
+    return "bodyCamera"
   }
 
-  if (
-    Math.abs(face.rollAngle) > MAX_HEAD_TURN_DEGREES ||
-    Math.abs(face.yawAngle) > MAX_HEAD_TURN_DEGREES
-  ) {
-    return { framing: "off-center", hint: "centerFace", valid: false }
-  }
-
-  if (scale < FACE_SCALE_RANGE.minimum) {
-    return { framing: "far", hint: "moveCloser", valid: false }
-  }
-
-  if (scale > FACE_SCALE_RANGE.maximum) {
-    return { framing: "close", hint: "moveBack", valid: false }
-  }
-
-  return { framing: "ready", hint: "startTop", valid: true }
+  return null
 }
