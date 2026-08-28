@@ -20,10 +20,10 @@ import {
 } from "react-native-vision-camera"
 import { scheduleOnRN } from "react-native-worklets"
 
-import { getMedianDepthMeters } from "./_lib/depth"
+import { getDepthMeasurement, type DepthMeasurement } from "./_lib/depth"
 
 const CAMERA_RESOLUTION = { height: 360, width: 640 } as const
-const DEPTH_RESOLUTION = { height: 240, width: 320 } as const
+const DEPTH_RESOLUTION = { height: 180, width: 320 } as const
 const DEPTH_STALE_AFTER_MS = 500
 const IS_ANDROID = Platform.OS === "android"
 const styles = StyleSheet.create({
@@ -39,7 +39,7 @@ function supportsTracking(device: CameraDevice) {
   )
 }
 
-function readDepthMeters(depth: Depth) {
+function readDepthFrame(depth: Depth): DepthMeasurement | null {
   "worklet"
 
   let readableDepth = depth
@@ -58,7 +58,7 @@ function readDepthMeters(depth: Depth) {
       return null
     }
 
-    return getMedianDepthMeters({
+    return getDepthMeasurement({
       buffer: readableDepth.getDepthData(),
       bytesPerRow: readableDepth.bytesPerRow,
       format,
@@ -94,11 +94,8 @@ export default function TrackingCamera({
 
   useEffect(() => {
     errorCallback.current = onError
-  }, [onError])
-
-  useEffect(() => {
     observationCallback.current = onObservation
-  }, [onObservation])
+  }, [onError, onObservation])
 
   useEffect(() => {
     if (!hasPermission) void requestPermission()
@@ -110,16 +107,20 @@ export default function TrackingCamera({
   const [handleDepth] = useState(
     () =>
       (
-        distanceMeters: number,
+        frame: DepthMeasurement,
         quality: DepthObservation["quality"],
         accuracy: DepthObservation["accuracy"]
       ) => {
-        latestDepth.current = {
-          accuracy,
-          distanceMeters,
-          quality,
-          receivedAt: Date.now(),
-        }
+        const now = Date.now()
+        latestDepth.current =
+          frame.distanceMeters === null
+            ? null
+            : {
+                accuracy,
+                distanceMeters: frame.distanceMeters,
+                quality,
+                receivedAt: now,
+              }
       }
   )
   const [handleDepthError] = useState(() => (message: string) => {
@@ -187,10 +188,10 @@ export default function TrackingCamera({
       try {
         const quality = depth.depthDataQuality
         const accuracy = depth.depthDataAccuracy
-        const distanceMeters = readDepthMeters(depth)
-        if (distanceMeters === null) return
+        const frame = readDepthFrame(depth)
+        if (frame === null) return
 
-        scheduleOnRN(handleDepth, distanceMeters, quality, accuracy)
+        scheduleOnRN(handleDepth, frame, quality, accuracy)
       } catch (error) {
         scheduleOnRN(
           handleDepthError,

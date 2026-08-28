@@ -3,9 +3,9 @@ import { useSessionClock } from "@/features/workout/_hooks/use-session-clock"
 import {
   abandonActiveAttempt,
   createCounterState,
-  getPushupDepthProgress,
-  processDepthRatio,
-  recordTrackingLoss,
+  getDepthGlowProgress,
+  processDepthMeters,
+  recordTrailingDepth,
   type CounterState,
   type WorkoutAttempt,
 } from "@/features/workout/_lib/counter"
@@ -13,7 +13,7 @@ import {
   handleCompletedAttempt,
   notifySessionEnd,
 } from "@/features/workout/_lib/feedback"
-import type { SetupFraming, TrainingHint } from "@/features/workout/_lib/setup"
+import type { TrainingHint } from "@/features/workout/_lib/setup"
 import {
   createWorkoutSession,
   saveSession,
@@ -23,15 +23,10 @@ import {
 } from "@/features/workout/_lib/storage"
 import { syncPendingSessions } from "@/features/workout/_lib/sync"
 import {
-  createTrackingCalibration,
-  finishTrackingCalibration,
+  createTrackingIssueState,
   getActiveTrackingStatus,
   getTrackingFrame,
-  sampleTrackingCalibration,
-  TRACKING_CALIBRATION_DURATION_MS,
   TRACKING_LOSS_GRACE_MS,
-  type TrackingCalibration,
-  type TrackingScales,
 } from "@/features/workout/_lib/tracking"
 import type { TrackingObservation } from "@/features/workout/camera.types"
 import { useI18n } from "@/hooks/use-i18n"
@@ -40,11 +35,11 @@ import { api } from "@workspace/backend/api"
 import { useMutation } from "convex/react"
 import { useEffect, useRef, useState } from "react"
 
-export type SessionPhase = "active" | "countdown" | "paused" | "positioning"
+export type SessionPhase = "active" | "countdown" | "paused"
 
-const COUNTDOWN_TRACKING_GRACE_MS = 500
 const INITIAL_COUNTER_STATE = createCounterState()
-const INITIAL_TRACKING_CALIBRATION = createTrackingCalibration()
+const INITIAL_TRACKING_ISSUE = createTrackingIssueState()
+const COMPLETION_BUFFER_MS = 250
 const TOAST_DURATION_MS = 1200
 
 function clearToastTimeout(timeout: {
@@ -64,27 +59,19 @@ function showSessionToast(
 }
 
 function useCountdown({
-  calibration,
   clock,
   counter,
-  lastTrackingAt,
   phase,
   planSoundEnabled,
-  readySince,
   setCountdown,
   setPhase,
-  topScales,
 }: {
-  calibration: { current: TrackingCalibration }
   clock: ReturnType<typeof useSessionClock>["clock"]
   counter: { current: CounterState }
-  lastTrackingAt: { current: number }
   phase: SessionPhase
   planSoundEnabled: boolean
-  readySince: { current: number | null }
   setCountdown: (value: number) => void
   setPhase: (phase: SessionPhase) => void
-  topScales: { current: TrackingScales | null }
 }) {
   useEffect(() => {
     if (phase !== "countdown") return undefined
@@ -92,25 +79,8 @@ function useCountdown({
     let current = 3
     loopSfx("recording", planSoundEnabled)
     const interval = setInterval(() => {
-      if (
-        readySince.current === null ||
-        Date.now() - lastTrackingAt.current > COUNTDOWN_TRACKING_GRACE_MS
-      ) {
-        clearInterval(interval)
-        stopSfx()
-        calibration.current = createTrackingCalibration()
-        readySince.current = null
-        topScales.current = null
-        setCountdown(3)
-        setPhase("positioning")
-        return
-      }
-
       current -= 1
-      if (current > 0) {
-        setCountdown(current)
-        return
-      }
+      if (current > 0) return setCountdown(current)
 
       clearInterval(interval)
       playSfx("start", planSoundEnabled)
@@ -120,28 +90,15 @@ function useCountdown({
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [
-    calibration,
-    clock,
-    counter,
-    lastTrackingAt,
-    phase,
-    planSoundEnabled,
-    readySince,
-    setCountdown,
-    setPhase,
-    topScales,
-  ])
+  }, [clock, counter, phase, planSoundEnabled, setCountdown, setPhase])
 }
 
 function toggleSessionPause({
   clock,
-  lastTrackingAt,
   phase,
   setPhase,
 }: {
   clock: ReturnType<typeof useSessionClock>["clock"]
-  lastTrackingAt: { current: number }
   phase: SessionPhase
   setPhase: (phase: SessionPhase) => void
 }) {
@@ -154,27 +111,26 @@ function toggleSessionPause({
 
   if (phase === "paused") {
     clock.resume()
-    lastTrackingAt.current = Date.now()
     setPhase("active")
   }
 }
 
 function processActiveFrame({
   counter,
-  depthRatio,
+  depthMeters,
   elapsedMs,
   onCompleted,
   poseVerified,
 }: {
   counter: { current: CounterState }
-  depthRatio: number
+  depthMeters: number
   elapsedMs: number
   onCompleted: (attempt: WorkoutAttempt, state: CounterState) => void
   poseVerified: boolean
 }) {
-  const result = processDepthRatio(
+  const result = processDepthMeters(
     counter.current,
-    depthRatio,
+    depthMeters,
     elapsedMs,
     poseVerified
   )
@@ -186,14 +142,17 @@ function processActiveFrame({
 }
 
 function useSessionCleanup({
+  completionTimeout,
   finished,
   toastTimeout,
 }: {
+  completionTimeout: { current: ReturnType<typeof setTimeout> | null }
   finished: { current: boolean }
   toastTimeout: { current: ReturnType<typeof setTimeout> | null }
 }) {
   const [cleanup] = useState(() => () => {
     if (!finished.current) stopSfx()
+    if (completionTimeout.current) clearTimeout(completionTimeout.current)
     clearToastTimeout(toastTimeout)
   })
 
@@ -216,31 +175,24 @@ export function useSession({
   const [countdown, setCountdown] = useState(3)
   const [depthProgress, setDepthProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [phase, setPhase] = useState<SessionPhase>("positioning")
-  const [setupFraming, setSetupFraming] = useState<SetupFraming>("unknown")
+  const [phase, setPhase] = useState<SessionPhase>("countdown")
   const [trackingHint, setTrackingHint] = useState<TrainingHint | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [validReps, setValidReps] = useState(0)
   const phoneInclination = usePhoneInclination(phase !== "paused")
   const { clock, elapsedMs } = useSessionClock(phase === "active")
-  const calibration = useRef(INITIAL_TRACKING_CALIBRATION)
+  const completionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const counter = useRef(INITIAL_COUNTER_STATE)
   const finished = useRef(false)
-  const lastDepthRatio = useRef<number | null>(null)
-  const lastSignalSeenAt = useRef({ body: 0, depth: 0 })
-  const lastTrackingAt = useRef(0)
-  const lastTrackingElapsedMs = useRef(0)
-  const readySince = useRef<number | null>(null)
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const topScales = useRef<TrackingScales | null>(null)
-  function complete(status: WorkoutStatus, counterState?: CounterState) {
-    if (finished.current) return
+  const trackingIssue = useRef(INITIAL_TRACKING_ISSUE)
 
+  function finish(status: WorkoutStatus) {
     finished.current = true
     const endedAt = Date.now()
     const startedAt = clock.startedAt.current || endedAt
     const session = createWorkoutSession({
-      counterState: counterState ?? counter.current,
+      counterState: counter.current,
       endedAt,
       plan,
       startedAt,
@@ -255,151 +207,98 @@ export function useSession({
     onComplete(session)
   }
 
-  const showToast = (message: string) =>
-    showSessionToast(message, setToast, toastTimeout)
+  function complete(status: WorkoutStatus) {
+    if (finished.current || completionTimeout.current) return
 
-  function resetPositioning() {
-    calibration.current = createTrackingCalibration()
-    lastDepthRatio.current = null
-    readySince.current = null
-    topScales.current = null
-    setCountdown(3)
-    setPhase("positioning")
-  }
-
-  function handleTrackingIssue(trackingIssueMs: number) {
-    setDepthProgress(0)
-    readySince.current = null
-
-    if (phase === "countdown") {
-      stopSfx()
-      resetPositioning()
+    if (status === "completed") {
+      completionTimeout.current = setTimeout(() => {
+        completionTimeout.current = null
+        finish(status)
+      }, COMPLETION_BUFFER_MS)
       return
     }
 
-    if (phase !== "active") return
-
-    counter.current = recordTrackingLoss(
-      counter.current,
-      lastTrackingElapsedMs.current
-    )
-    if (trackingIssueMs > TRACKING_LOSS_GRACE_MS) {
-      counter.current = abandonActiveAttempt(counter.current)
-      lastDepthRatio.current = null
-    }
+    finish(status)
   }
 
   function onObservation(observation: TrackingObservation) {
     const now = Date.now()
-    const { ratios, scales, setup } = getTrackingFrame(
-      observation,
-      topScales.current,
-      phoneInclination.flat.current,
-      lastDepthRatio.current
-    )
+    const frame = getTrackingFrame(observation)
     const tracking = getActiveTrackingStatus(
-      lastSignalSeenAt.current,
-      lastTrackingAt.current,
+      trackingIssue.current,
       phoneInclination.flat.current,
-      ratios,
+      frame.signals,
       now
     )
-    lastSignalSeenAt.current = tracking.signalSeenAt
+    trackingIssue.current = tracking.issueState
 
-    setSetupFraming(tracking.depthRatio === null ? setup.framing : "ready")
+    setTrackingHint(
+      phase === "active" && tracking.type === "issue" ? tracking.hint : null
+    )
 
-    if (phase !== "positioning") {
-      if (tracking.type === "issue") {
-        setTrackingHint(tracking.hint)
-        handleTrackingIssue(tracking.elapsedMs)
-        return
-      }
+    if (phase !== "active") return
 
-      lastTrackingAt.current = now
-      lastDepthRatio.current = tracking.depthRatio
-      setTrackingHint(null)
-
-      if (phase === "countdown") return
-
-      const currentElapsedMs = clock.getElapsed(now)
-      lastTrackingElapsedMs.current = currentElapsedMs
-
-      if (phase === "paused") return
-
-      setDepthProgress(getPushupDepthProgress(tracking.depthRatio))
-      processActiveFrame({
-        counter,
-        depthRatio: tracking.depthRatio,
-        elapsedMs: currentElapsedMs,
-        onCompleted: (attempt, state) =>
-          handleCompletedAttempt({
-            attempt,
-            complete,
-            didNotCount: t("feedback.didNotCount"),
-            setValidReps,
-            showToast,
-            soundEnabled: plan.soundEnabled,
-            state,
-            targetReps,
-          }),
-        poseVerified: true,
-      })
+    if (
+      tracking.type === "issue" &&
+      tracking.elapsedMs > TRACKING_LOSS_GRACE_MS
+    ) {
+      setDepthProgress(0)
+      counter.current = abandonActiveAttempt(counter.current)
       return
     }
 
-    if (!setup.valid) {
-      handleTrackingIssue(0)
-      return
-    }
+    const depthMeters = frame.signals.depthMeters
+    if (!phoneInclination.flat.current || depthMeters === null) return
 
-    lastTrackingAt.current = now
-    setTrackingHint(null)
+    const currentElapsedMs = clock.getElapsed(now)
+    setDepthProgress(getDepthGlowProgress(depthMeters))
 
-    if (readySince.current === null) {
-      readySince.current = now
-      calibration.current = sampleTrackingCalibration(
-        createTrackingCalibration(),
-        scales
+    if (completionTimeout.current) {
+      counter.current = recordTrailingDepth(
+        counter.current,
+        depthMeters,
+        currentElapsedMs
       )
       return
     }
 
-    calibration.current = sampleTrackingCalibration(calibration.current, scales)
-    if (now - readySince.current < TRACKING_CALIBRATION_DURATION_MS) return
-
-    const calibrated = finishTrackingCalibration(calibration.current)
-    if (calibrated === null) {
-      readySince.current = null
-      return
-    }
-
-    topScales.current = calibrated
-    lastDepthRatio.current = 1
-    setCountdown(3)
-    setPhase("countdown")
+    processActiveFrame({
+      counter,
+      depthMeters,
+      elapsedMs: currentElapsedMs,
+      onCompleted: (attempt, state) =>
+        handleCompletedAttempt({
+          attempt,
+          complete,
+          didNotCount: t("feedback.didNotCount"),
+          setValidReps,
+          showToast: (message) =>
+            showSessionToast(message, setToast, toastTimeout),
+          soundEnabled: plan.soundEnabled,
+          state,
+          targetReps,
+        }),
+      poseVerified: frame.signals.poseVerified,
+    })
   }
 
   function togglePause() {
-    lastSignalSeenAt.current = { body: Date.now(), depth: Date.now() }
+    trackingIssue.current = createTrackingIssueState(Date.now())
     setDepthProgress(0)
     setTrackingHint(null)
-    toggleSessionPause({ clock, lastTrackingAt, phase, setPhase })
+    toggleSessionPause({ clock, phase, setPhase })
   }
 
   useCountdown({
-    calibration,
     clock,
     counter,
-    lastTrackingAt,
     phase,
     planSoundEnabled: plan.soundEnabled,
-    readySince,
     setCountdown,
     setPhase,
-    topScales,
   })
 
-  useSessionCleanup({ finished, toastTimeout })
+  useSessionCleanup({ completionTimeout, finished, toastTimeout })
   return {
     countdown,
     depthProgress,
@@ -408,8 +307,6 @@ export function useSession({
     onCameraError: setError,
     onObservation,
     phase,
-    phoneInclination: phoneInclination.display,
-    setupFraming,
     stop: () => complete("stopped"),
     toast,
     trackingHint,

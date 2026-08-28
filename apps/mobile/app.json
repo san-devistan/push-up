@@ -8,12 +8,17 @@
     "scheme": "pumpr",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "appleTeamId": "QMWC7QVJ59",
       "icon": {
         "light": "./assets/images/icon.png",
         "dark": "./assets/images/icon-dark.png"
       },
       "usesAppleSignIn": true,
       "supportsTablet": true,
+      "entitlements": {
+        "com.apple.developer.family-controls": true,
+        "com.apple.security.application-groups": ["group.com.leocombaret.pumpr"]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "pumpr. uses the camera to count repetitions locally on your device."
       },
@@ -65,6 +70,14 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Allow pumpr. to save transparent performance PNGs.",
+          "granularPermissions": ["photo"]
+        }
+      ],
+      [
         "react-native-share",
         {
           "ios": ["instagram", "instagram-stories"],
@@ -82,7 +95,8 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

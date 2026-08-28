@@ -1,4 +1,5 @@
 import { PanelUIProvider as LocalPanelUIProvider } from "@/components/ui/panel-ui-provider"
+import { AppBlockerSync } from "@/features/app-blocker/_components/sync"
 import { isOnboardingComplete } from "@/features/onboarding/storage"
 import {
   PreferencesProvider,
@@ -137,6 +138,7 @@ function RootProviders() {
       <OptionalConvexProvider>
         <PlanProvider>
           <RecapProvider>
+            <AppBlockerSync />
             <ThemeProvider value={NAV_THEME[colorScheme]}>
               <RootStack />
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />

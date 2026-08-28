@@ -5,6 +5,7 @@ export type ActivitySession = {
   activeRepetitionTimeMs: number
   invalidReps: number
   localDate: string
+  totalDurationMs: number
   validReps: number
 }
 
@@ -36,20 +37,23 @@ function totalsOf(sessions: readonly ActivitySession[]) {
   let attempts = 0
   let bestSessionReps = 0
   let pushups = 0
+  let totalDurationMs = 0
 
   for (const session of sessions) {
     activeMs += session.activeRepetitionTimeMs
     attempts += session.validReps + session.invalidReps
     bestSessionReps = Math.max(bestSessionReps, session.validReps)
     pushups += session.validReps
+    totalDurationMs += session.totalDurationMs
   }
 
   return {
-    averageRepMs: attempts === 0 ? 0 : Math.round(activeMs / attempts),
+    averageRepMs: pushups === 0 ? 0 : Math.round(activeMs / pushups),
     bestSessionReps,
     successRate: attempts === 0 ? 0 : Math.round((pushups / attempts) * 100),
     totalActiveMs: activeMs,
     totalAttempts: attempts,
+    totalDurationMs,
     totalPushups: pushups,
     totalSessions: sessions.filter((session) => session.validReps > 0).length,
   }

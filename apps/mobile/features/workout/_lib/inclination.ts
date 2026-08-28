@@ -1,9 +1,7 @@
-import type { SetupState } from "./setup.ts"
-
 export const PHONE_FLAT_TARGET_DEGREES = 90
 export const PHONE_FLAT_TOLERANCE_DEGREES = 15
 
-type GravityVector = {
+export type GravityVector = {
   x: number
   y: number
   z: number
@@ -22,11 +20,4 @@ export function isPhoneFlat(degrees: number) {
     Math.abs(degrees - PHONE_FLAT_TARGET_DEGREES) <=
     PHONE_FLAT_TOLERANCE_DEGREES
   )
-}
-
-export function requireFlatPhone(
-  setup: SetupState,
-  phoneFlat: boolean
-): SetupState {
-  return !phoneFlat ? { ...setup, hint: "layPhoneFlat", valid: false } : setup
 }

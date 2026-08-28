@@ -1,6 +1,6 @@
 import type { Activity } from "@/features/workout/_lib/activity"
 
-export const DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_DATA === "1"
+export const DEMO_DATA = true
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const VISIBLE_DAYS = 26 * 7
@@ -46,13 +46,14 @@ export function demoActivity(today: string): Activity {
 
     return {
       date: new Date(start - daysAgo * DAY_MS).toISOString().slice(0, 10),
-      reps: daysAgo === 0 ? 6 : repsFor(daysAgo, random),
+      reps: daysAgo === 0 ? 100 : repsFor(daysAgo, random),
     }
   })
 
   const totalPushups = recentDays.reduce((total, day) => total + day.reps, 0)
   const activeDays = recentDays.filter((day) => day.reps > 0)
   const totalAttempts = Math.round(totalPushups / 0.88)
+  const totalActiveMs = totalPushups * 2380
   const todayReps = recentDays.at(-1)?.reps ?? 0
   let currentStreak = 0
 
@@ -67,14 +68,15 @@ export function demoActivity(today: string): Activity {
     averageRepMs: 2380,
     bestDayReps: Math.max(...recentDays.map((day) => day.reps)),
     bestSessionReps: 34,
-    bestStreak: Math.max(currentStreak, 19),
-    currentStreak,
+    bestStreak: 123,
+    currentStreak: 123,
     recentDays,
     successRate: 88,
     todayAttempts: Math.round(todayReps / 0.88),
     todayReps,
-    totalActiveMs: totalAttempts * 2380,
+    totalActiveMs,
     totalAttempts,
+    totalDurationMs: totalActiveMs,
     totalPushups,
     totalSessions: activeDays.length,
     weeks: Array.from({ length: CHART_WEEKS }, (_, index) => {

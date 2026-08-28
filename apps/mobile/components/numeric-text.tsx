@@ -2,7 +2,13 @@ import { useI18n } from "@/hooks/use-i18n"
 import { FONT_FAMILY } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { Text } from "panelui-native"
-import { StyleSheet, View, type StyleProp, type TextStyle } from "react-native"
+import {
+  StyleSheet,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native"
 import {
   NumericText as NumericTextPrimitive,
   type NumericTextProps as NumericTextPrimitiveProps,
@@ -11,9 +17,18 @@ import { withUniwind } from "uniwind"
 
 export const NUMERIC_TEXT_SLOT = "\uFFFC"
 
-export type NumericTextProps = NumericTextPrimitiveProps & {
-  className?: string
-}
+type NumericTextLayoutProps =
+  | { containerStyle?: never; layoutStyle?: never; layoutText?: undefined }
+  | {
+      containerStyle?: StyleProp<ViewStyle>
+      layoutStyle?: StyleProp<TextStyle>
+      layoutText: string
+    }
+
+export type NumericTextProps = NumericTextPrimitiveProps &
+  NumericTextLayoutProps & {
+    className?: string
+  }
 
 type NumericPhraseProps = NumericTextProps & {
   containerClassName?: string
@@ -25,22 +40,66 @@ type NumericPhraseProps = NumericTextProps & {
 const StyledNumericText = withUniwind(NumericTextPrimitive)
 
 const styles = StyleSheet.create({
+  layoutOverlay: {
+    alignItems: "center",
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  layoutPlaceholder: { opacity: 0 },
   root: {
     fontFamily:
       process.env.EXPO_OS === "ios" ? "Anton-Regular" : FONT_FAMILY.heading,
   },
 })
 
-function NumericText({ className, locale, style, ...props }: NumericTextProps) {
+function NumericText({
+  className,
+  containerStyle,
+  layoutStyle,
+  layoutText,
+  locale,
+  style,
+  ...props
+}: NumericTextProps) {
   const { locale: defaultLocale } = useI18n()
-
-  return (
+  const resolvedClassName = cn("text-base text-foreground", className)
+  const resolvedStyle = StyleSheet.compose<TextStyle, TextStyle, TextStyle>(
+    styles.root,
+    style
+  )
+  const numericText = (
     <StyledNumericText
-      className={cn("text-base text-foreground", className)}
+      className={resolvedClassName}
       locale={locale ?? defaultLocale}
-      style={StyleSheet.compose(styles.root, style)}
+      style={resolvedStyle}
       {...props}
     />
+  )
+
+  if (layoutText === undefined) return numericText
+
+  return (
+    <View style={containerStyle}>
+      <Text
+        accessibilityElementsHidden
+        accessible={false}
+        className={resolvedClassName}
+        importantForAccessibility="no-hide-descendants"
+        style={StyleSheet.compose<TextStyle, TextStyle, TextStyle>(
+          layoutStyle,
+          styles.layoutPlaceholder
+        )}
+      >
+        {layoutText}
+      </Text>
+      <View pointerEvents="none" style={styles.layoutOverlay}>
+        {numericText}
+      </View>
+    </View>
   )
 }
 

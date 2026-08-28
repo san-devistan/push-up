@@ -22,10 +22,6 @@ export function hapticSuccess() {
   hapticFeedback("success")
 }
 
-export function hapticForward() {
-  hapticFeedback("forward")
-}
-
 export function hapticOpen() {
   hapticFeedback("open")
 }

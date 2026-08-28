@@ -2,6 +2,7 @@ import { loadDeviceMotion } from "@/features/workout/_lib/device-motion"
 import {
   getPhoneInclinationDegrees,
   isPhoneFlat,
+  type GravityVector,
 } from "@/features/workout/_lib/inclination"
 import { useEffect, useRef, useState } from "react"
 
@@ -21,6 +22,7 @@ export function usePhoneInclination(enabled: boolean) {
   })
   const degrees = useRef<number | null>(null)
   const flat = useRef(true)
+  const gravity = useRef<GravityVector | null>(null)
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -48,6 +50,7 @@ export function usePhoneInclination(enabled: boolean) {
         ({ accelerationIncludingGravity }) => {
           if (!active) return
 
+          gravity.current = accelerationIncludingGravity
           const measuredDegrees = getPhoneInclinationDegrees(
             accelerationIncludingGravity
           )
@@ -82,6 +85,7 @@ export function usePhoneInclination(enabled: boolean) {
 
       degrees.current = null
       flat.current = true
+      gravity.current = null
       setDisplay({ type: "unavailable" })
     })
 
@@ -90,8 +94,9 @@ export function usePhoneInclination(enabled: boolean) {
       subscription?.remove()
       degrees.current = null
       flat.current = true
+      gravity.current = null
     }
   }, [enabled])
 
-  return { degrees, display, flat }
+  return { degrees, display, flat, gravity }
 }

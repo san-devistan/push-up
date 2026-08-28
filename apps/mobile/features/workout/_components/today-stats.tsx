@@ -67,7 +67,7 @@ function StatBackdrop({ children }: { children: ReactNode }) {
 }
 
 function getCalories(activity: Activity | undefined) {
-  return getEstimatedCalories(activity?.todayAttempts || 0)
+  return activity ? getEstimatedCalories(activity.totalPushups) : undefined
 }
 
 function useThemeColor(name: string) {
@@ -287,10 +287,12 @@ function MetricsGrid({ activity }: { activity: Activity | undefined }) {
 
   return (
     <GridItem.Group aspect={1.6} columns={2} gap={12} size="sm">
-      <MetricTile icon={ZapIcon} label={t("today.calories")}>
+      <MetricTile icon={ZapIcon} label={t("common.calories")}>
         <MetricValue
           maximumFractionDigits={1}
-          minimumFractionDigits={calories > 0 && calories < 10 ? 1 : 0}
+          minimumFractionDigits={
+            calories !== undefined && calories > 0 && calories < 10 ? 1 : 0
+          }
           suffix="kcal"
           value={calories}
         />
@@ -298,8 +300,8 @@ function MetricsGrid({ activity }: { activity: Activity | undefined }) {
 
       <MetricTile icon={TimerIcon} label={t("common.avgRep")}>
         <MetricValue
-          maximumFractionDigits={1}
-          minimumFractionDigits={1}
+          maximumFractionDigits={2}
+          minimumFractionDigits={2}
           suffix={t("time.secondsShort")}
           value={activity ? activity.averageRepMs / 1000 : null}
         />
@@ -312,7 +314,7 @@ function MetricsGrid({ activity }: { activity: Activity | undefined }) {
       <MetricTile icon={ClockIcon} label={t("today.totalTime")}>
         <Text className="font-heading text-3xl">
           {activity
-            ? formatTotalDuration(activity.totalActiveMs)
+            ? formatTotalDuration(activity.totalDurationMs)
                 .split(" ")
                 .map((part, index) => (
                   <Fragment key={part.slice(-1)}>

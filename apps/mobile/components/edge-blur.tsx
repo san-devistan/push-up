@@ -7,8 +7,7 @@
 import MaskedView from "@react-native-masked-view/masked-view"
 import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
-import { useMemo } from "react"
-import { StyleSheet } from "react-native"
+import { StyleSheet, type ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
@@ -54,12 +53,10 @@ function useBackgroundTint(edge: Edge) {
   const value = useCSSVariable("--color-background")
   const hex = typeof value === "string" && value.length === 7 ? value : null
 
-  return useMemo(() => {
-    if (!hex) return ["transparent", "transparent"] as const
-    return edge === "top"
-      ? ([hex, `${hex}00`] as const)
-      : ([`${hex}00`, hex] as const)
-  }, [edge, hex])
+  if (!hex) return ["transparent", "transparent"] as const
+  return edge === "top"
+    ? ([hex, `${hex}00`] as const)
+    : ([`${hex}00`, hex] as const)
 }
 
 export function EdgeBlur({
@@ -72,9 +69,9 @@ export function EdgeBlur({
   const insets = useSafeAreaInsets()
   const tint = useBackgroundTint(edge)
   const inset = edge === "top" ? insets.top : insets.bottom
-  const rootStyle = useMemo(
-    () => [styles[edge], { height: inset + height }],
-    [edge, height, inset]
+  const rootStyle = StyleSheet.compose<ViewStyle, ViewStyle, ViewStyle>(
+    styles[edge],
+    { height: inset + height }
   )
 
   return (

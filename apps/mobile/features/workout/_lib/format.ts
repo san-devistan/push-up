@@ -6,16 +6,18 @@ export function formatDuration(durationMs: number) {
 }
 
 export function formatTotalDuration(durationMs: number) {
-  const totalMinutes = Math.ceil(durationMs / 60_000)
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor((totalMinutes % 1440) / 60)
-  const minutes = totalMinutes % 60
+  const totalSeconds = Math.round(durationMs / 1000)
+  const days = Math.floor(totalSeconds / 86_400)
+  const hours = Math.floor((totalSeconds % 86_400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
   const units = [
     days && `${days}d`,
     hours && `${hours}h`,
     minutes && `${minutes}m`,
+    seconds && `${seconds}s`,
   ]
-  return units.filter(Boolean).join(" ") || "0m"
+  return units.filter(Boolean).join(" ") || "0s"
 }
 
 export function formatClock(

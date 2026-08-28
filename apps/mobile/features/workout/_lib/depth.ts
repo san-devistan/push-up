@@ -1,8 +1,21 @@
-const MAXIMUM_DEPTH_METERS = 3
-const MINIMUM_DEPTH_METERS = 0.08
-const MINIMUM_SAMPLE_COUNT = 9
+const MAXIMUM_DEPTH_METERS = 0.7
+const MINIMUM_DEPTH_METERS = 0
+const MINIMUM_USABLE_SAMPLE_RATIO = 0.1
 
 export type DepthBufferFormat = "android-depth-16" | "float-depth-32"
+
+export type DepthMeasurement = {
+  distanceMeters: number | null
+  sampleCount: number
+  sampleRegion: {
+    endX: number
+    endY: number
+    startX: number
+    startY: number
+    step: number
+  }
+  usableSampleCount: number
+}
 
 function getPixelBytes(format: DepthBufferFormat) {
   "worklet"
@@ -35,30 +48,33 @@ function median(samples: number[]) {
     : (samples[middle] ?? null)
 }
 
-export function getMedianDepthMeters({
-  buffer,
-  bytesPerRow,
-  format,
-  height,
-  width,
-}: {
+type DepthBuffer = {
   buffer: ArrayBuffer
   bytesPerRow: number
   format: DepthBufferFormat
   height: number
   width: number
-}) {
+}
+
+export function getDepthMeasurement({
+  buffer,
+  bytesPerRow,
+  format,
+  height,
+  width,
+}: DepthBuffer): DepthMeasurement {
   "worklet"
 
   const pixelBytes = getPixelBytes(format)
   const rowBytes = bytesPerRow > 0 ? bytesPerRow : width * pixelBytes
-  const startX = Math.floor(width * 0.25)
-  const endX = Math.ceil(width * 0.75)
-  const startY = Math.floor(height * 0.2)
-  const endY = Math.ceil(height * 0.8)
+  const startX = 0
+  const endX = width
+  const startY = 0
+  const endY = height
   const step = Math.max(1, Math.floor(Math.min(width, height) / 40))
   const view = new DataView(buffer)
-  const samples: number[] = []
+  let sampleCount = 0
+  const usableSamples: number[] = []
 
   for (let y = startY; y < endY; y += step) {
     for (let x = startX; x < endX; x += step) {
@@ -66,9 +82,24 @@ export function getMedianDepthMeters({
       if (offset + pixelBytes > buffer.byteLength) continue
 
       const meters = readMeters(view, offset, format)
-      if (isUsableDepth(meters)) samples.push(meters)
+      sampleCount += 1
+      if (isUsableDepth(meters)) usableSamples.push(meters)
     }
   }
 
-  return samples.length >= MINIMUM_SAMPLE_COUNT ? median(samples) : null
+  return {
+    distanceMeters:
+      usableSamples.length >=
+      Math.max(1, Math.ceil(sampleCount * MINIMUM_USABLE_SAMPLE_RATIO))
+        ? median(usableSamples)
+        : null,
+    sampleCount,
+    sampleRegion: { endX, endY, startX, startY, step },
+    usableSampleCount: usableSamples.length,
+  }
+}
+
+export function getMedianDepthMeters(buffer: DepthBuffer) {
+  "worklet"
+  return getDepthMeasurement(buffer).distanceMeters
 }

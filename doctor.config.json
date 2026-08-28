@@ -58,6 +58,10 @@
         ]
       },
       {
+        "files": ["components/icons.tsx"],
+        "rules": ["react-doctor/only-export-components"]
+      },
+      {
         "files": [
           "**/features/workout/camera.tsx",
           "**/features/workout/camera.ios.tsx",

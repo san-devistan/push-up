@@ -1,0 +1,7 @@
+{
+  "platforms": ["apple"],
+  "apple": {
+    "modules": ["DailyAppBlockerModule"],
+    "podspecPath": "PumprDailyAppBlocker.podspec"
+  }
+}

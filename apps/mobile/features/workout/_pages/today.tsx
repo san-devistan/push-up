@@ -1,5 +1,6 @@
 import { EdgeBlur } from "@/components/edge-blur"
-import { FlameIcon, SettingsIcon } from "@/components/icons"
+import { SettingsIcon } from "@/components/icons"
+import { NumericText } from "@/components/numeric-text"
 import { Button } from "@/components/ui/button"
 import { Surface } from "@/components/ui/surface"
 import { Tabs } from "@/components/ui/tabs"
@@ -13,9 +14,11 @@ import { Slab } from "@/features/workout/_components/figures"
 import { ScreenGlow } from "@/features/workout/_components/screen-glow"
 import WorkoutSectionRail from "@/features/workout/_components/section-rail"
 import StartButton from "@/features/workout/_components/start-button"
+import { Streak } from "@/features/workout/_components/streak"
 import SummaryOverlay from "@/features/workout/_components/summary"
 import { TodayStats } from "@/features/workout/_components/today-stats"
 import { useActivity } from "@/features/workout/_hooks/use-activity"
+import { useDelayedValue } from "@/features/workout/_hooks/use-delayed-value"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
 import { useRecap } from "@/features/workout/_hooks/use-recap"
 import type { Activity } from "@/features/workout/_lib/activity"
@@ -28,19 +31,18 @@ import { Text } from "panelui-native"
 import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import { useEffect, useState } from "react"
 import { StyleSheet, View } from "react-native"
-import Animated, {
-  createAnimatedComponent,
-  FadeInDown,
-  ReduceMotion,
-} from "react-native-reanimated"
+import Animated, { FadeInDown, ReduceMotion } from "react-native-reanimated"
 import { useCSSVariable } from "uniwind"
 
 const EMPTY_ACTIVITY_DAYS = [] as const
 const HOME_SECTION_IDS = ["overview", "goal", "activity", "stats"]
-const AnimatedText = createAnimatedComponent(Text)
-const VALUE_ENTERING = FadeInDown.duration(240)
-  .withInitialValues({ opacity: 0, transform: [{ translateY: 4 }] })
-  .reduceMotion(ReduceMotion.System)
+const HOME_VALUE_ANIMATION_DURATION_MS = 1000
+const HOME_UPDATE_DELAYS = {
+  activity: 1000,
+  level: 750,
+  reps: 500,
+  total: 250,
+} as const
 const SECTION_ENTERING = HOME_SECTION_IDS.map((_, index) =>
   FadeInDown.duration(260)
     .delay(index * 70)
@@ -112,9 +114,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     fontSize: 72,
     lineHeight: 88,
-    marginBottom: -16,
     textAlign: "left",
+    transform: [{ translateY: -4 }],
   },
+  totalHeroNumberLayout: { marginBottom: -16 },
 })
 
 const TOTAL_HERO_AVATAR_DOM_PROPS = {
@@ -159,31 +162,13 @@ function HomeHeaderLeft() {
   )
 }
 
-function Streak({ days }: { days: number }) {
-  const { formatNumber, t } = useI18n()
-  const foregroundValue = useCSSVariable("--color-foreground")
-  const foreground =
-    typeof foregroundValue === "string" ? foregroundValue : undefined
-
-  return (
-    <View className="flex-row items-center">
-      <FlameIcon color={foreground} fill={foreground} size={24} />
-      <AnimatedText
-        accessibilityLabel={`${formatNumber(days)} ${t(days === 1 ? "common.day" : "common.days")}`}
-        className="pt-1 font-heading text-2xl"
-        entering={VALUE_ENTERING}
-        key={days}
-      >
-        {formatNumber(days)}
-      </AnimatedText>
-    </View>
-  )
-}
-
 function TotalHero({ activity }: { activity: Activity | undefined }) {
   const { formatNumber, t } = useI18n()
   const { plan } = usePlan()
-  const totalPushups = activity?.totalPushups ?? 0
+  const totalPushups = useDelayedValue(
+    activity?.totalPushups ?? 0,
+    HOME_UPDATE_DELAYS.total
+  )
   const goalCompleted = (activity?.todayReps ?? 0) >= plan.targetReps
 
   return (
@@ -195,14 +180,18 @@ function TotalHero({ activity }: { activity: Activity | undefined }) {
     >
       <View pointerEvents="none" style={styles.totalHeroGradient} />
       <View className="w-full items-start justify-center">
-        <AnimatedText
+        <NumericText
+          align="start"
+          animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
           className="font-heading text-foreground"
-          entering={VALUE_ENTERING}
-          key={totalPushups}
+          containerStyle={styles.totalHeroNumberLayout}
+          direction="up"
+          layoutStyle={styles.totalHeroNumber}
+          layoutText={formatNumber(totalPushups)}
+          reduceMotion="system"
           style={styles.totalHeroNumber}
-        >
-          {formatNumber(totalPushups)}
-        </AnimatedText>
+          value={totalPushups}
+        />
         <Text className="font-heading text-base text-foreground">
           {t("today.totalPushups")}
         </Text>
@@ -236,10 +225,17 @@ function ActivitySection({ activity }: { activity: Activity | undefined }) {
           </Tabs.List>
         </View>
         <Tabs.Content value="week">
-          <DailyColumns days={dailyDays} />
+          <DailyColumns
+            animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
+            days={dailyDays}
+          />
         </Tabs.Content>
         <Tabs.Content value="month">
-          <ActivityHeatmap recentDays={recentDays} today={today} />
+          <ActivityHeatmap
+            animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
+            recentDays={recentDays}
+            today={today}
+          />
         </Tabs.Content>
       </Tabs>
     </Slab>
@@ -255,6 +251,7 @@ export default function TodayPage() {
       : recap.type === "revealed"
         ? recap.activity
         : liveActivity
+  const activityGraph = useDelayedValue(activity, HOME_UPDATE_DELAYS.activity)
   const {
     active,
     measure,
@@ -293,13 +290,18 @@ export default function TodayPage() {
           entering={SECTION_ENTERING[1]}
           onLayout={measure("goal")}
         >
-          <DailyGoal activity={activity} />
+          <DailyGoal
+            activity={activity}
+            animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
+            levelUpdateDelay={HOME_UPDATE_DELAYS.level}
+            repsUpdateDelay={HOME_UPDATE_DELAYS.reps}
+          />
         </Animated.View>
         <Animated.View
           entering={SECTION_ENTERING[2]}
           onLayout={measure("activity")}
         >
-          <ActivitySection activity={activity} />
+          <ActivitySection activity={activityGraph} />
         </Animated.View>
         <Animated.View
           entering={SECTION_ENTERING[3]}
@@ -332,7 +334,10 @@ export default function TodayPage() {
             >
               upgrade to pro.
             </Button>
-            <Streak days={activity?.currentStreak ?? 0} />
+            <Streak
+              animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
+              days={activity?.currentStreak ?? 0}
+            />
           </View>
         </Stack.Toolbar.View>
         <Stack.Toolbar.View>

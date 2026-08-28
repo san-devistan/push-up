@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 
 import { getActivityAfterSession, type Activity } from "./activity.ts"
+import { getEstimatedCalories } from "./calories.ts"
 import type { WorkoutSession } from "./storage.ts"
 
 const before = {
@@ -18,6 +19,7 @@ const before = {
   todayReps: 0,
   totalActiveMs: 20_000,
   totalAttempts: 10,
+  totalDurationMs: 25_000,
   totalPushups: 10,
   totalSessions: 1,
   weeks: [{ reps: 10, start: "2026-08-25" }],
@@ -51,7 +53,10 @@ assert.equal(after?.todayReps, 5)
 assert.equal(after?.currentStreak, 3)
 assert.equal(after?.bestStreak, 3)
 assert.equal(after?.totalAttempts, 16)
+assert.equal(after?.averageRepMs, 1933)
+assert.equal(getEstimatedCalories(session.validReps), 1.6)
 assert.equal(after?.successRate, 94)
+assert.equal(after?.totalDurationMs, 37_000)
 assert.equal(after?.weeks.at(-1)?.reps, 15)
 
 console.log("Workout recap checks passed")

@@ -1,6 +1,6 @@
 import { EdgeBlur } from "@/components/edge-blur"
 import { CheckIcon, ChevronLeftIcon } from "@/components/icons"
-import { NUMERIC_TEXT_SLOT, NumericPhrase } from "@/components/numeric-text"
+import { NUMERIC_TEXT_SLOT } from "@/components/numeric-text"
 import { Accordion } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Surface } from "@/components/ui/surface"
@@ -70,17 +70,14 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  dailyNumber: { marginRight: -4, width: 20 },
   screen: { flex: 1 },
-  streakNumber: { marginRight: -6, width: 24 },
-  totalNumber: { marginRight: -8, width: 38 },
 })
 
 function getReachedCount(level: number, start: number, end: number) {
-  return Math.max(0, Math.min(level - 1, end) - start + 1)
+  return Math.max(0, Math.min(level, end) - start + 1)
 }
 
-function getCurrentGroupValue(level: number) {
+function getActiveGroupValue(level: number) {
   const index = Math.min(
     LEVEL_GROUPS.length - 1,
     Math.floor(Math.max(0, level - 1) / LEVELS_PER_GROUP)
@@ -99,6 +96,7 @@ function LevelsBackButton() {
       className="h-10 w-10 rounded-full"
       onPress={router.back}
       size="icon"
+      sfx={false}
       variant="ghost"
     >
       <ChevronLeftIcon strokeWidth={3} />
@@ -110,6 +108,24 @@ function renderLevelsBackButton() {
   return <LevelsBackButton />
 }
 
+function RequirementLabel({
+  template,
+  value,
+}: {
+  template: string
+  value: string
+}) {
+  const slot = template.indexOf(NUMERIC_TEXT_SLOT)
+
+  return (
+    <>
+      {template.slice(0, slot)}
+      <Text className="font-bold">{value}</Text>
+      {template.slice(slot + NUMERIC_TEXT_SLOT.length)}
+    </>
+  )
+}
+
 function RequirementText({
   emphasized,
   requirement,
@@ -117,7 +133,7 @@ function RequirementText({
   emphasized: boolean
   requirement: LevelRequirement
 }) {
-  const { t } = useI18n()
+  const { formatNumber, t } = useI18n()
   const total = getCompactNumber(requirement.totalReps)
   const textClassName = cn(
     "text-[15px] text-muted-foreground",
@@ -125,49 +141,30 @@ function RequirementText({
   )
 
   return (
-    <View className="flex-1 flex-row flex-wrap items-center justify-end">
-      <NumericPhrase
-        align="end"
-        className={cn(textClassName, "text-[13px]")}
-        maximumFractionDigits={2}
-        style={styles.totalNumber}
-        template={t("levels.total", {
-          value: `${NUMERIC_TEXT_SLOT}${total.suffix}`,
-        })}
-        textClassName={textClassName}
-        value={total.value}
+    <Text className={cn(textClassName, "flex-1 text-right")}>
+      <RequirementLabel
+        template={t("levels.total", { value: NUMERIC_TEXT_SLOT })}
+        value={`${formatNumber(total.value, { maximumFractionDigits: 2 })}${total.suffix}`}
       />
       {requirement.streak > 0 ? (
         <>
-          <Text className={cn(textClassName, "w-4 translate-x-px text-center")}>
-            ·
-          </Text>
-          <NumericPhrase
-            align="end"
-            className={cn(textClassName, "text-[13px]")}
-            style={styles.streakNumber}
+          {" · "}
+          <RequirementLabel
             template={t("levels.streak", { value: NUMERIC_TEXT_SLOT })}
-            textClassName={textClassName}
-            value={requirement.streak}
+            value={formatNumber(requirement.streak)}
           />
         </>
       ) : null}
       {requirement.recentDailyAverage > 0 ? (
         <>
-          <Text className={cn(textClassName, "w-4 translate-x-px text-center")}>
-            ·
-          </Text>
-          <NumericPhrase
-            align="end"
-            className={cn(textClassName, "text-[13px]")}
-            style={styles.dailyNumber}
+          {" · "}
+          <RequirementLabel
             template={t("levels.daily", { value: NUMERIC_TEXT_SLOT })}
-            textClassName={textClassName}
-            value={requirement.recentDailyAverage}
+            value={formatNumber(requirement.recentDailyAverage)}
           />
         </>
       ) : null}
-    </View>
+    </Text>
   )
 }
 
@@ -176,20 +173,23 @@ function LevelTimelineItem({
   index,
   last,
   requirement,
+  targetLevel,
 }: {
   currentLevel: number
   index: number
   last: boolean
   requirement: LevelRequirement
+  targetLevel: number
 }) {
   const { formatNumber, t } = useI18n()
-  const isCompleted = requirement.level < currentLevel
-  const isCurrentLevel = requirement.level === currentLevel
+  const isCompleted = requirement.level <= currentLevel
+  const isNextLevel =
+    targetLevel > currentLevel && requirement.level === targetLevel
 
   return (
     <Timeline.Item completed={isCompleted} last={last} step={index}>
       <Timeline.Indicator
-        className={cn("size-4 border-0", isCurrentLevel && "bg-foreground")}
+        className={cn("size-4 border-0", isNextLevel && "bg-foreground")}
       >
         {isCompleted ? <CheckIcon size={10} strokeWidth={3} /> : null}
       </Timeline.Indicator>
@@ -197,17 +197,14 @@ function LevelTimelineItem({
         <Timeline.Title
           className={cn(
             "shrink-0 font-heading text-base text-muted-foreground",
-            isCurrentLevel && "text-foreground"
+            isNextLevel && "text-foreground"
           )}
         >
           {t("today.level", {
             level: formatNumber(requirement.level),
           })}
         </Timeline.Title>
-        <RequirementText
-          emphasized={isCurrentLevel}
-          requirement={requirement}
-        />
+        <RequirementText emphasized={isNextLevel} requirement={requirement} />
       </Timeline.Content>
     </Timeline.Item>
   )
@@ -216,20 +213,20 @@ function LevelTimelineItem({
 function LevelGroup({
   currentLevel,
   group,
+  targetLevel,
 }: {
   currentLevel: number
   group: (typeof LEVEL_GROUPS)[number]
+  targetLevel: number
 }) {
   const { formatNumber, locale, t } = useI18n()
   const reached = getReachedCount(currentLevel, group.start, group.end)
-  const isCurrent =
-    (currentLevel === 0 && group.start === 1) ||
-    (currentLevel >= group.start && currentLevel <= group.end)
+  const isActive = targetLevel >= group.start && targetLevel <= group.end
   const title = `${t("levels.levels").toLocaleLowerCase(locale)} ${formatNumber(group.start)}–${formatNumber(group.end)}`
 
   return (
     <Surface
-      className={cn(isCurrent && "border border-primary/50")}
+      className={cn(isActive && "border border-primary/50")}
       elevated
       padding="none"
     >
@@ -243,7 +240,7 @@ function LevelGroup({
             variant={
               reached === group.requirements.length
                 ? "success"
-                : isCurrent
+                : isActive
                   ? "default"
                   : "secondary"
             }
@@ -261,6 +258,7 @@ function LevelGroup({
                 key={requirement.level}
                 last={index === group.requirements.length - 1}
                 requirement={requirement}
+                targetLevel={targetLevel}
               />
             ))}
           </Timeline>
@@ -281,12 +279,13 @@ export default function LevelsPage() {
     scrollProps,
     scrollTo,
   } = useScrollSections({ ids: LEVEL_SECTION_IDS })
-  const { level } = getLevel({
+  const { level, nextLevel, nextRequirement } = getLevel({
     bestStreak: activity?.bestStreak ?? 0,
     dailyGoal: plan.targetReps,
     recentDays: activity?.recentDays ?? [],
     totalReps: activity?.totalPushups ?? 0,
   })
+  const targetLevel = nextRequirement ? nextLevel : level
 
   return (
     <>
@@ -299,13 +298,17 @@ export default function LevelsPage() {
       >
         <Accordion
           className="gap-2.5 overflow-visible"
-          defaultValue={getCurrentGroupValue(level)}
+          defaultValue={getActiveGroupValue(targetLevel)}
           selectionMode="single"
           variant="ghost"
         >
           {LEVEL_GROUPS.map((group) => (
             <View key={group.value} onLayout={measure(group.value)}>
-              <LevelGroup currentLevel={level} group={group} />
+              <LevelGroup
+                currentLevel={level}
+                group={group}
+                targetLevel={targetLevel}
+              />
             </View>
           ))}
         </Accordion>

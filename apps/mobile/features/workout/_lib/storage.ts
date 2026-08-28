@@ -133,6 +133,10 @@ function isAttempt(value: unknown): value is WorkoutAttempt {
   return (
     isRecord(value) &&
     isTrace(value.depthTrace) &&
+    isTrace(value.depthTraceOffsetsMs) &&
+    (value.depthTraceOffsetsMs === undefined ||
+      (Array.isArray(value.depthTrace) &&
+        value.depthTraceOffsetsMs.length === value.depthTrace.length)) &&
     typeof value.durationMs === "number" &&
     Array.isArray(value.failureReasons) &&
     value.failureReasons.every(isFailureReason) &&

@@ -1,0 +1,97 @@
+import { useI18n } from "@/hooks/use-i18n"
+import {
+  getDailyAppBlockerState,
+  requestDailyAppBlockerAuthorization,
+  setDailyAppBlockerEnabled,
+  type DailyAppBlockerState,
+} from "@/modules/daily-app-blocker"
+import { useEffect, useState } from "react"
+import { Linking } from "react-native"
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+async function loadState(
+  isActive: () => boolean,
+  fallback: string,
+  setError: (error: string | null) => void,
+  setState: (state: DailyAppBlockerState) => void
+) {
+  try {
+    const next = await getDailyAppBlockerState()
+    if (isActive()) setState(next)
+  } catch (cause) {
+    if (isActive()) setError(errorMessage(cause, fallback))
+  }
+}
+
+async function updateEnabled(
+  enabled: boolean,
+  current: DailyAppBlockerState | null,
+  fallback: string,
+  setError: (error: string | null) => void,
+  setPending: (pending: boolean) => void,
+  setState: (state: DailyAppBlockerState) => void
+) {
+  setPending(true)
+  setError(null)
+  try {
+    let next = current ?? (await getDailyAppBlockerState())
+    if (enabled && next.authorizationStatus !== "approved") {
+      next = await requestDailyAppBlockerAuthorization()
+    }
+    if (!enabled || next.authorizationStatus === "approved") {
+      next = await setDailyAppBlockerEnabled(enabled)
+    }
+    setState(next)
+  } catch (cause) {
+    setError(errorMessage(cause, fallback))
+  } finally {
+    setPending(false)
+  }
+}
+
+export function useAppBlocker() {
+  const { t } = useI18n()
+  const errorFallback = t("appBlocker.error")
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const [state, setState] = useState<DailyAppBlockerState | null>(null)
+
+  useEffect(() => {
+    let active = true
+    void loadState(() => active, errorFallback, setError, setState)
+    return () => {
+      active = false
+    }
+  }, [errorFallback])
+
+  const setEnabled = (enabled: boolean) =>
+    void updateEnabled(
+      enabled,
+      state,
+      errorFallback,
+      setError,
+      setPending,
+      setState
+    )
+
+  return {
+    authorize: () =>
+      state?.authorizationStatus === "denied"
+        ? void Linking.openSettings()
+        : setEnabled(true),
+    error,
+    onSelectionChange: ({
+      nativeEvent,
+    }: {
+      nativeEvent: { selectedCount: number }
+    }) => setEnabled(nativeEvent.selectedCount > 0),
+    pending,
+    reload: () => void loadState(() => true, errorFallback, setError, setState),
+    state,
+  }
+}
+
+export type AppBlockerController = ReturnType<typeof useAppBlocker>

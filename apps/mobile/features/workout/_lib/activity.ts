@@ -10,6 +10,7 @@ function addSession(activity: Activity, session: WorkoutSession): Activity {
   const totalAttempts = activity.totalAttempts + attempts
   const totalPushups = activity.totalPushups + validReps
   const totalActiveMs = activity.totalActiveMs + session.activeRepetitionTimeMs
+  const totalDurationMs = activity.totalDurationMs + session.totalDurationMs
   const isToday = activity.recentDays.at(-1)?.date === session.localDate
   let sessionDayReps = 0
   const recentDays = activity.recentDays.map((day) => {
@@ -27,7 +28,7 @@ function addSession(activity: Activity, session: WorkoutSession): Activity {
   return {
     ...activity,
     averageRepMs:
-      totalAttempts === 0 ? 0 : Math.round(totalActiveMs / totalAttempts),
+      totalPushups === 0 ? 0 : Math.round(totalActiveMs / totalPushups),
     bestDayReps: Math.max(activity.bestDayReps, sessionDayReps),
     bestSessionReps: Math.max(activity.bestSessionReps, validReps),
     bestStreak: Math.max(activity.bestStreak, currentStreak),
@@ -41,6 +42,7 @@ function addSession(activity: Activity, session: WorkoutSession): Activity {
     todayReps: activity.todayReps + (isToday ? validReps : 0),
     totalActiveMs,
     totalAttempts,
+    totalDurationMs,
     totalPushups,
     totalSessions: activity.totalSessions + (validReps > 0 ? 1 : 0),
     weeks: activity.weeks.map((week, index) =>

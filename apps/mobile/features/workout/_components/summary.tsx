@@ -1,19 +1,18 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes the local recap-stage handlers. */
-import {
-  FlameIcon,
-  InstagramIcon,
-  ShareNodesIcon,
-  TrophyIcon,
-  type IconProps,
-} from "@/components/icons"
-import { NumericText } from "@/components/numeric-text"
+/* eslint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- React Compiler stabilizes the local recap handlers and responsive styles. */
+import { InstagramIcon, ShareNodesIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Dialog } from "@/components/ui/dialog"
+import { DownloadIcon } from "@/components/ui/icons"
 import { Surface } from "@/components/ui/surface"
+import {
+  LevelRings,
+  TodayRepsRing,
+} from "@/features/workout/_components/daily-goal"
 import {
   PerformanceCard,
   useSharePerformance,
 } from "@/features/workout/_components/share"
+import { Streak } from "@/features/workout/_components/streak"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
 import { useRecap } from "@/features/workout/_hooks/use-recap"
 import {
@@ -25,19 +24,37 @@ import { getLevel } from "@/features/workout/_lib/gamification"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
 import { playSfx } from "@/lib/sfx"
-import { Text } from "panelui-native"
-import { useEffect, useState, type ComponentType } from "react"
-import { StyleSheet, View } from "react-native"
-import Animated, { FadeInDown, ReduceMotion } from "react-native-reanimated"
+import { useEffect, useState } from "react"
+import { StyleSheet, useWindowDimensions, View } from "react-native"
 import { useCSSVariable } from "uniwind"
+
+const DIALOG_HORIZONTAL_PADDING = 48
+const DIALOG_MAX_WIDTH = 384
+const PROGRESSION_GAP = 8
+const PROGRESSION_MAX_ITEM_SIZE = 220
+const PROGRESSION_ANIMATION_DURATION_MS = 1000
+const PROGRESSION_REVEAL_DELAY_MS = 500
+const PROGRESSION_STAGGER_MS = 250
 
 const styles = StyleSheet.create({
   action: {
     flex: 1,
     height: 60,
   },
-  progressValue: { fontSize: 36, lineHeight: 44 },
+  actionSurface: { borderCurve: "circular" },
 })
+
+function getProgressionItemSize(viewportWidth: number, itemCount: number) {
+  const contentWidth = Math.min(
+    viewportWidth - DIALOG_HORIZONTAL_PADDING,
+    DIALOG_MAX_WIDTH
+  )
+
+  return Math.min(
+    PROGRESSION_MAX_ITEM_SIZE,
+    Math.floor((contentWidth - PROGRESSION_GAP * (itemCount - 1)) / itemCount)
+  )
+}
 
 function getOpenChange(onDone: () => void) {
   return (open: boolean) => {
@@ -63,6 +80,7 @@ function RecapCard({
     : 0
   const {
     backgroundRef,
+    saveTransparent,
     shareBackground,
     shareInstagram,
     sharing,
@@ -80,7 +98,7 @@ function RecapCard({
       >
         <PerformanceCard
           backgroundRef={backgroundRef}
-          calories={getEstimatedCalories(session.attempts.length)}
+          calories={getEstimatedCalories(session.validReps)}
           session={session}
           streak={streak}
           successRate={successRate}
@@ -90,32 +108,54 @@ function RecapCard({
           <Button
             accessibilityLabel={t("share.shareBackground")}
             className="rounded-full border-0 bg-transparent"
-            disabled={sharing !== null}
+            disabled={sharing}
             onPress={shareBackground}
             size="icon"
             style={styles.action}
             variant="ghost"
           >
             <Surface
+              bordered={false}
               className="absolute inset-0 rounded-full"
               padding="none"
               pointerEvents="none"
+              style={styles.actionSurface}
             />
             <ShareNodesIcon color={foreground} size={24} />
           </Button>
           <Button
+            accessibilityLabel={t("share.saveTransparent")}
+            className="rounded-full border-0 bg-transparent"
+            disabled={sharing}
+            onPress={saveTransparent}
+            size="icon"
+            style={styles.action}
+            variant="ghost"
+          >
+            <Surface
+              bordered={false}
+              className="absolute inset-0 rounded-full"
+              padding="none"
+              pointerEvents="none"
+              style={styles.actionSurface}
+            />
+            <DownloadIcon color={foreground} size={24} />
+          </Button>
+          <Button
             accessibilityLabel="Instagram Stories"
             className="rounded-full border-0 bg-transparent"
-            disabled={sharing !== null}
+            disabled={sharing}
             onPress={shareInstagram}
             size="icon"
             style={styles.action}
             variant="ghost"
           >
             <Surface
+              bordered={false}
               className="absolute inset-0 rounded-full"
               padding="none"
               pointerEvents="none"
+              style={styles.actionSurface}
             />
             <InstagramIcon color={foreground} size={24} />
           </Button>
@@ -125,110 +165,125 @@ function RecapCard({
   )
 }
 
-function levelOf(activity: Activity, dailyGoal: number) {
+function progressionOf(activity: Activity, dailyGoal: number) {
   return getLevel({
     bestStreak: activity.bestStreak,
     dailyGoal,
     recentDays: activity.recentDays,
     totalReps: activity.totalPushups,
-  }).level
+  })
 }
 
-function ProgressionStat({
-  delay,
-  icon: Icon,
-  label,
-  value,
-}: {
-  delay: number
-  icon: ComponentType<IconProps>
-  label: string
-  value: number
-}) {
-  const foregroundValue = useCSSVariable("--color-foreground")
-  const foreground =
-    typeof foregroundValue === "string" ? foregroundValue : undefined
+function reachedDailyGoal(before: Activity, after: Activity, target: number) {
+  return before.todayReps < target && after.todayReps >= target
+}
+
+function hasProgressionAchievement(
+  before: Activity | undefined,
+  after: Activity | undefined,
+  target: number
+) {
+  if (!before || !after) return false
 
   return (
-    <Animated.View
-      className="flex-1 items-center gap-1"
-      entering={FadeInDown.duration(220)
-        .delay(delay)
-        .reduceMotion(ReduceMotion.System)}
-    >
-      <Icon color={foreground} size={22} />
-      <NumericText
-        align="center"
-        direction="up"
-        reduceMotion="system"
-        style={styles.progressValue}
-        value={value}
-      />
-      <Text className="font-mono text-xs text-muted-foreground">{label}</Text>
-    </Animated.View>
+    reachedDailyGoal(before, after, target) ||
+    after.currentStreak > before.currentStreak ||
+    progressionOf(after, target).level > progressionOf(before, target).level
   )
 }
 
-function ProgressionCard({
+export function AchievementOverlay({
   after,
   before,
   onDone,
-  session,
+  soundEnabled,
 }: {
   after: Activity
   before: Activity
   onDone: () => void
-  session: WorkoutSession
+  soundEnabled: boolean
 }) {
+  const { width } = useWindowDimensions()
   const { plan } = usePlan()
-  const { t } = useI18n()
-  const beforeLevel = levelOf(before, plan.targetReps)
-  const afterLevel = levelOf(after, plan.targetReps)
-  const levelIncreased = afterLevel > beforeLevel
+  const beforeProgression = progressionOf(before, plan.targetReps)
+  const afterProgression = progressionOf(after, plan.targetReps)
+  const goalReached = reachedDailyGoal(before, after, plan.targetReps)
+  const levelIncreased = afterProgression.level > beforeProgression.level
   const streakIncreased = after.currentStreak > before.currentStreak
-  const [revealed, setRevealed] = useState(false)
+  const [revealedItems, setRevealedItems] = useState(0)
   const handleOpenChange = getOpenChange(onDone)
+  const itemCount =
+    Number(streakIncreased) + Number(goalReached) + Number(levelIncreased)
+  const lowerItemCount = Number(goalReached) + Number(levelIncreased)
+  const streakRevealed = revealedItems > 0
+  const goalRevealed = revealedItems > Number(streakIncreased)
+  const levelRevealed =
+    revealedItems > Number(streakIncreased) + Number(goalReached)
+  const progression = levelRevealed ? afterProgression : beforeProgression
+  const todayReps = goalRevealed ? after.todayReps : before.todayReps
+  const itemSize = getProgressionItemSize(
+    width,
+    Math.max(Number(streakIncreased), lowerItemCount)
+  )
+  const itemStyle = { height: itemSize, width: itemSize }
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setRevealed(true)
-      if (levelIncreased) playSfx("achievement", session.soundEnabled)
-    }, 240)
+    playSfx("achievement", soundEnabled)
 
-    return () => clearTimeout(timeout)
-  }, [levelIncreased, session.soundEnabled])
+    const timeouts = Array.from({ length: itemCount }, (_, index) =>
+      setTimeout(
+        () => setRevealedItems(index + 1),
+        PROGRESSION_REVEAL_DELAY_MS + index * PROGRESSION_STAGGER_MS
+      )
+    )
+
+    return () => timeouts.forEach(clearTimeout)
+  }, [itemCount, soundEnabled])
 
   return (
     <Dialog open onOpenChange={handleOpenChange}>
       <Dialog.Content
-        accessibilityLabel={t("session.backToday")}
         blur
-        className="gap-3 border-0 bg-transparent p-0 shadow-none"
+        className="border-0 bg-transparent p-0 shadow-none"
         dismissSfx={false}
       >
-        <Surface className="w-full" elevated padding="lg">
-          <View className="w-full flex-row gap-4">
-            {streakIncreased ? (
-              <ProgressionStat
-                delay={80}
-                icon={FlameIcon}
-                label={t("common.streak")}
-                value={revealed ? after.currentStreak : before.currentStreak}
+        <View className="w-full items-center gap-2">
+          {streakIncreased ? (
+            <View className="items-center justify-center" style={itemStyle}>
+              <Streak
+                animationDuration={PROGRESSION_ANIMATION_DURATION_MS}
+                days={
+                  streakRevealed ? after.currentStreak : before.currentStreak
+                }
+                size={itemSize}
               />
-            ) : null}
-            {levelIncreased ? (
-              <ProgressionStat
-                delay={160}
-                icon={TrophyIcon}
-                label={t("today.level", { level: "" }).trim()}
-                value={revealed ? afterLevel : beforeLevel}
-              />
-            ) : null}
-          </View>
-        </Surface>
-        <Button className="rounded-full" onPress={onDone} size="lg">
-          {t("session.backToday")}
-        </Button>
+            </View>
+          ) : null}
+          {lowerItemCount > 0 ? (
+            <View className="w-full flex-row items-center justify-center gap-2">
+              {goalReached ? (
+                <View className="items-center justify-center" style={itemStyle}>
+                  <TodayRepsRing
+                    animationDuration={PROGRESSION_ANIMATION_DURATION_MS}
+                    reps={todayReps}
+                    size={itemSize}
+                    target={plan.targetReps}
+                  />
+                </View>
+              ) : null}
+              {levelIncreased ? (
+                <View className="items-center justify-center" style={itemStyle}>
+                  <LevelRings
+                    animationDuration={PROGRESSION_ANIMATION_DURATION_MS}
+                    level={progression.level}
+                    milestones={progression.milestones}
+                    size={itemSize}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </Dialog.Content>
     </Dialog>
   )
@@ -250,11 +305,11 @@ function RecapFlow({
   const { plan } = usePlan()
   const [stage, setStage] = useState<"progression" | "share">("share")
   const after = getActivityAfterSession(before, activity, session)
-  const hasAchievement =
-    before &&
-    after &&
-    (after.currentStreak > before.currentStreak ||
-      levelOf(after, plan.targetReps) > levelOf(before, plan.targetReps))
+  const hasAchievement = hasProgressionAchievement(
+    before,
+    after,
+    plan.targetReps
+  )
   const finish = () => (after ? onReveal(after) : onSettle())
   const finishShare = () => {
     if (
@@ -276,11 +331,11 @@ function RecapFlow({
       streak={after?.currentStreak ?? before?.currentStreak ?? 0}
     />
   ) : before && after ? (
-    <ProgressionCard
+    <AchievementOverlay
       after={after}
       before={before}
       onDone={finish}
-      session={session}
+      soundEnabled={session.soundEnabled}
     />
   ) : null
 }

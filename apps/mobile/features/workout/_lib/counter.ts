@@ -6,11 +6,13 @@ import {
 } from "./trace.ts"
 
 export const COUNTER_THRESHOLDS = {
-  bottom: 1.35,
-  leaveTop: 1.12,
-  recoveryMaxTrackingGapMs: 750,
-  returnTop: 1.08,
+  bottomMeters: 0.3,
+  topMaximumMeters: 0.7,
 } as const
+
+const DEPTH_GLOW_MINIMUM_METERS = 0.25
+const DEPTH_GLOW_MAXIMUM_METERS = 0.35
+const DEPTH_GLOW_LOG_STRENGTH = 9
 
 export type FailureReason =
   | "incomplete_return"
@@ -19,23 +21,21 @@ export type FailureReason =
 
 export type WorkoutAttempt = {
   depthTrace?: number[]
+  depthTraceOffsetsMs?: number[]
   durationMs: number
   failureReasons: FailureReason[]
   startedAtOffsetMs: number
   valid: boolean
 }
 
-type ActiveAttempt = MotionTrace & {
-  maxTrackingGapMs: number
-  poseVerified: boolean
-  reachedBottom: boolean
+type TracedAttempt = MotionTrace & {
   startedAtOffsetMs: number
-  trackingLostAtOffsetMs: number | null
 }
 
 export type CounterState = {
-  activeAttempt: ActiveAttempt | null
+  activeAttempt: TracedAttempt | null
   attempts: WorkoutAttempt[]
+  topPosition: TracedAttempt | null
   validReps: number
 }
 
@@ -44,133 +44,170 @@ export type CounterEvent =
   | { attempt: WorkoutAttempt; type: "attempt-completed" }
 
 export function createCounterState(): CounterState {
-  return { activeAttempt: null, attempts: [], validReps: 0 }
-}
-
-export function getPushupDepthProgress(depthRatio: number) {
-  const progress =
-    (depthRatio - COUNTER_THRESHOLDS.returnTop) /
-    (COUNTER_THRESHOLDS.bottom - COUNTER_THRESHOLDS.returnTop)
-
-  return Math.max(0, Math.min(1, progress))
-}
-
-export function recordTrackingLoss(
-  state: CounterState,
-  lastTrackingAtOffsetMs: number
-): CounterState {
-  if (!state.activeAttempt) return state
-
   return {
-    ...state,
-    activeAttempt: {
-      ...state.activeAttempt,
-      trackingLostAtOffsetMs:
-        state.activeAttempt.trackingLostAtOffsetMs ?? lastTrackingAtOffsetMs,
-    },
+    activeAttempt: null,
+    attempts: [],
+    topPosition: null,
+    validReps: 0,
   }
 }
 
-function closeTrackingGap(attempt: ActiveAttempt, elapsedMs: number) {
-  if (attempt.trackingLostAtOffsetMs === null) return attempt
+export function getDepthGlowProgress(depthMeters: number) {
+  const linearProgress = Math.max(
+    0,
+    Math.min(
+      1,
+      (DEPTH_GLOW_MAXIMUM_METERS - depthMeters) /
+        (DEPTH_GLOW_MAXIMUM_METERS - DEPTH_GLOW_MINIMUM_METERS)
+    )
+  )
 
-  return {
-    ...attempt,
-    maxTrackingGapMs: Math.max(
-      attempt.maxTrackingGapMs,
-      elapsedMs - attempt.trackingLostAtOffsetMs
-    ),
-    trackingLostAtOffsetMs: null,
-  }
+  return (
+    Math.log1p(linearProgress * DEPTH_GLOW_LOG_STRENGTH) /
+    Math.log1p(DEPTH_GLOW_LOG_STRENGTH)
+  )
 }
 
-function createFailureReasons(attempt: ActiveAttempt): FailureReason[] {
-  const reasons: FailureReason[] = []
-
-  if (!attempt.reachedBottom) {
-    reasons.push("insufficient_depth")
-  }
-
-  if (
-    !attempt.poseVerified ||
-    attempt.maxTrackingGapMs > COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
-  ) {
-    reasons.push("tracking_lost")
-  }
-
-  return reasons
+function isTopPosition(depthMeters: number, poseVerified: boolean) {
+  return (
+    poseVerified &&
+    depthMeters >= COUNTER_THRESHOLDS.bottomMeters &&
+    depthMeters <= COUNTER_THRESHOLDS.topMaximumMeters
+  )
 }
 
-export function processDepthRatio(
+export function processDepthMeters(
   state: CounterState,
-  depthRatio: number,
+  depthMeters: number,
   elapsedMs: number,
   poseVerified: boolean
 ): { event: CounterEvent; state: CounterState } {
-  const depthOffset = depthRatio - COUNTER_THRESHOLDS.bottom
+  const topPosition = isTopPosition(depthMeters, poseVerified)
 
-  if (!state.activeAttempt) {
-    if (depthRatio < COUNTER_THRESHOLDS.leaveTop) {
-      return { event: { type: "none" }, state }
+  if (state.activeAttempt) {
+    const activeAttempt = {
+      ...state.activeAttempt,
+      ...sampleTrace(state.activeAttempt, depthMeters, elapsedMs),
     }
+
+    if (!topPosition) {
+      return {
+        event: { type: "none" },
+        state: { ...state, activeAttempt },
+      }
+    }
+
+    const trace = closeTrace(activeAttempt, depthMeters, elapsedMs)
+    const attempt = {
+      depthTrace: trace.depthTrace,
+      depthTraceOffsetsMs: trace.depthTraceOffsetsMs,
+      durationMs: Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs),
+      failureReasons: [],
+      startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
+      valid: true,
+    } satisfies WorkoutAttempt
+
+    return {
+      event: { attempt, type: "attempt-completed" },
+      state: {
+        activeAttempt: null,
+        attempts: [...state.attempts, attempt],
+        topPosition: {
+          ...startTrace(depthMeters, elapsedMs),
+          startedAtOffsetMs: elapsedMs,
+        },
+        validReps: state.validReps + 1,
+      },
+    }
+  }
+
+  if (topPosition) {
+    const trace = state.topPosition
+      ? sampleTrace(state.topPosition, depthMeters, elapsedMs)
+      : startTrace(depthMeters, elapsedMs)
 
     return {
       event: { type: "none" },
       state: {
         ...state,
-        activeAttempt: {
-          maxTrackingGapMs: 0,
-          poseVerified,
-          reachedBottom: depthRatio >= COUNTER_THRESHOLDS.bottom,
-          startedAtOffsetMs: elapsedMs,
-          trackingLostAtOffsetMs: null,
-          ...startTrace(depthOffset, elapsedMs),
+        topPosition: {
+          ...trace,
+          startedAtOffsetMs: state.topPosition?.startedAtOffsetMs ?? elapsedMs,
         },
       },
     }
   }
 
-  const gapClosed = closeTrackingGap(state.activeAttempt, elapsedMs)
-  const traced = {
-    ...gapClosed,
-    ...sampleTrace(gapClosed, depthOffset, elapsedMs),
-  }
-  const activeAttempt = {
-    ...traced,
-    poseVerified: traced.poseVerified || poseVerified,
-    reachedBottom:
-      traced.reachedBottom || depthRatio >= COUNTER_THRESHOLDS.bottom,
-  }
+  if (state.topPosition === null) return { event: { type: "none" }, state }
 
-  if (depthRatio > COUNTER_THRESHOLDS.returnTop) {
+  const trace = sampleTrace(state.topPosition, depthMeters, elapsedMs)
+
+  if (depthMeters >= COUNTER_THRESHOLDS.bottomMeters) {
     return {
       event: { type: "none" },
-      state: { ...state, activeAttempt },
+      state: { ...state, topPosition: { ...state.topPosition, ...trace } },
     }
   }
 
-  const durationMs = Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs)
-  const failureReasons = createFailureReasons(activeAttempt)
-  const attempt = {
-    depthTrace: closeTrace(activeAttempt, depthOffset, elapsedMs),
-    durationMs,
-    failureReasons,
-    startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
-    valid: failureReasons.length === 0,
-  } satisfies WorkoutAttempt
-
   return {
-    event: { attempt, type: "attempt-completed" },
+    event: { type: "none" },
     state: {
-      activeAttempt: null,
-      attempts: [...state.attempts, attempt],
-      validReps: state.validReps + (attempt.valid ? 1 : 0),
+      ...state,
+      activeAttempt: {
+        ...state.topPosition,
+        ...trace,
+      },
+      topPosition: null,
     },
   }
 }
 
 export function abandonActiveAttempt(state: CounterState): CounterState {
-  return { ...state, activeAttempt: null }
+  return { ...state, activeAttempt: null, topPosition: null }
+}
+
+export function recordTrailingDepth(
+  state: CounterState,
+  depthMeters: number,
+  elapsedMs: number
+): CounterState {
+  const attempt = state.attempts.at(-1)
+  const depthTrace = attempt?.depthTrace
+  const depthTraceOffsetsMs = attempt?.depthTraceOffsetsMs
+  const tracedAtOffsetMs = depthTraceOffsetsMs?.at(-1)
+
+  if (
+    !attempt ||
+    !depthTrace ||
+    !depthTraceOffsetsMs ||
+    tracedAtOffsetMs == null
+  ) {
+    return state
+  }
+
+  const trace = sampleTrace(
+    { depthTrace, depthTraceOffsetsMs, tracedAtOffsetMs },
+    depthMeters,
+    elapsedMs
+  )
+
+  if (trace.tracedAtOffsetMs === tracedAtOffsetMs) return state
+
+  return {
+    ...state,
+    attempts: [
+      ...state.attempts.slice(0, -1),
+      {
+        ...attempt,
+        depthTrace: trace.depthTrace,
+        depthTraceOffsetsMs: trace.depthTraceOffsetsMs,
+        durationMs: Math.max(
+          attempt.durationMs,
+          elapsedMs - attempt.startedAtOffsetMs
+        ),
+      },
+    ],
+  }
 }
 
 export function finishActiveAttempt(
@@ -179,30 +216,19 @@ export function finishActiveAttempt(
 ): CounterState {
   if (!state.activeAttempt) return state
 
-  const activeAttempt = closeTrackingGap(state.activeAttempt, elapsedMs)
-  const failureReasons: FailureReason[] = [
-    activeAttempt.reachedBottom ? "incomplete_return" : "insufficient_depth",
-  ]
-
-  if (
-    !activeAttempt.poseVerified ||
-    activeAttempt.maxTrackingGapMs > COUNTER_THRESHOLDS.recoveryMaxTrackingGapMs
-  ) {
-    failureReasons.push("tracking_lost")
-  }
+  const attempt = {
+    depthTrace: state.activeAttempt.depthTrace,
+    depthTraceOffsetsMs: state.activeAttempt.depthTraceOffsetsMs,
+    durationMs: Math.max(0, elapsedMs - state.activeAttempt.startedAtOffsetMs),
+    failureReasons: ["incomplete_return"],
+    startedAtOffsetMs: state.activeAttempt.startedAtOffsetMs,
+    valid: false,
+  } satisfies WorkoutAttempt
 
   return {
     activeAttempt: null,
-    attempts: [
-      ...state.attempts,
-      {
-        depthTrace: activeAttempt.depthTrace,
-        durationMs: Math.max(0, elapsedMs - activeAttempt.startedAtOffsetMs),
-        failureReasons,
-        startedAtOffsetMs: activeAttempt.startedAtOffsetMs,
-        valid: false,
-      },
-    ],
+    attempts: [...state.attempts, attempt],
+    topPosition: null,
     validReps: state.validReps,
   }
 }

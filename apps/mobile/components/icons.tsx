@@ -51,6 +51,10 @@ export const EyeIcon = withPanelColor(Lucide.EyeIcon)
 export const FlameIcon = withPanelColor(Lucide.FlameIcon)
 export const InfoIcon = withPanelColor(Lucide.InfoIcon)
 export const LockIcon = withPanelColor(Lucide.LockIcon)
+const ThemedLogOutIcon = withPanelColor(Lucide.LogOutIcon)
+export function LogOutIcon(props: IconProps) {
+  return <ThemedLogOutIcon {...props} />
+}
 export const MenuIcon = withPanelColor(Lucide.MenuIcon)
 export const MessageCircleIcon = withPanelColor(Lucide.MessageCircleIcon)
 export const SolidMessageCircleIcon = withPanelColor(

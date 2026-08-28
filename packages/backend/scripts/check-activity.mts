@@ -5,8 +5,15 @@ const session = (
   localDate: string,
   validReps: number,
   invalidReps = 0,
-  activeRepetitionTimeMs = validReps * 2000
-) => ({ activeRepetitionTimeMs, invalidReps, localDate, validReps })
+  activeRepetitionTimeMs = validReps * 2000,
+  totalDurationMs = activeRepetitionTimeMs + 1000
+) => ({
+  activeRepetitionTimeMs,
+  invalidReps,
+  localDate,
+  totalDurationMs,
+  validReps,
+})
 
 const summary = summarizeActivity(
   [
@@ -30,8 +37,9 @@ assert.equal(summary.bestDayReps, 10)
 assert.equal(summary.bestSessionReps, 10)
 assert.equal(summary.todayAttempts, 0)
 assert.equal(summary.todayReps, 0)
-assert.equal(summary.averageRepMs, 1800)
+assert.equal(summary.averageRepMs, 2000)
 assert.equal(summary.totalActiveMs, 36_000)
+assert.equal(summary.totalDurationMs, 41_000)
 assert.deepEqual(summary.recentDays.at(-1), { date: "2026-08-15", reps: 0 })
 assert.deepEqual(summary.weeks, [{ reps: 18, start: "2026-08-09" }])
 
@@ -41,6 +49,7 @@ assert.equal(empty.successRate, 0)
 assert.equal(empty.averageRepMs, 0)
 assert.equal(empty.bestDayReps, 0)
 assert.equal(empty.currentStreak, 0)
+assert.equal(empty.totalDurationMs, 0)
 
 const today = summarizeActivity([session("2026-08-15", 4, 2)], "2026-08-15", 7)
 assert.equal(today.todayAttempts, 6)

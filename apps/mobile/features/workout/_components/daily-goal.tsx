@@ -1,4 +1,6 @@
+/* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop -- React Compiler stabilizes derived chart data and responsive styles. */
 import { NumericText } from "@/components/numeric-text"
+import { useDelayedValue } from "@/features/workout/_hooks/use-delayed-value"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
 import type { Activity } from "@/features/workout/_lib/activity"
 import {
@@ -15,15 +17,10 @@ import {
   type RingChartHandle,
   type RingDatum,
 } from "panelui-native"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { StyleSheet, View } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
-import {
-  createAnimatedComponent,
-  FadeInDown,
-  ReduceMotion,
-  useSharedValue,
-} from "react-native-reanimated"
+import { useSharedValue } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 import { useCSSVariable } from "uniwind"
 
@@ -34,18 +31,18 @@ const MILESTONE_RING_GAP = 4
 const MILESTONE_HOLD_MS = 180
 /** Past this a tick per rep is thinner than the gap between ticks. */
 const COUNTABLE_REPS = 30
-const AnimatedText = createAnimatedComponent(Text)
-const VALUE_ENTERING = FadeInDown.duration(240)
-  .withInitialValues({ opacity: 0, transform: [{ translateY: 4 }] })
-  .reduceMotion(ReduceMotion.System)
 const styles = StyleSheet.create({
   centerNumber: {
     fontSize: 40,
     lineHeight: 52,
+    transform: [{ translateY: -3 }, { translateX: 2 }],
   },
-  centerTarget: { fontSize: 16 },
-  levelNumber: { fontSize: 32, lineHeight: 40 },
-  ringGesture: { height: RING_SIZE, width: RING_SIZE },
+  centerTarget: { fontSize: 16, transform: [{ translateY: 6 }] },
+  levelNumber: {
+    fontSize: 32,
+    lineHeight: 40,
+    transform: [{ translateY: -2 }],
+  },
 })
 
 function useThemeColor(name: string) {
@@ -53,51 +50,55 @@ function useThemeColor(name: string) {
   return typeof value === "string" ? value : undefined
 }
 
-function GoalRing({
-  done,
+export function TodayRepsRing({
+  animationDuration,
   reps,
+  size = RING_SIZE,
   target,
 }: {
-  done: boolean
+  animationDuration?: number
   reps: number
+  size?: number
   target: number
 }) {
   const { formatNumber, t } = useI18n()
   const primary = useThemeColor("--color-primary")
   const success = useThemeColor("--color-success")
+  const done = reps >= target
   const color = done ? success : primary
   const label = t("plan.dailyGoal")
   const ringRef = useRef<RingChartHandle>(null)
-  const data = useMemo(
-    () => [{ label, maxValue: target, value: reps }],
-    [label, reps, target]
-  )
+  const data = [{ label, maxValue: target, value: reps }]
+  const scale = size / RING_SIZE
+  const centerStyle = { transform: [{ scale: Math.max(1, scale) }] }
 
   useEffect(() => ringRef.current?.replay(), [reps])
 
-  const renderCenter = useCallback(
-    () => (
-      <View className="items-center">
-        <AnimatedText
+  const renderCenter = () => (
+    <View className="items-center" style={centerStyle}>
+      <View className="flex-row items-center">
+        <NumericText
+          align="end"
+          animationDuration={animationDuration}
           className="font-heading text-foreground"
-          entering={VALUE_ENTERING}
-          key={reps}
+          direction="up"
+          layoutStyle={styles.centerNumber}
+          layoutText={formatNumber(reps)}
+          reduceMotion="system"
           style={styles.centerNumber}
+          value={reps}
+        />
+        <Text
+          className="font-heading text-muted-foreground"
+          style={styles.centerTarget}
         >
-          {formatNumber(reps)}
-          <Text
-            className="font-heading text-muted-foreground"
-            style={styles.centerTarget}
-          >
-            {` /${formatNumber(target)}`}
-          </Text>
-        </AnimatedText>
-        <Text className="-mt-2 font-heading text-[10px] leading-3 tracking-[1px] text-muted-foreground">
-          {t("common.reps").toLocaleLowerCase()}
+          {` /${formatNumber(target)}`}
         </Text>
       </View>
-    ),
-    [formatNumber, reps, t, target]
+      <Text className="-mt-2 font-heading text-[10px] leading-3 tracking-[1px] text-muted-foreground">
+        {t("common.reps").toLocaleLowerCase()}
+      </Text>
+    </View>
   )
 
   return (
@@ -110,11 +111,12 @@ function GoalRing({
               percent: Math.round((reps / Math.max(1, target)) * 100),
             })
       }
-      className="w-36"
       data={data}
+      animationDuration={animationDuration}
       ref={ringRef}
-      size={RING_SIZE}
-      strokeWidth={RING_STROKE}
+      size={size}
+      strokeWidth={RING_STROKE * scale}
+      style={{ width: size }}
     >
       <RingChart.Ring
         color={color}
@@ -126,42 +128,53 @@ function GoalRing({
   )
 }
 
-function MilestoneRings({
+export function LevelRings({
+  animationDuration,
   level,
   milestones,
+  size = RING_SIZE,
 }: {
+  animationDuration?: number
   level: number
   milestones: LevelMilestone[]
+  size?: number
 }) {
   const { t } = useI18n()
   const isDark = useColorScheme() === "dark"
   const [activeIndex, setActiveIndex] = useState(-1)
   const lastIndex = useSharedValue(-1)
-  const data = useMemo(
-    () =>
-      milestones.map(({ label, target, value }) => ({
-        label,
-        maxValue: target,
-        value,
-      })),
-    [milestones]
-  )
-  const renderCenter = useCallback(
-    (ring: RingDatum | null) =>
-      ring ? (
+  const ringRef = useRef<RingChartHandle>(null)
+  const scale = size / RING_SIZE
+  const centerStyle = { transform: [{ scale: Math.max(1, scale) }] }
+  const ringGap = MILESTONE_RING_GAP * scale
+  const strokeWidth = MILESTONE_RING_STROKE * scale
+  const data = milestones.map(({ label, target, value }) => ({
+    label,
+    maxValue: target,
+    value,
+  }))
+  const renderCenter = (ring: RingDatum | null) =>
+    ring ? (
+      <View className="items-center" style={centerStyle}>
         <Text className="text-center font-heading text-xs text-foreground">
           {ring.label}
         </Text>
-      ) : (
-        <View className="items-center">
-          <NumericText style={styles.levelNumber} value={level} />
-          <Text className="-mt-2 font-heading text-[10px] leading-3 tracking-[1px] text-muted-foreground">
-            {t("today.level", { level: "" }).trim().toLocaleLowerCase()}
-          </Text>
-        </View>
-      ),
-    [level, t]
-  )
+      </View>
+    ) : (
+      <View className="items-center" style={centerStyle}>
+        <NumericText
+          align="center"
+          animationDuration={animationDuration}
+          direction="up"
+          reduceMotion="system"
+          style={styles.levelNumber}
+          value={level}
+        />
+        <Text className="-mt-2 font-heading text-[10px] leading-3 tracking-[1px] text-muted-foreground">
+          {t("today.level", { level: "" }).trim().toLocaleLowerCase()}
+        </Text>
+      </View>
+    )
   const focus = (index: number) => {
     setActiveIndex(index)
     selectionTick()
@@ -169,15 +182,13 @@ function MilestoneRings({
   const clear = () => setActiveIndex(-1)
   const focusAt = (x: number, y: number) => {
     "worklet"
-    const radius = RING_SIZE / 2 - MILESTONE_RING_STROKE / 2
-    const distance = Math.hypot(x - RING_SIZE / 2, y - RING_SIZE / 2)
+    const radius = size / 2 - strokeWidth / 2
+    const distance = Math.hypot(x - size / 2, y - size / 2)
     const index = Math.max(
       0,
       Math.min(
         milestones.length - 1,
-        Math.round(
-          (radius - distance) / (MILESTONE_RING_STROKE + MILESTONE_RING_GAP)
-        )
+        Math.round((radius - distance) / (strokeWidth + ringGap))
       )
     )
     if (index === lastIndex.value) return
@@ -202,21 +213,27 @@ function MilestoneRings({
       scheduleOnRN(clear)
     })
 
+  useEffect(() => {
+    if (animationDuration) ringRef.current?.replay()
+  }, [animationDuration, level])
+
   if (milestones.length === 0) {
     return null
   }
 
   return (
     <GestureDetector gesture={gesture}>
-      <View collapsable={false} style={styles.ringGesture}>
+      <View collapsable={false} style={{ height: size, width: size }}>
         <RingChart
           accessibilityLabel={t("today.level", { level })}
           activeIndex={activeIndex}
-          className="w-36"
+          animationDuration={animationDuration}
           data={data}
-          ringGap={MILESTONE_RING_GAP}
-          size={RING_SIZE}
-          strokeWidth={MILESTONE_RING_STROKE}
+          ref={ringRef}
+          ringGap={ringGap}
+          size={size}
+          strokeWidth={strokeWidth}
+          style={{ width: size }}
         >
           <RingChart.Ring colorIndex={isDark ? 1 : 2} index={0} />
           <RingChart.Ring colorIndex={isDark ? 2 : 3} index={1} />
@@ -228,16 +245,26 @@ function MilestoneRings({
   )
 }
 
-export function DailyGoal({ activity }: { activity: Activity | undefined }) {
+export function DailyGoal({
+  activity,
+  animationDuration,
+  levelUpdateDelay = 0,
+  repsUpdateDelay = 0,
+}: {
+  activity: Activity | undefined
+  animationDuration?: number
+  levelUpdateDelay?: number
+  repsUpdateDelay?: number
+}) {
   const { plan } = usePlan()
-  const target = plan.targetReps
-  const reps = activity?.todayReps ?? 0
-  const done = reps >= target
+  const target = 90
+  const reps = useDelayedValue(activity?.todayReps ?? 0, repsUpdateDelay)
+  const levelActivity = useDelayedValue(activity, levelUpdateDelay)
   const { level, milestones } = getLevel({
-    bestStreak: activity?.bestStreak ?? 0,
+    bestStreak: levelActivity?.bestStreak ?? 0,
     dailyGoal: target,
-    recentDays: activity?.recentDays ?? [],
-    totalReps: activity?.totalPushups ?? 0,
+    recentDays: levelActivity?.recentDays ?? [],
+    totalReps: levelActivity?.totalPushups ?? 0,
   })
 
   return (
@@ -246,13 +273,21 @@ export function DailyGoal({ activity }: { activity: Activity | undefined }) {
         className="items-center justify-end overflow-visible"
         variant="plain"
       >
-        <GoalRing done={done} reps={reps} target={target} />
+        <TodayRepsRing
+          animationDuration={animationDuration}
+          reps={reps}
+          target={target}
+        />
       </GridItem>
       <GridItem
         className="items-center justify-end overflow-visible"
         variant="plain"
       >
-        <MilestoneRings level={level} milestones={milestones} />
+        <LevelRings
+          animationDuration={animationDuration}
+          level={level}
+          milestones={milestones}
+        />
       </GridItem>
     </GridItem.Group>
   )

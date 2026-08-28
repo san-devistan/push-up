@@ -9,6 +9,7 @@ import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
 import { formatNumber, translate, type Language } from "@/lib/i18n"
+import * as MediaLibrary from "expo-media-library"
 import * as Sharing from "expo-sharing"
 import { Text } from "panelui-native"
 import { useRef, useState } from "react"
@@ -266,6 +267,40 @@ async function sharePerformanceCard(
   }
 }
 
+async function saveTransparentCard(
+  card: View | null,
+  session: WorkoutSession,
+  language: Language
+) {
+  const permission = await MediaLibrary.requestPermissionsAsync(true, ["photo"])
+
+  if (!permission.granted) {
+    Alert.alert(
+      translate(language, "share.photosTitle"),
+      translate(language, "share.photosBody")
+    )
+    return
+  }
+
+  const captureUri = await capturePerformanceCard(
+    card,
+    session,
+    "-transparent",
+    language
+  )
+
+  try {
+    await MediaLibrary.Asset.create(captureUri)
+  } finally {
+    releaseCapture(captureUri)
+  }
+
+  Alert.alert(
+    translate(language, "share.pngTitle"),
+    translate(language, "share.pngBody")
+  )
+}
+
 async function shareInstagramStory(
   card: View | null,
   appId: string,
@@ -288,33 +323,26 @@ async function shareInstagramStory(
   })
 }
 
-type ShareTarget = "background" | "instagram"
-
 export function useSharePerformance(
   session: WorkoutSession,
   successRate: number
 ) {
   const { language, t } = useI18n()
   const backgroundRef = useRef<View>(null)
-  const [sharing, setSharing] = useState<ShareTarget | null>(null)
+  const [sharing, setSharing] = useState(false)
   const transparentRef = useRef<View>(null)
 
-  function run(
-    target: ShareTarget,
-    action: () => Promise<void>,
-    errorTitle: string
-  ) {
+  function run(action: () => Promise<void>, errorTitle: string) {
     if (sharing) return
 
-    setSharing(target)
+    setSharing(true)
     void action()
       .catch(() => Alert.alert(errorTitle, t("share.tryAgain")))
-      .finally(() => setSharing(null))
+      .finally(() => setSharing(false))
   }
 
   function shareBackground() {
     run(
-      "background",
       () =>
         sharePerformanceCard(
           backgroundRef.current,
@@ -323,6 +351,13 @@ export function useSharePerformance(
           language
         ),
       t("share.couldNotShare")
+    )
+  }
+
+  function saveTransparent() {
+    run(
+      () => saveTransparentCard(transparentRef.current, session, language),
+      t("share.couldNotSave")
     )
   }
 
@@ -335,7 +370,6 @@ export function useSharePerformance(
     }
 
     run(
-      "instagram",
       () => shareInstagramStory(transparentRef.current, appId, language),
       t("share.couldNotShare")
     )
@@ -343,6 +377,7 @@ export function useSharePerformance(
 
   return {
     backgroundRef,
+    saveTransparent,
     shareBackground,
     shareInstagram,
     sharing,

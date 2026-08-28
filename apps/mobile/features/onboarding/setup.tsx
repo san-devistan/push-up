@@ -4,6 +4,7 @@ import { NumericText } from "@/components/numeric-text"
 import { SpeechBubble } from "@/components/speech-bubble"
 import { Button } from "@/components/ui/button"
 import TrackingIllustration from "@/features/onboarding/_components/tracking-illustration"
+import AppBlockerStep from "@/features/onboarding/app-blocker"
 import ScheduleStep from "@/features/onboarding/schedule"
 import { completeOnboarding } from "@/features/onboarding/storage"
 import WorkoutAvatar from "@/features/workout/_components/avatar"
@@ -31,7 +32,8 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
-const STEP_COUNT = 4
+const HAS_APP_BLOCKER_STEP = process.env.EXPO_OS === "ios"
+const STEP_COUNT = HAS_APP_BLOCKER_STEP ? 5 : 4
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 const styles = StyleSheet.create({
   accountHeroAvatar: {
@@ -243,6 +245,10 @@ function StepContent({ onNext, step }: { onNext: () => void; step: number }) {
     return <CameraStep />
   }
 
+  if (HAS_APP_BLOCKER_STEP && step === 3) {
+    return <AppBlockerStep />
+  }
+
   return <ScheduleStep />
 }
 
@@ -267,6 +273,8 @@ export default function OnboardingSetup() {
   const [step, setStep] = useState(0)
   const next = getNext(router, step, setStep)
   const action = step === STEP_COUNT - 1 ? "start training." : "next."
+  const scrollEnabled =
+    step < STEP_COUNT - 1 && !(HAS_APP_BLOCKER_STEP && step === 3)
 
   return (
     <View style={styles.screen}>
@@ -275,7 +283,7 @@ export default function OnboardingSetup() {
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
-          scrollEnabled={step < STEP_COUNT - 1}
+          scrollEnabled={scrollEnabled}
         >
           <ProgressRail step={step} />
           <Animated.View

@@ -7,10 +7,16 @@
     "development": {
       "autoIncrement": true,
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_META_APP_ID": "1565443168652464"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_META_APP_ID": "1565443168652464"
+      }
     }
   }
 }

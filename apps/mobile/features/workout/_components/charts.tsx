@@ -1,6 +1,10 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- React Compiler stabilizes chart props. */
 
-import { BarChart, type BarChartDatum } from "@/components/ui/bar-chart"
+import {
+  BarChart,
+  type BarChartDatum,
+  type BarChartHandle,
+} from "@/components/ui/bar-chart"
 import {
   HeatmapChart,
   buildHeatmapCalendar,
@@ -14,7 +18,7 @@ import { DEMO_DATA } from "@/features/workout/_lib/demo"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
 import { selectionTick } from "@/lib/haptics"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import { ScrollView, View } from "react-native"
 
 const HEATMAP_WEEK_START = 1
@@ -64,13 +68,23 @@ function getDateLabel(
   return formatActivityDate(dateKey, locale)
 }
 
-export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
+export function DailyColumns({
+  animationDuration,
+  days,
+}: {
+  animationDuration?: number
+  days: readonly ActivityDay[]
+}) {
   const { formatNumber, locale, t } = useI18n()
+  const chartRef = useRef<BarChartHandle>(null)
   const data = days.map((day) => ({
     date: day.date,
     label: getShortDay(day.date, locale),
     reps: day.reps,
   }))
+  const totalReps = days.reduce((total, day) => total + day.reps, 0)
+
+  useEffect(() => chartRef.current?.replay(), [totalReps])
 
   const labelDatum = (datum: BarChartDatum) => {
     const reps = Number(datum.reps ?? 0)
@@ -84,11 +98,13 @@ export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
       <BarChart
         accessibilityLabel={t("today.activity")}
         accessibilityLabelForDatum={labelDatum}
+        animationDuration={animationDuration}
         aspectRatio={2.5}
         data={data}
         minBarLength={2}
         onAccessibilityDatumPress={selectionTick}
         onActiveIndexChange={hapticBarSelection}
+        ref={chartRef}
         xDataKey="label"
       >
         <BarChart.Grid opacity={0.45} rows={3} />
@@ -107,9 +123,11 @@ export function DailyColumns({ days }: { days: readonly ActivityDay[] }) {
 }
 
 export function ActivityHeatmap({
+  animationDuration,
   recentDays,
   today,
 }: {
+  animationDuration?: number
   recentDays: readonly ActivityDay[]
   today: number
 }) {
@@ -120,6 +138,7 @@ export function ActivityHeatmap({
     count: day.reps,
     date: parseActivityDate(day.date),
   }))
+  const totalReps = recentDays.reduce((total, day) => total + day.reps, 0)
   const weeks = buildHeatmapCalendar(entries, {
     end: new Date(today),
     start: entries[0]?.date,
@@ -144,11 +163,13 @@ export function ActivityHeatmap({
     <HeatmapChart
       accessibilityLabel={t("today.activity")}
       accessibilityLabelForDatum={labelCell}
+      animationDuration={animationDuration}
       className={DEMO_DATA ? "w-[428px]" : undefined}
       color="--color-chart-3"
       data={weeks}
       emptyColor="--color-foreground"
       gap={4}
+      key={totalReps}
       layout={DEMO_DATA ? "fluid" : "fill"}
       levelOpacity={
         colorScheme === "dark" ? DARK_HEATMAP_OPACITY : LIGHT_HEATMAP_OPACITY

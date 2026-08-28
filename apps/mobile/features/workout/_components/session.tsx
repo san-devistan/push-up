@@ -23,8 +23,11 @@ import { Text } from "panelui-native"
 import { useEffect } from "react"
 import { StyleSheet, View } from "react-native"
 import Animated, {
+  FadeIn,
   FadeInDown,
+  FadeOut,
   FadeOutUp,
+  ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -34,7 +37,6 @@ import { SafeAreaView } from "react-native-safe-area-context"
 
 import WorkoutAvatar from "./avatar"
 import { ActiveScore } from "./score"
-import SetupGuide from "./setup-guide"
 import { StopControl } from "./stop-control"
 
 const TOP_EDGE = ["top"] as const
@@ -61,6 +63,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  circularSurface: { borderCurve: "circular" },
   depthGlow: {
     bottom: 0,
     experimental_backgroundImage:
@@ -85,12 +88,6 @@ const styles = StyleSheet.create({
   },
   invalidToastLabel: { color: "#09090b" },
   preparingBorder: { borderCurve: "continuous" },
-  timer: {
-    alignItems: "center",
-    flex: 1,
-    height: 72,
-    justifyContent: "center",
-  },
   timerLabel: {
     fontSize: 24,
     fontVariant: ["tabular-nums"],
@@ -237,6 +234,53 @@ function InvalidToast({ message }: { message: string | null }) {
   ) : null
 }
 
+function SessionTimer({ elapsedMs }: { elapsedMs: number }) {
+  return (
+    <View className="h-[72px] flex-1 p-1">
+      <Surface
+        className="flex-1 items-center justify-center rounded-full"
+        padding="none"
+        style={styles.circularSurface}
+        variant="tertiary"
+      >
+        <Text className="text-muted-foreground" style={styles.timerLabel}>
+          {formatSessionTime(elapsedMs)}
+        </Text>
+      </Surface>
+    </View>
+  )
+}
+
+function PauseControl({
+  label,
+  onPress,
+  paused,
+}: {
+  label: string
+  onPress: () => void
+  paused: boolean
+}) {
+  return (
+    <Button
+      accessibilityLabel={label}
+      className="h-[72px] w-[72px] shrink-0 rounded-full border-0 bg-transparent p-1"
+      onPress={onPress}
+      size="icon"
+      variant="ghost"
+    >
+      <Surface
+        className="flex-1 items-center justify-center self-stretch rounded-full"
+        padding="none"
+        pointerEvents="none"
+        style={styles.circularSurface}
+        variant="tertiary"
+      >
+        {paused ? <PlayIcon size={30} /> : <PauseIcon size={30} />}
+      </Surface>
+    </Button>
+  )
+}
+
 export default function SessionScreen({
   onComplete,
   plan,
@@ -250,8 +294,7 @@ export default function SessionScreen({
   const session = useSession({ onComplete, plan, targetReps })
   const running = session.phase === "active" || session.phase === "paused"
   const trackingHint = session.phase === "active" ? session.trackingHint : null
-  const showCameraGuidance =
-    session.phase === "positioning" || trackingHint !== null
+  const showCameraGuidance = trackingHint !== null
 
   return (
     <View className="flex-1 bg-background">
@@ -267,12 +310,7 @@ export default function SessionScreen({
           <DepthGlow progress={session.depthProgress} />
           <TrainingAvatar hint={trackingHint} validReps={session.validReps} />
         </>
-      ) : (
-        <SetupGuide
-          framing={session.setupFraming}
-          phone={session.phoneInclination}
-        />
-      )}
+      ) : null}
 
       {running ? (
         <ActiveScore count={session.validReps} target={targetReps} />
@@ -285,40 +323,16 @@ export default function SessionScreen({
           <InvalidToast message={session.toast} />
           {running ? (
             <View className="w-full max-w-md flex-row items-center gap-3">
-              <Surface
-                className="rounded-full"
-                padding="none"
-                style={styles.timer}
-              >
-                <Text
-                  className="text-muted-foreground"
-                  style={styles.timerLabel}
-                >
-                  {formatSessionTime(session.elapsedMs)}
-                </Text>
-              </Surface>
-              <Button
-                accessibilityLabel={t(
+              <SessionTimer elapsedMs={session.elapsedMs} />
+              <PauseControl
+                label={t(
                   session.phase === "paused"
                     ? "session.resume"
                     : "session.pause"
                 )}
-                className="h-[72px] w-[72px] shrink-0 rounded-full border-0 bg-transparent"
                 onPress={session.togglePause}
-                size="icon"
-                variant="ghost"
-              >
-                <Surface
-                  className="absolute inset-0 rounded-full"
-                  padding="none"
-                  pointerEvents="none"
-                />
-                {session.phase === "paused" ? (
-                  <PlayIcon size={30} />
-                ) : (
-                  <PauseIcon size={30} />
-                )}
-              </Button>
+                paused={session.phase === "paused"}
+              />
               <StopControl onPress={session.stop} />
             </View>
           ) : (
@@ -335,8 +349,10 @@ export default function SessionScreen({
         </View>
       </SafeAreaView>
       {showCameraGuidance ? (
-        <View
-          className="absolute inset-0 rounded-[52px] border-[7px] border-foreground"
+        <Animated.View
+          className="absolute inset-0 rounded-[52px] border-4 border-foreground"
+          entering={FadeIn.duration(180).reduceMotion(ReduceMotion.System)}
+          exiting={FadeOut.duration(140).reduceMotion(ReduceMotion.System)}
           pointerEvents="none"
           style={styles.preparingBorder}
         />

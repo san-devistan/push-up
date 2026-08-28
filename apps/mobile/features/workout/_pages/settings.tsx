@@ -4,44 +4,31 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CrosshairIcon,
-  PlusIcon,
-  RepeatIcon,
   SolidBellIcon,
   TrophyIcon,
   Volume2Icon,
-  XIcon,
   type IconProps,
 } from "@/components/icons"
-import {
-  NUMERIC_TEXT_SLOT,
-  NumericPhrase,
-  NumericText,
-} from "@/components/numeric-text"
+import { NumericText } from "@/components/numeric-text"
 import { Button } from "@/components/ui/button"
+import { AppBlockerSettings } from "@/features/app-blocker/_components/settings"
 import { PreferencesSection } from "@/features/preferences/_components/section"
-import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
+import AppIdentity from "@/features/workout/_components/app-identity"
 import { Connect } from "@/features/workout/_components/connect"
 import { Overline, Slab } from "@/features/workout/_components/figures"
 import WorkoutSectionRail from "@/features/workout/_components/section-rail"
-import TimeControl from "@/features/workout/_components/time-control"
+import TrainingTimes from "@/features/workout/_components/training-times"
 import { usePlan } from "@/features/workout/_hooks/use-plan"
-import { formatClock } from "@/features/workout/_lib/format"
 import {
   goalAtIndex,
   LAST_GOAL_INDEX,
-  MAX_TRAINING_TIMES,
   nearestGoalIndex,
-  repsPerSession,
 } from "@/features/workout/_lib/goal"
 import type { ReminderState } from "@/features/workout/_lib/reminders"
-import type {
-  TrainingPlan,
-  TrainingTime,
-} from "@/features/workout/_lib/storage"
+import type { TrainingPlan } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
-import { hapticFeedback, hapticForward, selectionTick } from "@/lib/haptics"
+import { hapticFeedback, selectionTick } from "@/lib/haptics"
 import { FONT_FAMILY } from "@/lib/theme"
-import Constants from "expo-constants"
 import { Link, Stack, useRouter } from "expo-router"
 import { Slider, Switch, Text } from "panelui-native"
 import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
@@ -49,8 +36,6 @@ import type { ComponentType } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
-const APP_NAME = Constants.expoConfig?.name ?? "pumpr."
-const APP_VERSION = Constants.expoConfig?.version ?? "dev"
 const SETTINGS_SECTION_IDS = ["training", "preferences", "sync"]
 const SETTINGS_READING_LINE = 320
 const HEADER_FONT_FAMILY =
@@ -83,11 +68,6 @@ const SETTINGS_LARGE_TITLE_STYLE = {
 } as const
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 
-function nextTrainingTime(times: readonly TrainingTime[]): TrainingTime {
-  const last = times.at(-1) ?? { hour: 8, minute: 0 }
-  return { hour: (last.hour + 4) % 24, minute: last.minute }
-}
-
 function Divider() {
   return <View className="h-px bg-border" />
 }
@@ -102,6 +82,7 @@ function SettingsBackButton() {
       className="h-10 w-10 rounded-full"
       onPress={router.back}
       size="icon"
+      sfx={false}
       variant="ghost"
     >
       <ChevronLeftIcon strokeWidth={3} />
@@ -123,43 +104,6 @@ function getSetTarget(
     selectionTick()
     updatePlan({ targetReps: goalAtIndex(index) })
   }
-}
-
-function getTimeChange(
-  index: number,
-  onChange: (index: number, time: TrainingTime) => void
-) {
-  return (hour: number, minute: number) => onChange(index, { hour, minute })
-}
-
-function getTimeRemove(index: number, onRemove: (index: number) => void) {
-  return () => onRemove(index)
-}
-
-function getChangeTime(
-  times: readonly TrainingTime[],
-  updatePlan: (patch: Partial<TrainingPlan>) => void
-) {
-  return (index: number, time: TrainingTime) =>
-    updatePlan({
-      reminderTimes: times.map((item, at) => (at === index ? time : item)),
-    })
-}
-
-function getRemoveTime(
-  times: readonly TrainingTime[],
-  updatePlan: (patch: Partial<TrainingPlan>) => void
-) {
-  return (index: number) =>
-    updatePlan({ reminderTimes: times.filter((_, at) => at !== index) })
-}
-
-function getAddTime(
-  times: readonly TrainingTime[],
-  updatePlan: (patch: Partial<TrainingPlan>) => void
-) {
-  return () =>
-    updatePlan({ reminderTimes: [...times, nextTrainingTime(times)] })
 }
 
 function getSetPlanBoolean(
@@ -251,112 +195,6 @@ function PermissionNotice({ state }: { state: ReminderState }) {
   )
 }
 
-function TimeRow({
-  index,
-  onChange,
-  onRemove,
-  time,
-}: {
-  index: number
-  onChange: (index: number, time: TrainingTime) => void
-  onRemove: (index: number) => void
-  time: TrainingTime
-}) {
-  const { clockFormat } = usePreferences()
-  const { locale, t } = useI18n()
-  const change = getTimeChange(index, onChange)
-  const remove = getTimeRemove(index, onRemove)
-
-  return (
-    <View className="flex-row items-center gap-3">
-      <Button
-        accessibilityLabel={t("plan.removeSession", {
-          time: formatClock(time.hour, time.minute, locale, clockFormat),
-        })}
-        onPress={remove}
-        className="h-10 w-10"
-        size="icon"
-        variant="ghost"
-      >
-        <XIcon />
-      </Button>
-      <View className="flex-1" />
-      <TimeControl onChange={change} value={time} />
-    </View>
-  )
-}
-
-function TimesSection() {
-  const { t } = useI18n()
-  const { plan, updatePlan } = usePlan()
-  const times = plan.reminderTimes
-  const timeSlots = times.map(
-    (time, index) => [`training-${index}`, index, time] as const
-  )
-  const perSession = repsPerSession(plan.targetReps, times.length)
-  const canAdd =
-    times.length < MAX_TRAINING_TIMES && times.length < plan.targetReps
-  const changeTime = getChangeTime(times, updatePlan)
-  const removeTime = getRemoveTime(times, updatePlan)
-  const addTime = getAddTime(times, updatePlan)
-  const hasMultipleTimes = times.length > 1
-
-  return (
-    <View className="gap-3">
-      <View className="flex-row items-center gap-4">
-        <RepeatIcon size={18} />
-        <Text className="flex-1 font-semibold">
-          {t(hasMultipleTimes ? "plan.trainingTimes" : "plan.trainingTime")}
-        </Text>
-        {hasMultipleTimes ? (
-          <NumericPhrase
-            className="text-sm text-muted-foreground"
-            containerClassName="shrink-0"
-            template={t("plan.repsEach", { count: NUMERIC_TEXT_SLOT })}
-            textClassName="text-sm text-muted-foreground"
-            value={perSession}
-          />
-        ) : (
-          timeSlots.map(([id, index, time]) => (
-            <TimeControl
-              key={id}
-              onChange={getTimeChange(index, changeTime)}
-              value={time}
-            />
-          ))
-        )}
-      </View>
-      {hasMultipleTimes ? (
-        <View className="gap-2">
-          {timeSlots.map(([id, index, time]) => (
-            <TimeRow
-              key={id}
-              index={index}
-              onChange={changeTime}
-              onRemove={removeTime}
-              time={time}
-            />
-          ))}
-        </View>
-      ) : null}
-      {canAdd ? (
-        <View className="items-center">
-          <Button
-            accessibilityLabel={t("plan.addSession")}
-            className="w-full rounded-full dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
-            onPress={addTime}
-            size="sm"
-            variant="outline"
-          >
-            <PlusIcon size={14} />
-            {t("plan.addSession")}
-          </Button>
-        </View>
-      ) : null}
-    </View>
-  )
-}
-
 function NotificationRows() {
   const { t } = useI18n()
   const { plan, reminderState, updatePlan } = usePlan()
@@ -398,42 +236,15 @@ function LevelsRow() {
     <Link asChild href="/levels">
       <Pressable
         accessibilityLabel={label}
-        className="min-h-11 flex-row items-center gap-4 active:opacity-60"
-        onPress={hapticForward}
+        className="min-h-8 flex-row items-center gap-4 active:opacity-60"
+        hitSlop={6}
+        onPress={selectionTick}
       >
         <TrophyIcon size={18} />
         <Text className="flex-1 font-semibold capitalize">{label}</Text>
         <ChevronRightIcon size={18} />
       </Pressable>
     </Link>
-  )
-}
-
-function getReplayOnboarding(router: ReturnType<typeof useRouter>) {
-  return () => {
-    hapticFeedback("long-press")
-    router.push("/onboarding")
-  }
-}
-
-function AppIdentity() {
-  const router = useRouter()
-  const replayOnboarding = getReplayOnboarding(router)
-
-  return (
-    <Pressable
-      accessibilityHint="Long press to replay onboarding"
-      accessibilityLabel={`${APP_NAME} version ${APP_VERSION}`}
-      accessibilityRole="button"
-      className="flex-row items-baseline justify-center gap-1 py-4 active:opacity-60"
-      delayLongPress={600}
-      onLongPress={replayOnboarding}
-    >
-      <Text className="font-heading text-xs text-muted-foreground">
-        {APP_NAME}
-      </Text>
-      <Text className="text-xs text-muted-foreground">v{APP_VERSION}</Text>
-    </Pressable>
   )
 }
 
@@ -469,12 +280,14 @@ export default function SettingsPage() {
             <Overline>{t("plan.trainingSettings")}</Overline>
             <GoalFields />
             <Divider />
-            <TimesSection />
+            <TrainingTimes />
             <Divider />
             <NotificationRows />
             <Divider />
             <SoundRow />
             <Divider />
+            {process.env.EXPO_OS === "ios" ? <AppBlockerSettings /> : null}
+            {process.env.EXPO_OS === "ios" ? <Divider /> : null}
             <LevelsRow />
           </Slab>
         </View>

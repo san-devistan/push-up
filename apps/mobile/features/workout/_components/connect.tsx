@@ -1,6 +1,7 @@
-import { ArrowUpRightIcon } from "@/components/icons"
+import { LogOutIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { ProgressButton } from "@/components/ui/progress-button"
+import { Surface } from "@/components/ui/surface"
 import { Overline, Slab } from "@/features/workout/_components/figures"
 import { clearWorkoutData } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
@@ -34,6 +35,7 @@ const styles = StyleSheet.create({
   appleLabelDark: { color: "#09090b" },
   appleLabelLight: { color: "#ffffff" },
   provider: { borderCurve: "continuous", borderRadius: 14, height: 52 },
+  surface: { borderCurve: "circular" },
 })
 
 function AppleMark({ color }: { color: string }) {
@@ -156,10 +158,11 @@ function getConnectAction(
 
 function getSignOutAction(
   errorMessage: string,
+  language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>
 ) {
-  return () => {
+  const signOut = () => {
     setError(null)
     setPending("sign-out")
     void authClient
@@ -168,6 +171,20 @@ function getSignOutAction(
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
+
+  return () =>
+    Alert.alert(
+      translate(language, "connect.signOutTitle"),
+      translate(language, "connect.signOutBody"),
+      [
+        { style: "cancel", text: translate(language, "common.cancel") },
+        {
+          onPress: signOut,
+          style: "destructive",
+          text: translate(language, "connect.signOut"),
+        },
+      ]
+    )
 }
 
 function getDeleteDataAction(
@@ -238,6 +255,7 @@ export function ConnectProviders({
         <Button
           disabled={disabled}
           onPress={withApple}
+          sfx={false}
           style={isDark ? styles.appleDark : styles.appleLight}
         >
           <AppleMark color={isDark ? "#09090b" : "#ffffff"} />
@@ -253,6 +271,7 @@ export function ConnectProviders({
         className="dark:border-foreground/20 dark:bg-background dark:active:bg-muted"
         disabled={disabled}
         onPress={withGoogle}
+        sfx={false}
         style={styles.provider}
         variant="outline"
       >
@@ -277,6 +296,7 @@ export function Connect() {
 
   const signOut = getSignOutAction(
     t("connect.couldNotSignOut"),
+    language,
     setError,
     setPending
   )
@@ -298,12 +318,27 @@ export function Connect() {
 
   return (
     <Slab>
-      <Overline>{t("connect.sync")}</Overline>
+      <Overline>{t(isConnected ? "connect.account" : "connect.sync")}</Overline>
       {isAnonymous ? <ConnectProviders /> : null}
-      <View className="gap-3 border-t border-border pt-3 dark:border-foreground/20">
+      <View className="gap-3">
         {isConnected ? (
-          <Button disabled={disabled} onPress={signOut} variant="outline">
-            <ArrowUpRightIcon />
+          <Button
+            className="relative w-full rounded-full border-0 bg-transparent"
+            disabled={disabled}
+            onPress={signOut}
+            size="sm"
+            sfx={false}
+            variant="ghost"
+          >
+            <Surface
+              bordered={false}
+              className="absolute inset-0 rounded-full"
+              padding="none"
+              pointerEvents="none"
+              style={styles.surface}
+              variant="destructive"
+            />
+            <LogOutIcon />
             {t("connect.signOut")}
           </Button>
         ) : null}

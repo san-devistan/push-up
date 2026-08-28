@@ -57,8 +57,9 @@ assert.equal(getDailyPace(0, 20, 8)?.delta, -8)
 
 assert.equal(formatClock(19, 30, "en-US", "12"), "7:30 PM")
 assert.equal(formatClock(19, 30, "en-US", "24"), "19:30")
-assert.equal(formatTotalDuration(3_723_000), "1h 3m")
-assert.equal(formatTotalDuration(90_123_000), "1d 1h 3m")
+assert.equal(formatTotalDuration(5059), "5s")
+assert.equal(formatTotalDuration(3_723_000), "1h 2m 3s")
+assert.equal(formatTotalDuration(90_123_000), "1d 1h 2m 3s")
 assert.equal(formatTotalDuration(3_600_000), "1h")
 
 for (const total of [1, 7, 10, 45, 200]) {
