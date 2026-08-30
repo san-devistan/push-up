@@ -257,7 +257,7 @@ export function DailyGoal({
   repsUpdateDelay?: number
 }) {
   const { plan } = usePlan()
-  const target = 90
+  const target = plan.targetReps
   const reps = useDelayedValue(activity?.todayReps ?? 0, repsUpdateDelay)
   const levelActivity = useDelayedValue(activity, levelUpdateDelay)
   const { level, milestones } = getLevel({

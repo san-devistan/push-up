@@ -78,7 +78,13 @@ function AnonymousSession() {
 
   useEffect(() => {
     async function requestAnonymousSession() {
-      if (!isAuthConfigured || isPending || session || requested.current) {
+      if (
+        !isOnboardingComplete() ||
+        !isAuthConfigured ||
+        isPending ||
+        session ||
+        requested.current
+      ) {
         return
       }
 

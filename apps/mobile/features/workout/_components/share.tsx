@@ -1,20 +1,18 @@
 import { Surface } from "@/components/ui/surface"
 import { RepMotionChart } from "@/features/workout/_components/rep-motion"
 import { ShareStat } from "@/features/workout/_components/share-metrics"
+import { formatTotalDuration } from "@/features/workout/_lib/format"
 import {
-  formatDuration,
-  formatTotalDuration,
-} from "@/features/workout/_lib/format"
+  saveTransparentCard,
+  shareInstagramStory,
+  sharePerformanceCard,
+} from "@/features/workout/_lib/share"
 import type { WorkoutSession } from "@/features/workout/_lib/storage"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
-import { formatNumber, translate, type Language } from "@/lib/i18n"
-import * as MediaLibrary from "expo-media-library"
-import * as Sharing from "expo-sharing"
 import { Text } from "panelui-native"
-import { useRef, useState } from "react"
-import { Alert, Share as NativeShare, StyleSheet, View } from "react-native"
-import { captureRef, releaseCapture } from "react-native-view-shot"
+import { useRef } from "react"
+import { Alert, StyleSheet, View } from "react-native"
 
 // The card ink follows Surface's scheme. Since the capture itself is
 // transparent, every glyph carries a shadow in the opposite tone to survive
@@ -60,11 +58,22 @@ const CARD_STYLES = {
   dark: createCardStyles(INK.onDark),
   light: createCardStyles(INK.onLight),
 }
+const CARD_GRAPH_COLORS = {
+  dark: INK.onDark.strong,
+  light: INK.onLight.strong,
+}
+const DOWNLOAD_CARD_STYLES = createCardStyles({
+  line: "rgba(255, 255, 255, 0.22)",
+  muted: "#ffffff",
+  shadow: "transparent",
+  strong: "#ffffff",
+})
 
 const styles = StyleSheet.create({
   // Padding keeps the glyph shadows inside the capture bounds.
-  card: { padding: 14 },
-  scoreColumn: { flex: 44 },
+  card: { padding: 8 },
+  graph: { marginBottom: -8 },
+  scoreColumn: { alignItems: "flex-start", flex: 44 },
   shareCapture: {
     left: -10_000,
     position: "absolute",
@@ -95,10 +104,7 @@ function PerformanceOverview({
         pumpr.
       </Text>
       <View className="flex-row items-stretch gap-1">
-        <View
-          className="min-w-0 items-center justify-center"
-          style={styles.scoreColumn}
-        >
+        <View className="min-w-0 justify-center" style={styles.scoreColumn}>
           <View className="items-start">
             <Text
               adjustsFontSizeToFit
@@ -163,6 +169,7 @@ function PerformanceCardContent({
   calories,
   cardStyles,
   contentRef,
+  graphColor,
   session,
   streak,
   successRate,
@@ -170,6 +177,7 @@ function PerformanceCardContent({
   calories: number
   cardStyles: ReturnType<typeof createCardStyles>
   contentRef?: React.RefObject<View | null>
+  graphColor: string
   session: WorkoutSession
   streak: number
   successRate: number
@@ -194,133 +202,16 @@ function PerformanceCardContent({
       {session.attempts.length > 0 ? (
         <>
           <View style={cardStyles.rule} />
-          <View className="gap-1">
+          <View className="gap-1" style={styles.graph}>
             <Text className="font-mono text-[10px]" style={cardStyles.label}>
               {t("share.repMotion")}
             </Text>
-            <RepMotionChart attempts={session.attempts} />
+            <RepMotionChart attempts={session.attempts} color={graphColor} />
           </View>
         </>
       ) : null}
     </View>
   )
-}
-
-function getShareMessage(
-  session: WorkoutSession,
-  successRate: number,
-  language: Language
-) {
-  const reps = `${formatNumber(language, session.validReps)}/${formatNumber(
-    language,
-    session.targetReps
-  )}`
-  const success = formatNumber(language, successRate / 100, {
-    maximumFractionDigits: 0,
-    style: "percent",
-  })
-
-  return `${reps} ${translate(language, "share.pushups")} · ${success} ${translate(language, "common.success")} · ${formatDuration(session.totalDurationMs)} · pumpr.`
-}
-
-async function capturePerformanceCard(
-  card: View | null,
-  session: WorkoutSession,
-  suffix: string,
-  language: Language
-) {
-  if (!card) {
-    throw new Error(translate(language, "share.cardUnavailable"))
-  }
-
-  return captureRef(card, {
-    fileName: `pumpr-${session.localDate}${suffix}`,
-    format: "png",
-    result: "tmpfile",
-  })
-}
-
-async function sharePerformanceCard(
-  card: View | null,
-  session: WorkoutSession,
-  successRate: number,
-  language: Language
-) {
-  if (!card || !(await Sharing.isAvailableAsync())) {
-    await NativeShare.share({
-      message: getShareMessage(session, successRate, language),
-      title: `pumpr. — ${translate(language, "share.share")}`,
-    })
-    return
-  }
-
-  const captureUri = await capturePerformanceCard(card, session, "", language)
-
-  try {
-    await Sharing.shareAsync(captureUri, {
-      UTI: "public.png",
-      dialogTitle: translate(language, "share.share"),
-      mimeType: "image/png",
-    })
-  } finally {
-    releaseCapture(captureUri)
-  }
-}
-
-async function saveTransparentCard(
-  card: View | null,
-  session: WorkoutSession,
-  language: Language
-) {
-  const permission = await MediaLibrary.requestPermissionsAsync(true, ["photo"])
-
-  if (!permission.granted) {
-    Alert.alert(
-      translate(language, "share.photosTitle"),
-      translate(language, "share.photosBody")
-    )
-    return
-  }
-
-  const captureUri = await capturePerformanceCard(
-    card,
-    session,
-    "-transparent",
-    language
-  )
-
-  try {
-    await MediaLibrary.Asset.create(captureUri)
-  } finally {
-    releaseCapture(captureUri)
-  }
-
-  Alert.alert(
-    translate(language, "share.pngTitle"),
-    translate(language, "share.pngBody")
-  )
-}
-
-async function shareInstagramStory(
-  card: View | null,
-  appId: string,
-  language: Language
-) {
-  if (!card) {
-    throw new Error(translate(language, "share.cardUnavailable"))
-  }
-
-  const [stickerImage, { default: SocialShare, Social }] = await Promise.all([
-    captureRef(card, { format: "png", result: "data-uri" }),
-    import("react-native-share"),
-  ])
-
-  await SocialShare.shareSingle({
-    appId,
-    social: Social.InstagramStories,
-    stickerImage,
-    useInternalStorage: true,
-  })
 }
 
 export function useSharePerformance(
@@ -329,16 +220,18 @@ export function useSharePerformance(
 ) {
   const { language, t } = useI18n()
   const backgroundRef = useRef<View>(null)
-  const [sharing, setSharing] = useState(false)
-  const transparentRef = useRef<View>(null)
+  const downloadRef = useRef<View>(null)
+  const sharing = useRef(false)
 
   function run(action: () => Promise<void>, errorTitle: string) {
-    if (sharing) return
+    if (sharing.current) return
 
-    setSharing(true)
+    sharing.current = true
     void action()
       .catch(() => Alert.alert(errorTitle, t("share.tryAgain")))
-      .finally(() => setSharing(false))
+      .finally(() => {
+        sharing.current = false
+      })
   }
 
   function shareBackground() {
@@ -356,7 +249,7 @@ export function useSharePerformance(
 
   function saveTransparent() {
     run(
-      () => saveTransparentCard(transparentRef.current, session, language),
+      () => saveTransparentCard(downloadRef.current, session, language),
       t("share.couldNotSave")
     )
   }
@@ -370,37 +263,38 @@ export function useSharePerformance(
     }
 
     run(
-      () => shareInstagramStory(transparentRef.current, appId, language),
+      () => shareInstagramStory(downloadRef.current, appId, language),
       t("share.couldNotShare")
     )
   }
 
   return {
     backgroundRef,
+    downloadRef,
     saveTransparent,
     shareBackground,
     shareInstagram,
-    sharing,
-    transparentRef,
   }
 }
 
 export function PerformanceCard({
   backgroundRef,
   calories,
+  downloadRef,
   session,
   streak,
   successRate,
-  transparentRef,
 }: {
   backgroundRef: React.RefObject<View | null>
   calories: number
+  downloadRef: React.RefObject<View | null>
   session: WorkoutSession
   streak: number
   successRate: number
-  transparentRef: React.RefObject<View | null>
 }) {
-  const cardStyles = CARD_STYLES[useColorScheme()]
+  const colorScheme = useColorScheme()
+  const cardStyles = CARD_STYLES[colorScheme]
+  const graphColor = CARD_GRAPH_COLORS[colorScheme]
 
   return (
     <View className="w-full">
@@ -416,16 +310,32 @@ export function PerformanceCard({
         <PerformanceCardContent
           calories={calories}
           cardStyles={cardStyles}
+          graphColor={graphColor}
           session={session}
           streak={streak}
           successRate={successRate}
         />
       </Surface>
+      <View
+        collapsable={false}
+        pointerEvents="none"
+        ref={downloadRef}
+        style={styles.shareCapture}
+      >
+        <PerformanceCardContent
+          calories={calories}
+          cardStyles={DOWNLOAD_CARD_STYLES}
+          graphColor="#ffffff"
+          session={session}
+          streak={streak}
+          successRate={successRate}
+        />
+      </View>
       <Surface padding="sm">
         <PerformanceCardContent
           calories={calories}
           cardStyles={cardStyles}
-          contentRef={transparentRef}
+          graphColor={graphColor}
           session={session}
           streak={streak}
           successRate={successRate}

@@ -80,11 +80,10 @@ function RecapCard({
     : 0
   const {
     backgroundRef,
+    downloadRef,
     saveTransparent,
     shareBackground,
     shareInstagram,
-    sharing,
-    transparentRef,
   } = useSharePerformance(session, successRate)
   const handleOpenChange = getOpenChange(onDone)
 
@@ -99,16 +98,15 @@ function RecapCard({
         <PerformanceCard
           backgroundRef={backgroundRef}
           calories={getEstimatedCalories(session.validReps)}
+          downloadRef={downloadRef}
           session={session}
           streak={streak}
           successRate={successRate}
-          transparentRef={transparentRef}
         />
         <View className="w-full flex-row gap-3">
           <Button
             accessibilityLabel={t("share.shareBackground")}
             className="rounded-full border-0 bg-transparent"
-            disabled={sharing}
             onPress={shareBackground}
             size="icon"
             style={styles.action}
@@ -126,7 +124,6 @@ function RecapCard({
           <Button
             accessibilityLabel={t("share.saveTransparent")}
             className="rounded-full border-0 bg-transparent"
-            disabled={sharing}
             onPress={saveTransparent}
             size="icon"
             style={styles.action}
@@ -144,7 +141,6 @@ function RecapCard({
           <Button
             accessibilityLabel="Instagram Stories"
             className="rounded-full border-0 bg-transparent"
-            disabled={sharing}
             onPress={shareInstagram}
             size="icon"
             style={styles.action}
@@ -192,7 +188,7 @@ function hasProgressionAchievement(
   )
 }
 
-export function AchievementOverlay({
+function AchievementOverlay({
   after,
   before,
   onDone,

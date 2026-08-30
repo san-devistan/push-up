@@ -13,6 +13,7 @@ import { NumericText } from "@/components/numeric-text"
 import { Button } from "@/components/ui/button"
 import { AppBlockerSettings } from "@/features/app-blocker/_components/settings"
 import { PreferencesSection } from "@/features/preferences/_components/section"
+import { usePreferences } from "@/features/preferences/_hooks/use-preferences"
 import AppIdentity from "@/features/workout/_components/app-identity"
 import { Connect } from "@/features/workout/_components/connect"
 import { Overline, Slab } from "@/features/workout/_components/figures"
@@ -36,7 +37,8 @@ import type { ComponentType } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
-const SETTINGS_SECTION_IDS = ["training", "preferences", "sync"]
+const SETTINGS_SECTION_IDS = ["training", "sync"]
+const DEBUG_SETTINGS_SECTION_IDS = ["training", "preferences", "sync"]
 const SETTINGS_READING_LINE = 320
 const HEADER_FONT_FAMILY =
   process.env.EXPO_OS === "ios" ? "Anton-Regular" : FONT_FAMILY.heading
@@ -67,6 +69,13 @@ const SETTINGS_LARGE_TITLE_STYLE = {
   fontSize: 44,
 } as const
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
+
+function getSettingsRailSections(t: ReturnType<typeof useI18n>["t"]) {
+  return [
+    { label: t("plan.trainingSettings"), value: "training" },
+    { label: t("connect.sync"), value: "sync" },
+  ]
+}
 
 function Divider() {
   return <View className="h-px bg-border" />
@@ -248,9 +257,29 @@ function LevelsRow() {
   )
 }
 
+function getOpenOnboarding(router: ReturnType<typeof useRouter>) {
+  return () => router.push("/onboarding")
+}
+
+function OpenOnboardingButton() {
+  const router = useRouter()
+  const openOnboarding = getOpenOnboarding(router)
+
+  return (
+    <Button onPress={openOnboarding} variant="outline">
+      open onboarding
+    </Button>
+  )
+}
+
 export default function SettingsPage() {
+  const { debugMode } = usePreferences()
   const { locale, t } = useI18n()
   const title = `${t("settings.title").toLocaleLowerCase(locale)}.`
+  const sectionIds = debugMode
+    ? DEBUG_SETTINGS_SECTION_IDS
+    : SETTINGS_SECTION_IDS
+  const sections = debugMode ? undefined : getSettingsRailSections(t)
   const {
     active,
     measure,
@@ -259,7 +288,7 @@ export default function SettingsPage() {
     scrollTo,
   } = useScrollSections({
     endThreshold: 0,
-    ids: SETTINGS_SECTION_IDS,
+    ids: sectionIds,
     offset: SETTINGS_READING_LINE,
     scrollPadding: SETTINGS_READING_LINE,
   })
@@ -292,15 +321,19 @@ export default function SettingsPage() {
           </Slab>
         </View>
 
-        <View onLayout={measure("preferences")}>
-          <Slab>
-            <Overline>{t("plan.preferences")}</Overline>
-            <PreferencesSection />
-          </Slab>
-        </View>
+        {debugMode ? (
+          <View onLayout={measure("preferences")}>
+            <Slab>
+              <Overline>{t("plan.preferences")}</Overline>
+              <PreferencesSection />
+              <Divider />
+              <OpenOnboardingButton />
+            </Slab>
+          </View>
+        ) : null}
 
         <View className="gap-4" onLayout={measure("sync")}>
-          <Connect />
+          <Connect showDeleteData={debugMode} />
           <AppIdentity />
         </View>
       </ScrollView>
@@ -309,6 +342,7 @@ export default function SettingsPage() {
         active={active}
         onValueChange={scrollTo}
         screen="settings"
+        sections={sections}
       />
       <Stack.Screen options={SETTINGS_SCREEN_OPTIONS} />
       <Stack.Title

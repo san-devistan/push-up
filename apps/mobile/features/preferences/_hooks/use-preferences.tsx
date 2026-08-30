@@ -1,4 +1,6 @@
+import { resolvePreferences } from "@/features/preferences/_lib/mode"
 import {
+  getPhonePreferences,
   loadPreferences,
   savePreferences,
   type AppearancePreference,
@@ -7,16 +9,22 @@ import {
   type Preferences,
 } from "@/features/preferences/_lib/storage"
 import * as React from "react"
-import { useColorScheme as useSystemColorScheme } from "react-native"
+import { AppState, useColorScheme as useSystemColorScheme } from "react-native"
 
 type ResolvedColorScheme = "light" | "dark"
 
 type PreferencesContextValue = Preferences & {
   colorScheme: ResolvedColorScheme
+  debugMode: boolean
   setAppearance: (appearance: AppearancePreference) => void
   setClockFormat: (clockFormat: ClockFormatPreference) => void
   setLanguage: (language: LanguagePreference) => void
+  toggleDebugMode: () => void
 }
+type PreferencesActions = Pick<
+  PreferencesContextValue,
+  "setAppearance" | "setClockFormat" | "setLanguage" | "toggleDebugMode"
+>
 
 const PreferencesContext = React.createContext<PreferencesContextValue | null>(
   null
@@ -86,16 +94,14 @@ function getSetClockFormat(
 function getPreferencesContextValue(
   preferences: Preferences,
   colorScheme: ResolvedColorScheme,
-  setAppearance: (appearance: AppearancePreference) => void,
-  setClockFormat: (clockFormat: ClockFormatPreference) => void,
-  setLanguage: (language: LanguagePreference) => void
+  debugMode: boolean,
+  actions: PreferencesActions
 ) {
   return {
     ...preferences,
+    ...actions,
     colorScheme,
-    setAppearance,
-    setClockFormat,
-    setLanguage,
+    debugMode,
   }
 }
 
@@ -105,17 +111,37 @@ export function PreferencesProvider({
   children: React.ReactNode
 }) {
   const [preferences, setPreferences] = React.useState(loadPreferences)
+  const [phonePreferences, setPhonePreferences] =
+    React.useState(getPhonePreferences)
+  const [debugMode, setDebugMode] = React.useState(false)
   const systemScheme = useSystemColorScheme() === "dark" ? "dark" : "light"
-  const colorScheme = resolveColorScheme(preferences.appearance, systemScheme)
+  const activePreferences = resolvePreferences(
+    debugMode,
+    phonePreferences,
+    preferences
+  )
+  const colorScheme = resolveColorScheme(
+    activePreferences.appearance,
+    systemScheme
+  )
+  const toggleDebugMode = () => setDebugMode((current) => !current)
   const setAppearance = getSetAppearance(setPreferences)
   const setClockFormat = getSetClockFormat(setPreferences)
   const setLanguage = getSetLanguage(setPreferences)
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener("change", () =>
+      setPhonePreferences(getPhonePreferences())
+    )
+
+    return () => subscription.remove()
+  }, [])
+
   const value = getPreferencesContextValue(
-    preferences,
+    activePreferences,
     colorScheme,
-    setAppearance,
-    setClockFormat,
-    setLanguage
+    debugMode,
+    { setAppearance, setClockFormat, setLanguage, toggleDebugMode }
   )
 
   return (

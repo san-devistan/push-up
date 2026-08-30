@@ -75,11 +75,47 @@ function ProgressRail({ step }: { step: number }) {
   )
 }
 
+function getContinueAsGuest(
+  isAnonymous: boolean,
+  onNext: () => void,
+  setError: Dispatch<SetStateAction<string | null>>,
+  setPending: Dispatch<SetStateAction<boolean>>
+) {
+  return () => {
+    if (isAnonymous) {
+      onNext()
+      return
+    }
+
+    setError(null)
+    setPending(true)
+    void authClient.signIn
+      .anonymous()
+      .then(({ error }) => error?.message ?? null)
+      .catch(() => "Could not start guest session. Check your connection.")
+      .then((error) => {
+        setPending(false)
+        setError(error)
+        if (error === null) onNext()
+        return error
+      })
+  }
+}
+
 function AccountStep({ onNext }: { onNext: () => void }) {
-  const { data: session } = authClient.useSession()
+  const { data: session, isPending: sessionPending } = authClient.useSession()
   const primaryForeground = useCSSVariable("--color-primary-foreground")
-  const connected = session && !session.user.isAnonymous
+  const [guestError, setGuestError] = useState<string | null>(null)
+  const [guestPending, setGuestPending] = useState(false)
+  const isAnonymous = session?.user.isAnonymous === true
+  const connected = session && !isAnonymous
   const identity = session?.user.email ?? session?.user.name
+  const continueAsGuest = getContinueAsGuest(
+    isAnonymous,
+    onNext,
+    setGuestError,
+    setGuestPending
+  )
 
   return (
     <View className="flex-1 justify-between gap-8">
@@ -141,12 +177,19 @@ function AccountStep({ onNext }: { onNext: () => void }) {
           <View className="gap-1">
             <ConnectProviders onConnected={onNext} />
             <Button
+              disabled={sessionPending}
               labelClassName="font-semibold underline"
-              onPress={onNext}
+              loading={guestPending}
+              onPress={continueAsGuest}
               variant="ghost"
             >
               continue as guest.
             </Button>
+            {guestError ? (
+              <Text selectable className="text-center text-sm text-destructive">
+                {guestError}
+              </Text>
+            ) : null}
           </View>
         )}
       </View>

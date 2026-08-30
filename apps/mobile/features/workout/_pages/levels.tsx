@@ -109,9 +109,11 @@ function renderLevelsBackButton() {
 }
 
 function RequirementLabel({
+  emphasized,
   template,
   value,
 }: {
+  emphasized: boolean
   template: string
   value: string
 }) {
@@ -120,7 +122,14 @@ function RequirementLabel({
   return (
     <>
       {template.slice(0, slot)}
-      <Text className="font-bold">{value}</Text>
+      <Text
+        className={cn(
+          "font-bold text-muted-foreground",
+          emphasized && "text-foreground"
+        )}
+      >
+        {value}
+      </Text>
       {template.slice(slot + NUMERIC_TEXT_SLOT.length)}
     </>
   )
@@ -143,6 +152,7 @@ function RequirementText({
   return (
     <Text className={cn(textClassName, "flex-1 text-right")}>
       <RequirementLabel
+        emphasized={emphasized}
         template={t("levels.total", { value: NUMERIC_TEXT_SLOT })}
         value={`${formatNumber(total.value, { maximumFractionDigits: 2 })}${total.suffix}`}
       />
@@ -150,6 +160,7 @@ function RequirementText({
         <>
           {" · "}
           <RequirementLabel
+            emphasized={emphasized}
             template={t("levels.streak", { value: NUMERIC_TEXT_SLOT })}
             value={formatNumber(requirement.streak)}
           />
@@ -159,6 +170,7 @@ function RequirementText({
         <>
           {" · "}
           <RequirementLabel
+            emphasized={emphasized}
             template={t("levels.daily", { value: NUMERIC_TEXT_SLOT })}
             value={formatNumber(requirement.recentDailyAverage)}
           />

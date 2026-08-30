@@ -3,6 +3,7 @@ import {
   SUPPORTED_LANGUAGES,
   type Language,
 } from "@/lib/i18n"
+import { getCalendars } from "expo-localization"
 import { Storage } from "expo-sqlite/kv-store"
 
 const APPEARANCES = ["system", "light", "dark"] as const
@@ -19,11 +20,6 @@ export type Preferences = {
   language: LanguagePreference
 }
 
-const DEFAULT_PREFERENCES = {
-  appearance: "system",
-  clockFormat: getDefaultClockFormat(),
-  language: getDefaultLanguage(),
-} satisfies Preferences
 const KEY = "pushup.preferences"
 
 function getDefaultLanguage(): LanguagePreference {
@@ -31,7 +27,21 @@ function getDefaultLanguage(): LanguagePreference {
 }
 
 function getDefaultClockFormat(): ClockFormatPreference {
+  const uses24hourClock = getCalendars()[0].uses24hourClock
+
+  if (uses24hourClock !== null) {
+    return uses24hourClock ? "24" : "12"
+  }
+
   return HOUR_FORMATTER.resolvedOptions().hour12 ? "12" : "24"
+}
+
+export function getPhonePreferences(): Preferences {
+  return {
+    appearance: "system",
+    clockFormat: getDefaultClockFormat(),
+    language: getDefaultLanguage(),
+  }
 }
 
 function readJson(key: string): unknown {
@@ -64,21 +74,20 @@ function isClockFormat(value: unknown): value is ClockFormatPreference {
 
 export function loadPreferences(): Preferences {
   const value = readJson(KEY)
+  const defaults = getPhonePreferences()
 
   if (!isRecord(value)) {
-    return DEFAULT_PREFERENCES
+    return defaults
   }
 
   return {
     appearance: isAppearance(value.appearance)
       ? value.appearance
-      : DEFAULT_PREFERENCES.appearance,
+      : defaults.appearance,
     clockFormat: isClockFormat(value.clockFormat)
       ? value.clockFormat
-      : DEFAULT_PREFERENCES.clockFormat,
-    language: isLanguage(value.language)
-      ? value.language
-      : DEFAULT_PREFERENCES.language,
+      : defaults.clockFormat,
+    language: isLanguage(value.language) ? value.language : defaults.language,
   }
 }
 

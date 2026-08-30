@@ -1,6 +1,7 @@
 import type { Activity } from "@/features/workout/_lib/activity"
+import type { WorkoutSession } from "@/features/workout/_lib/storage"
 
-export const DEMO_DATA = true
+export const DEMO_DATA = process.env.EXPO_PUBLIC_DEMO_DATA === "1"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const VISIBLE_DAYS = 26 * 7
@@ -10,6 +11,8 @@ const REST_GAPS = [
   { from: 47, to: 41 },
 ]
 const STREAK_DAYS = 14
+const DEMO_REPS = 18
+const DEMO_REP_DURATION_MS = 2400
 
 function seeded(seed: number) {
   let state = seed
@@ -46,7 +49,7 @@ export function demoActivity(today: string): Activity {
 
     return {
       date: new Date(start - daysAgo * DAY_MS).toISOString().slice(0, 10),
-      reps: daysAgo === 0 ? 100 : repsFor(daysAgo, random),
+      reps: daysAgo === 0 ? 6 : repsFor(daysAgo, random),
     }
   })
 
@@ -68,8 +71,8 @@ export function demoActivity(today: string): Activity {
     averageRepMs: 2380,
     bestDayReps: Math.max(...recentDays.map((day) => day.reps)),
     bestSessionReps: 34,
-    bestStreak: 123,
-    currentStreak: 123,
+    bestStreak: Math.max(currentStreak, 19),
+    currentStreak,
     recentDays,
     successRate: 88,
     todayAttempts: Math.round(todayReps / 0.88),
@@ -90,5 +93,41 @@ export function demoActivity(today: string): Activity {
         start: week[0]?.date ?? "",
       }
     }),
+  }
+}
+
+export function demoSession(localDate: string): WorkoutSession {
+  const totalDurationMs = DEMO_REPS * DEMO_REP_DURATION_MS
+  const endedAt = Date.now()
+  const attempts = Array.from({ length: DEMO_REPS }, (_, index) => {
+    const startedAtOffsetMs = index * DEMO_REP_DURATION_MS
+
+    return {
+      depthTrace: [0.52, 0.25, 0.53],
+      depthTraceOffsetsMs: [
+        startedAtOffsetMs,
+        startedAtOffsetMs + DEMO_REP_DURATION_MS / 2,
+        startedAtOffsetMs + DEMO_REP_DURATION_MS,
+      ],
+      durationMs: DEMO_REP_DURATION_MS,
+      failureReasons: [],
+      startedAtOffsetMs,
+      valid: true,
+    }
+  })
+
+  return {
+    activeRepetitionTimeMs: totalDurationMs,
+    attempts,
+    endedAt,
+    id: `debug-${endedAt}`,
+    localDate,
+    soundEnabled: false,
+    startedAt: endedAt - totalDurationMs,
+    status: "completed",
+    targetReps: 20,
+    timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+    totalDurationMs,
+    validReps: DEMO_REPS,
   }
 }

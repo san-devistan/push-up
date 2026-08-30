@@ -287,7 +287,7 @@ export function ConnectProviders({
   )
 }
 
-export function Connect() {
+export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
   const { language, t } = useI18n()
   const { data: authSession } = authClient.useSession()
   const clearRemoteData = useMutation(api.workoutSessions.clear)
@@ -342,15 +342,19 @@ export function Connect() {
             {t("connect.signOut")}
           </Button>
         ) : null}
-        <ProgressButton
-          autoReset
-          disabled={disabled}
-          haptics
-          onComplete={deleteData}
-          variant="destructive"
-        >
-          <ProgressButton.Label>{t("connect.deleteData")}</ProgressButton.Label>
-        </ProgressButton>
+        {showDeleteData ? (
+          <ProgressButton
+            autoReset
+            disabled={disabled}
+            haptics
+            onComplete={deleteData}
+            variant="destructive"
+          >
+            <ProgressButton.Label>
+              {t("connect.deleteData")}
+            </ProgressButton.Label>
+          </ProgressButton>
+        ) : null}
       </View>
       {error ? (
         <Text selectable className="text-destructive">

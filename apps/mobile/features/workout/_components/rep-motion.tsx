@@ -1,5 +1,4 @@
 import { COUNTER_THRESHOLDS } from "@/features/workout/_lib/counter"
-import { THEME } from "@/lib/theme"
 import { useState } from "react"
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native"
 import Svg, { Line, Polyline } from "react-native-svg"
@@ -78,7 +77,13 @@ function getMeasure(setWidth: (width: number) => void) {
   return (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)
 }
 
-export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
+export function RepMotionChart({
+  attempts,
+  color,
+}: {
+  attempts: readonly Attempt[]
+  color: string
+}) {
   const [width, setWidth] = useState(0)
   const samples = getTraceSamples(attempts)
 
@@ -92,8 +97,9 @@ export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
     <View onLayout={getMeasure(setWidth)} style={styles.plot}>
       <Svg height={PLOT_HEIGHT} width={width}>
         <Line
-          stroke={THEME.dark.mutedForeground}
+          stroke={color}
           strokeDasharray="4 5"
+          strokeOpacity={0.35}
           strokeWidth={1}
           x1={0}
           x2={width}
@@ -104,7 +110,7 @@ export function RepMotionChart({ attempts }: { attempts: readonly Attempt[] }) {
           <Polyline
             fill="none"
             points={points}
-            stroke={THEME.dark.primary}
+            stroke={color}
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2.5}

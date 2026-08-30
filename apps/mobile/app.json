@@ -20,6 +20,7 @@
         "com.apple.security.application-groups": ["group.com.leocombaret.pumpr"]
       },
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "pumpr. uses the camera to count repetitions locally on your device."
       },
       "bundleIdentifier": "com.leocombaret.pumpr"
@@ -72,7 +73,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": false,
+          "photosPermission": "Allow pumpr. to access your photo library to save performance images.",
           "savePhotosPermission": "Allow pumpr. to save transparent performance PNGs.",
           "granularPermissions": ["photo"]
         }
@@ -96,7 +97,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,
