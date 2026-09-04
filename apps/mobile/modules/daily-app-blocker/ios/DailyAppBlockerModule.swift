@@ -21,7 +21,7 @@ private enum DailyAppBlockerError: LocalizedError {
 
 private enum DailyAppBlockerStore {
   static let activity = DeviceActivityName("pumpr.daily-goal")
-  static let defaults = UserDefaults(suiteName: "group.com.leocombaret.pumpr") ?? .standard
+  static let defaults = UserDefaults(suiteName: "group.com.rukahiga.pumpr") ?? .standard
   static let managedSettings = ManagedSettingsStore(named: .init("pumpr.daily-goal"))
 
   private static let completedDateKey = "dailyAppBlocker.completedDate"

@@ -5,7 +5,7 @@ import Foundation
 import ManagedSettings
 
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
-  private let defaults = UserDefaults(suiteName: "group.com.leocombaret.pumpr")
+  private let defaults = UserDefaults(suiteName: "group.com.rukahiga.pumpr")
   private let store = ManagedSettingsStore(named: .init("pumpr.daily-goal"))
 
   override func intervalDidStart(for activity: DeviceActivityName) {

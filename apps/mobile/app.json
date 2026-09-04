@@ -8,7 +8,7 @@
     "scheme": "pumpr",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "appleTeamId": "QMWC7QVJ59",
+      "appleTeamId": "GBPRFMH5S5",
       "icon": {
         "light": "./assets/images/icon.png",
         "dark": "./assets/images/icon-dark.png"
@@ -17,19 +17,25 @@
       "supportsTablet": true,
       "entitlements": {
         "com.apple.developer.family-controls": true,
-        "com.apple.security.application-groups": ["group.com.leocombaret.pumpr"]
+        "com.apple.security.application-groups": ["group.com.rukahiga.pumpr"]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "pumpr. uses the camera to count repetitions locally on your device."
       },
-      "bundleIdentifier": "com.leocombaret.pumpr"
+      "bundleIdentifier": "com.rukahiga.pumpr"
     },
     "android": {
       "icon": "./assets/images/icon.png",
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
       "predictiveBackGestureEnabled": false,
-      "package": "com.leocombaret.pumpr"
+      "package": "com.rukahiga.pumpr"
     },
     "web": {
       "bundler": "metro",
@@ -103,6 +109,31 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.rukahiga.pumpr.daily-app-blocker-monitor",
+                  "targetName": "DailyAppBlockerMonitor",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.rukahiga.pumpr"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "18abc9c0-a8ce-4f0a-89de-fe63bb25cfaa"
+      }
+    },
+    "owner": "rukahiga"
   }
 }
