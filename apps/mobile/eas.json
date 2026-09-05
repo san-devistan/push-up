@@ -21,5 +21,16 @@
         "EXPO_PUBLIC_META_APP_ID": "1565443168652464"
       }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6808917745",
+        "appleTeamId": "GBPRFMH5S5",
+        "ascApiKeyPath": "./AuthKey_6RU345CCPK.p8",
+        "ascApiKeyIssuerId": "6c23f02b-a67d-4fb6-a49d-edd9fc86aef6",
+        "ascApiKeyId": "6RU345CCPK"
+      }
+    }
   }
 }
