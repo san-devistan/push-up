@@ -32,3 +32,8 @@ npm-debug.log*
 # Misc
 .DS_Store
 *.pem
+
+# Local iOS signing assets (EAS credentialsSource: local)
+credentials.json
+*.p12
+*.mobileprovision
