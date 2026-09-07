@@ -507,6 +507,17 @@ const MESSAGES = {
     ko: "Apple 로그인을 사용할 수 없습니다. 서버 자격 증명을 확인하세요.",
     "zh-Hans": "Apple 登录不可用。请检查服务器凭据。",
   },
+  "connect.incomplete": {
+    en: "Sign-in was not completed. Try again.",
+    fr: "La connexion n’a pas été finalisée. Réessayez.",
+    es: "El inicio de sesión no se completó. Inténtalo de nuevo.",
+    "pt-BR": "O login não foi concluído. Tente novamente.",
+    de: "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut.",
+    it: "L’accesso non è stato completato. Riprova.",
+    ja: "サインインが完了しませんでした。もう一度お試しください。",
+    ko: "로그인이 완료되지 않았습니다. 다시 시도하세요.",
+    "zh-Hans": "登录未完成。请重试。",
+  },
   "connect.couldNotDelete": {
     en: "Could not delete workout data.",
     fr: "Impossible de supprimer les données d’entraînement.",

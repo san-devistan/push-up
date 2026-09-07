@@ -33,7 +33,22 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
 const HAS_APP_BLOCKER_STEP = process.env.EXPO_OS === "ios"
-const STEP_COUNT = HAS_APP_BLOCKER_STEP ? 5 : 4
+const STEP_COUNT = HAS_APP_BLOCKER_STEP ? 6 : 5
+const LAST_STEP = STEP_COUNT - 1
+const WHY_PUSH_UPS = [
+  {
+    body: "Chest, shoulders, triceps and core, all loaded in a single movement.",
+    title: "One move, whole upper body",
+  },
+  {
+    body: "Bodyweight only. Floor, phone, ten minutes. Nothing to book or buy.",
+    title: "No gym, no equipment",
+  },
+  {
+    body: "A small goal hit every day beats a big session skipped. pumpr. counts, you show up.",
+    title: "Consistency builds the physique",
+  },
+] as const
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 const styles = StyleSheet.create({
   accountHeroAvatar: {
@@ -154,25 +169,35 @@ function AccountStep({ onNext }: { onNext: () => void }) {
         </View>
 
         {connected ? (
-          <Slab className="flex-row items-center gap-3">
-            <View className="size-10 items-center justify-center rounded-full bg-primary">
-              <CheckIcon
-                color={
-                  typeof primaryForeground === "string"
-                    ? primaryForeground
-                    : undefined
-                }
-              />
-            </View>
-            <View className="flex-1 gap-1">
-              <Text className="font-semibold">Progress sync is on</Text>
-              {identity ? (
-                <Text className="text-sm text-muted-foreground">
-                  {identity}
-                </Text>
-              ) : null}
-            </View>
-          </Slab>
+          <View className="gap-3">
+            <Slab className="flex-row items-center gap-3">
+              <View className="size-10 items-center justify-center rounded-full bg-primary">
+                <CheckIcon
+                  color={
+                    typeof primaryForeground === "string"
+                      ? primaryForeground
+                      : undefined
+                  }
+                />
+              </View>
+              <View className="flex-1 gap-1">
+                <Text className="font-semibold">Progress sync is on</Text>
+                {identity ? (
+                  <Text className="text-sm text-muted-foreground">
+                    {identity}
+                  </Text>
+                ) : null}
+              </View>
+            </Slab>
+            <Button
+              className="h-14 rounded-full bg-foreground"
+              labelClassName="font-heading lowercase text-lg text-background"
+              onPress={onNext}
+              size="lg"
+            >
+              next.
+            </Button>
+          </View>
         ) : (
           <View className="gap-1">
             <ConnectProviders onConnected={onNext} />
@@ -275,6 +300,30 @@ function CameraStep() {
   )
 }
 
+function WhyPushUpsStep() {
+  return (
+    <View className="flex-1 gap-6">
+      <View className="gap-3">
+        <Text className="font-heading text-4xl leading-[44px]">
+          Push-ups are enough.
+        </Text>
+        <Text className="text-lg text-muted-foreground">
+          The only exercise you need for an athletic physique. Your plan is set;
+          from here it is one set a day.
+        </Text>
+      </View>
+      <View className="gap-3">
+        {WHY_PUSH_UPS.map((item) => (
+          <Slab className="gap-1" key={item.title}>
+            <Text className="font-semibold">{item.title}</Text>
+            <Text className="text-sm text-muted-foreground">{item.body}</Text>
+          </Slab>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 function StepContent({ onNext, step }: { onNext: () => void; step: number }) {
   if (step === 0) {
     return <AccountStep onNext={onNext} />
@@ -292,6 +341,10 @@ function StepContent({ onNext, step }: { onNext: () => void; step: number }) {
     return <AppBlockerStep />
   }
 
+  if (step === LAST_STEP) {
+    return <WhyPushUpsStep />
+  }
+
   return <ScheduleStep />
 }
 
@@ -301,7 +354,7 @@ function getNext(
   setStep: Dispatch<SetStateAction<number>>
 ) {
   return () => {
-    if (step < STEP_COUNT - 1) {
+    if (step < LAST_STEP) {
       setStep((current) => current + 1)
       return
     }
@@ -315,9 +368,9 @@ export default function OnboardingSetup() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const next = getNext(router, step, setStep)
-  const action = step === STEP_COUNT - 1 ? "start training." : "next."
+  const action = step === LAST_STEP ? "see my plan." : "next."
   const scrollEnabled =
-    step < STEP_COUNT - 1 && !(HAS_APP_BLOCKER_STEP && step === 3)
+    step !== LAST_STEP - 1 && !(HAS_APP_BLOCKER_STEP && step === 3)
 
   return (
     <View style={styles.screen}>

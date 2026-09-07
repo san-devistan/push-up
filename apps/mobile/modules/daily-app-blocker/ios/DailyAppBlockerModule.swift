@@ -233,8 +233,17 @@ public final class DailyAppBlockerModule: Module {
     }.runOnQueue(.main)
 
     AsyncFunction("requestAuthorization") { () async throws -> DailyAppBlockerState in
-      try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-      return DailyAppBlockerStore.state()
+      // The Screen Time consent sheet is UI: request it on the main actor,
+      // otherwise the call can resolve without ever presenting the prompt.
+      do {
+        try await Task { @MainActor in
+          try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+        }.value
+      } catch FamilyControlsError.authorizationCanceled {
+        // The user closed the sheet. That is an answer, not a failure: the returned state
+        // says "not authorized" and the screen keeps offering the button.
+      }
+      return await MainActor.run { DailyAppBlockerStore.state() }
     }
 
     AsyncFunction("setEnabled") { (enabled: Bool) throws -> DailyAppBlockerState in

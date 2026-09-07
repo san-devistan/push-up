@@ -8,8 +8,17 @@ import {
 import { useEffect, useState } from "react"
 import { Linking } from "react-native"
 
+/**
+ * Native rejections arrive as "UnexpectedException: … (at ExpoModulesCore/…swift:90)" — a
+ * stack hint, not copy. Those get the translated fallback; a plain JS error keeps its text.
+ */
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
+  if (
+    !(error instanceof Error) ||
+    /\(at [^)]+\.swift:\d+\)/.test(error.message)
+  )
+    return fallback
+  return error.message
 }
 
 async function loadState(

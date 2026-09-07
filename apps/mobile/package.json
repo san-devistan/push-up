@@ -98,13 +98,6 @@
     "typescript": "~6.0.3"
   },
   "expo": {
-    "autolinking": {
-      "exclude": [
-        "pumpr-pose-detector",
-        "react-native-vision-camera",
-        "react-native-vision-camera-worklets"
-      ]
-    },
     "install": {
       "exclude": [
         "@expo/ui",

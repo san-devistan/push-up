@@ -131,28 +131,50 @@ async function connectGoogle(language: Language) {
   }
 }
 
+/**
+ * The provider call resolving is not proof of a signed-in account: the Google
+ * flow resolves when the browser closes, whatever happened inside. Only a
+ * fresh non-anonymous session counts as connected.
+ */
+async function hasConnectedSession() {
+  const { data } = await authClient.getSession({
+    query: { disableCookieCache: true },
+  })
+
+  return Boolean(data?.user) && data?.user.isAnonymous !== true
+}
+
 function getConnectAction(
+  language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>,
   pending: PendingAction,
   connect: () => Promise<string | null | undefined>,
   onConnected?: () => void
 ) {
+  async function run() {
+    const error = await connect()
+
+    if (error === undefined) {
+      return
+    }
+
+    if (error !== null) {
+      setError(error)
+      return
+    }
+
+    if (await hasConnectedSession()) {
+      onConnected?.()
+    } else {
+      setError(translate(language, "connect.incomplete"))
+    }
+  }
+
   return () => {
     setError(null)
     setPending(pending)
-    void connect()
-      .then((error) => {
-        if (error !== undefined) {
-          setError(error)
-          if (error === null) {
-            onConnected?.()
-          }
-        }
-
-        return error
-      })
-      .finally(() => setPending(null))
+    void run().finally(() => setPending(null))
   }
 }
 
@@ -234,6 +256,7 @@ export function ConnectProviders({
   }, [])
 
   const withApple = getConnectAction(
+    language,
     setError,
     setPending,
     "apple",
@@ -241,6 +264,7 @@ export function ConnectProviders({
     onConnected
   )
   const withGoogle = getConnectAction(
+    language,
     setError,
     setPending,
     "google",
