@@ -38,3 +38,6 @@ credentials.json
 *.p12
 *.mobileprovision
 *.p8
+
+# asc CLI reports
+.asc/
