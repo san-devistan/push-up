@@ -19,10 +19,10 @@ function TermsPage() {
       <h2>The service</h2>
       <p>
         pumpr. counts push-ups with your iPhone camera, tracks your progress,
-        and can keep apps you choose locked until your daily goal is done. It
-        is a training aid, not a medical device or a substitute for
-        professional advice. Consult a doctor before starting any exercise
-        program, and stop if you feel pain.
+        and can keep apps you choose locked until your daily goal is done. It is
+        a training aid, not a medical device or a substitute for professional
+        advice. Consult a doctor before starting any exercise program, and stop
+        if you feel pain.
       </p>
 
       <h2>Subscriptions</h2>
@@ -39,12 +39,10 @@ function TermsPage() {
           24 hours before the period ends.
         </li>
         <li>
-          Manage or cancel in iOS Settings → Apple ID → Subscriptions.
-          Deleting the app does not cancel a subscription.
+          Manage or cancel in iOS Settings → Apple ID → Subscriptions. Deleting
+          the app does not cancel a subscription.
         </li>
-        <li>
-          Refunds are handled by Apple under App Store rules.
-        </li>
+        <li>Refunds are handled by Apple under App Store rules.</li>
       </ul>
 
       <h2>Your account</h2>

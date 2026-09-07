@@ -26,9 +26,8 @@ function LandingPage() {
           Push-ups, counted. Distractions, locked.
         </h1>
         <p className="max-w-prose text-lg leading-relaxed text-muted-foreground">
-          pumpr. turns your daily push-ups into the key that unlocks your
-          phone. Set a goal, drop to the floor, and let the camera do the
-          counting.
+          pumpr. turns your daily push-ups into the key that unlocks your phone.
+          Set a goal, drop to the floor, and let the camera do the counting.
         </p>
       </header>
 

@@ -15,11 +15,9 @@ export function LegalPage({ children, title, updated }: LegalPageProps) {
           pumpr.
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="text-sm text-muted-foreground">
-          Last updated {updated}
-        </p>
+        <p className="text-sm text-muted-foreground">Last updated {updated}</p>
       </header>
-      <article className="flex flex-col gap-6 text-base leading-relaxed [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:pl-6 [&_li]:mt-1">
+      <article className="flex flex-col gap-6 text-base leading-relaxed [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-semibold [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-6">
         {children}
       </article>
       <footer className="flex flex-wrap gap-4 border-t pt-6 text-sm text-muted-foreground">

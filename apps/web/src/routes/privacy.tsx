@@ -31,14 +31,14 @@ function PrivacyPage() {
         <li>
           <strong>Screen Time (Family Controls).</strong> If you enable the app
           blocker, the apps and categories you choose are stored on your device
-          in a private app group so the daily schedule can lock and unlock
-          them. Apple provides these selections as opaque tokens: pumpr. cannot
-          see which apps you picked, and nothing about your Screen Time leaves
-          the phone.
+          in a private app group so the daily schedule can lock and unlock them.
+          Apple provides these selections as opaque tokens: pumpr. cannot see
+          which apps you picked, and nothing about your Screen Time leaves the
+          phone.
         </li>
         <li>
-          <strong>Reminders.</strong> Training reminders are local
-          notifications scheduled on the device.
+          <strong>Reminders.</strong> Training reminders are local notifications
+          scheduled on the device.
         </li>
         <li>
           <strong>Photos.</strong> When you choose to save or share a
@@ -55,8 +55,8 @@ function PrivacyPage() {
       </p>
       <ul>
         <li>
-          Workout sessions: date, duration, repetition count, goal reached,
-          and the score derived from them.
+          Workout sessions: date, duration, repetition count, goal reached, and
+          the score derived from them.
         </li>
         <li>
           Account identifiers: a random user id, and if you sign in, the email
@@ -68,16 +68,16 @@ function PrivacyPage() {
         </li>
       </ul>
       <p>
-        This data is stored with Convex on servers located in the European
-        Union and is used only to run the app and restore your history on a new
+        This data is stored with Convex on servers located in the European Union
+        and is used only to run the app and restore your history on a new
         device. We do not sell it, and we do not use it for advertising.
       </p>
 
       <h2>Subscriptions</h2>
       <p>
         Purchases are handled by Apple. To unlock your subscription across
-        devices we use RevenueCat, which receives the App Store receipt and
-        your pumpr. user id. Apple does not share your payment details with us.
+        devices we use RevenueCat, which receives the App Store receipt and your
+        pumpr. user id. Apple does not share your payment details with us.
         RevenueCat&apos;s policy is available at revenuecat.com/privacy.
       </p>
 
@@ -98,8 +98,8 @@ function PrivacyPage() {
         </li>
         <li>
           <strong>Permissions.</strong> Camera, Screen Time, photos and
-          notifications can be revoked at any time in iOS Settings; the
-          related feature simply stops working.
+          notifications can be revoked at any time in iOS Settings; the related
+          feature simply stops working.
         </li>
       </ul>
 
