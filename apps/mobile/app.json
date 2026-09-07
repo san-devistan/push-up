@@ -14,7 +14,7 @@
         "dark": "./assets/images/icon-dark.png"
       },
       "usesAppleSignIn": true,
-      "supportsTablet": true,
+      "supportsTablet": false,
       "entitlements": {
         "com.apple.developer.family-controls": true,
         "com.apple.security.application-groups": ["group.com.rukahiga.pumpr"]
