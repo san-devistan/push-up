@@ -42,11 +42,6 @@ function formatHours(hours: number) {
   return hours === whole ? `${whole}h` : `${whole}h30`
 }
 
-/** The goal's share of the scrolling, kept readable under one percent. */
-function formatShare(share: number) {
-  return `${share < 1 ? share.toFixed(1) : Math.round(share)}%`
-}
-
 function getChangeHours(
   current: number,
   setScrollHours: Dispatch<SetStateAction<number>>
@@ -59,13 +54,13 @@ function getChangeHours(
 }
 
 function StatRow({
+  duration,
   icon: Icon,
   label,
-  minutes,
 }: {
+  duration: string
   icon: ComponentType<IconProps>
   label: string
-  minutes: number
 }) {
   return (
     <View className="flex-row items-center gap-3">
@@ -81,30 +76,40 @@ function StatRow({
         </Text>
       </View>
       <Text className="font-heading text-lg text-foreground tabular-nums">
-        {`${Math.round(minutes)} min`}
+        {duration}
       </Text>
     </View>
   )
 }
 
 export default function ScreenTimeStep() {
-  const { t } = useI18n()
+  const { formatNumber, t } = useI18n()
   const { plan } = usePlan()
   const [scrollHours, setScrollHours] = useState(DEFAULT_SCROLL_HOURS)
   const scrollMinutes = scrollHours * MINUTES_PER_HOUR
-  const goalMinutes = (plan.targetReps * SECONDS_PER_REP) / SECONDS_PER_MINUTE
+  // A small goal rounds to nothing; "0 min" would read as free rather than cheap.
+  const goalMinutes = Math.max(
+    1,
+    Math.round((plan.targetReps * SECONDS_PER_REP) / SECONDS_PER_MINUTE)
+  )
   const repsPerYear = plan.targetReps * DAYS_PER_YEAR
-  const share = (goalMinutes / scrollMinutes) * 100
+  // Intl owns the decimal mark and the space before the sign: "0.6%" in
+  // English is "0,6 %" in French, and hand-built strings get that wrong.
+  const share = goalMinutes / scrollMinutes
+  const formattedShare = formatNumber(share, {
+    maximumFractionDigits: share < 0.01 ? 1 : 0,
+    style: "percent",
+  })
   const changeHours = getChangeHours(scrollHours, setScrollHours)
 
   return (
     <View className="flex-1 gap-8">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          {"One minute a day."}
+          {t("onboarding.screenTimeTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          {"You already spend more than that scrolling."}
+          {t("onboarding.screenTimeBody")}
         </Text>
       </View>
 
@@ -115,23 +120,25 @@ export default function ScreenTimeStep() {
           value={repsPerYear}
         />
         <Text className="font-mono text-xs tracking-[3px] text-muted-foreground uppercase">
-          push-ups a year
+          {t("onboarding.pushUpsPerYear")}
         </Text>
       </View>
 
       <Slab className="gap-4">
         <StatRow
+          duration={t("onboarding.minutesShort", {
+            minutes: Math.round(scrollMinutes),
+          })}
           icon={SmartphoneIcon}
-          label="on your phone"
-          minutes={scrollMinutes}
+          label={t("onboarding.onYourPhone")}
         />
         <StatRow
+          duration={t("onboarding.minutesShort", { minutes: goalMinutes })}
           icon={TimerIcon}
-          label={`your ${plan.targetReps} push-ups`}
-          minutes={goalMinutes}
+          label={t("onboarding.yourGoalReps", { reps: plan.targetReps })}
         />
         <Text className="text-xs text-muted-foreground">
-          {`Your goal costs ${formatShare(share)} of your screen time.`}
+          {t("onboarding.goalCost", { share: formattedShare })}
         </Text>
       </Slab>
 

@@ -81,9 +81,14 @@ const ACCOUNT_AVATAR_DOM_PROPS = {
 }
 
 function ProgressRail({ step }: { step: number }) {
+  const { t } = useI18n()
+
   return (
     <View
-      accessibilityLabel={`Step ${step + 1} of ${STEP_COUNT}`}
+      accessibilityLabel={t("accessibility.step", {
+        count: STEP_COUNT,
+        step: step + 1,
+      })}
       className="flex-row gap-2"
     >
       {Array.from({ length: STEP_COUNT }, (_, index) => (
@@ -101,6 +106,7 @@ function ProgressRail({ step }: { step: number }) {
 }
 
 function getContinueAsGuest(
+  errorFallback: string,
   isAnonymous: boolean,
   onNext: () => void,
   setError: Dispatch<SetStateAction<string | null>>,
@@ -117,7 +123,7 @@ function getContinueAsGuest(
     void authClient.signIn
       .anonymous()
       .then(({ error }) => error?.message ?? null)
-      .catch(() => "Could not start guest session. Check your connection.")
+      .catch(() => errorFallback)
       .then((error) => {
         setPending(false)
         setError(error)
@@ -128,6 +134,7 @@ function getContinueAsGuest(
 }
 
 function AccountStep({ onNext }: { onNext: () => void }) {
+  const { t } = useI18n()
   const { data: session, isPending: sessionPending } = authClient.useSession()
   const primaryForeground = useCSSVariable("--color-primary-foreground")
   const [guestError, setGuestError] = useState<string | null>(null)
@@ -136,6 +143,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
   const connected = session && !isAnonymous
   const identity = session?.user.email ?? session?.user.name
   const continueAsGuest = getContinueAsGuest(
+    t("onboarding.guestError"),
     isAnonymous,
     onNext,
     setGuestError,
@@ -162,7 +170,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
               expression="upward-side-glance"
             />
             <SpeechBubble className="absolute top-1 -right-5">
-              hello.
+              {t("onboarding.hello")}
             </SpeechBubble>
           </View>
         </View>
@@ -171,10 +179,10 @@ function AccountStep({ onNext }: { onNext: () => void }) {
       <View className="gap-5">
         <View className="gap-3">
           <Text className="font-heading text-4xl leading-[44px]">
-            Your reps. Your record.
+            {t("onboarding.accountTitle")}
           </Text>
           <Text className="text-lg text-muted-foreground">
-            Connect to sync across devices, or start instantly as a guest.
+            {t("onboarding.accountBody")}
           </Text>
         </View>
 
@@ -191,7 +199,9 @@ function AccountStep({ onNext }: { onNext: () => void }) {
                 />
               </View>
               <View className="flex-1 gap-1">
-                <Text className="font-semibold">Progress sync is on</Text>
+                <Text className="font-semibold">
+                  {t("onboarding.syncOn")}
+                </Text>
                 {identity ? (
                   <Text className="text-sm text-muted-foreground">
                     {identity}
@@ -205,7 +215,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
               onPress={onNext}
               size="lg"
             >
-              next.
+              {t("onboarding.next")}
             </Button>
           </View>
         ) : (
@@ -218,7 +228,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
               onPress={continueAsGuest}
               variant="ghost"
             >
-              continue as guest.
+              {t("onboarding.guest")}
             </Button>
             {guestError ? (
               <Text selectable className="text-center text-sm text-destructive">
@@ -254,11 +264,10 @@ function GoalStep() {
     <View className="flex-1 gap-8">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Pick a goal you can repeat.
+          {t("onboarding.goalTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          Choose a number you can reach every day. Consistency matters more than
-          starting big.
+          {t("onboarding.goalBody")}
         </Text>
       </View>
 
@@ -269,7 +278,7 @@ function GoalStep() {
           value={plan.targetReps}
         />
         <Text className="font-mono text-xs tracking-[3px] text-muted-foreground uppercase">
-          every day
+          {t("onboarding.everyDay")}
         </Text>
       </View>
 
@@ -289,22 +298,23 @@ function GoalStep() {
 }
 
 function CameraStep() {
+  const { t } = useI18n()
+
   return (
     <View className="flex-1 gap-5">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Your phone counts every rep.
+          {t("onboarding.cameraTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          pumpr. uses on-device pose tracking to count your push-ups. Place your
-          phone flat on the ground with the camera facing you.
+          {t("onboarding.cameraBody")}
         </Text>
       </View>
 
       <TrackingIllustration />
 
       <Text className="text-center text-sm text-muted-foreground">
-        Tracking stays on your device. No video leaves your phone.
+        {t("onboarding.cameraPrivacy")}
       </Text>
     </View>
   )
@@ -355,6 +365,7 @@ function getNext(
 }
 
 export default function OnboardingSetup() {
+  const { t } = useI18n()
   const router = useRouter()
   const [index, setIndex] = useState(0)
   const step = STEPS[index] ?? "account"
@@ -387,7 +398,7 @@ export default function OnboardingSetup() {
               sfx={isLast ? "success" : undefined}
               size="lg"
             >
-              {isLast ? "see my plan." : "next."}
+              {isLast ? t("onboarding.seePlan") : t("onboarding.next")}
             </Button>
           ) : null}
         </ScrollView>

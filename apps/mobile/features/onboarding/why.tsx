@@ -7,6 +7,8 @@ import {
 } from "@/components/icons"
 import { NumericText } from "@/components/numeric-text"
 import { Overline, Slab } from "@/features/workout/_components/figures"
+import { useI18n } from "@/hooks/use-i18n"
+import type { TranslationKey } from "@/lib/i18n"
 import { Progress, Text } from "panelui-native"
 import { useEffect, useState, type ComponentType } from "react"
 import { StyleSheet, View } from "react-native"
@@ -22,10 +24,10 @@ const YEARS_GAINED = 4
 const SECOND_GAUGE_DELAY_MS = 220
 
 const BENEFITS = [
-  { icon: BicepsFlexedIcon, label: "whole upper body" },
-  { icon: TimerIcon, label: "10 min a day" },
-  { icon: HouseIcon, label: "no gym" },
-] satisfies { icon: ComponentType<IconProps>; label: string }[]
+  { icon: BicepsFlexedIcon, key: "onboarding.benefitUpperBody" },
+  { icon: TimerIcon, key: "onboarding.benefitTenMinutes" },
+  { icon: HouseIcon, key: "onboarding.benefitNoGym" },
+] satisfies { icon: ComponentType<IconProps>; key: TranslationKey }[]
 
 const styles = StyleSheet.create({
   readout: { fontSize: 22, lineHeight: 26 },
@@ -52,11 +54,13 @@ function Gauge({
   delay = 0,
   icon: Icon,
   label,
+  unit,
   value,
 }: {
   delay?: number
   icon: ComponentType<IconProps>
   label: string
+  unit: string
   value: number
 }) {
   const revealed = useRevealedValue(value, delay)
@@ -85,7 +89,9 @@ function Gauge({
           style={styles.readout}
           value={revealed}
         />
-        <Text className="font-mono text-xs text-muted-foreground">yrs</Text>
+        <Text className="font-mono text-xs text-muted-foreground">
+          {unit}
+        </Text>
       </View>
       <Progress maxValue={YEARS_GAINED} size="lg" value={revealed} />
     </View>
@@ -93,31 +99,40 @@ function Gauge({
 }
 
 export default function WhyPushUpsStep() {
+  const { t } = useI18n()
+  const unit = t("onboarding.yearsShort")
+
   return (
     <View className="flex-1 justify-between gap-8">
       <Text className="font-heading text-4xl leading-[44px]">
-        {"Push-ups are enough."}
+        {t("onboarding.whyTitle")}
       </Text>
 
       <Slab className="gap-5">
-        <Overline>years of life gained</Overline>
-        <Gauge icon={ArmchairIcon} label="doing nothing" value={0} />
+        <Overline>{t("onboarding.yearsGained")}</Overline>
+        <Gauge
+          icon={ArmchairIcon}
+          label={t("onboarding.doingNothing")}
+          unit={unit}
+          value={0}
+        />
         <Gauge
           delay={SECOND_GAUGE_DELAY_MS}
           icon={BicepsFlexedIcon}
-          label="one set a day"
+          label={t("onboarding.oneSetADay")}
+          unit={unit}
           value={YEARS_GAINED}
         />
         <Text className="text-xs text-muted-foreground">
-          {"Pooled study of 650,000 adults, PLoS Medicine."}
+          {t("onboarding.whySource")}
         </Text>
       </Slab>
 
       <View className="flex-row gap-3">
-        {BENEFITS.map(({ icon: Icon, label }) => (
+        {BENEFITS.map(({ icon: Icon, key }) => (
           <View
             className="flex-1 flex-shrink items-center gap-2 rounded-2xl bg-muted p-3"
-            key={label}
+            key={key}
           >
             <Icon size={20} />
             <Text
@@ -126,7 +141,7 @@ export default function WhyPushUpsStep() {
               minimumFontScale={0.7}
               numberOfLines={2}
             >
-              {label}
+              {t(key)}
             </Text>
           </View>
         ))}
