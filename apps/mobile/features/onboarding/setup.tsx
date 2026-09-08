@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import TrackingIllustration from "@/features/onboarding/_components/tracking-illustration"
 import AppBlockerStep from "@/features/onboarding/app-blocker"
 import ScheduleStep from "@/features/onboarding/schedule"
+import ScreenTimeStep from "@/features/onboarding/screen-time"
 import { completeOnboarding } from "@/features/onboarding/storage"
+import WhyPushUpsStep from "@/features/onboarding/why"
 import WorkoutAvatar from "@/features/workout/_components/avatar"
 import { ConnectProviders } from "@/features/workout/_components/connect"
 import { Slab } from "@/features/workout/_components/figures"
@@ -33,22 +35,30 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
 const HAS_APP_BLOCKER_STEP = process.env.EXPO_OS === "ios"
-const STEP_COUNT = HAS_APP_BLOCKER_STEP ? 6 : 5
-const LAST_STEP = STEP_COUNT - 1
-const WHY_PUSH_UPS = [
-  {
-    body: "Chest, shoulders, triceps and core, all loaded in a single movement.",
-    title: "One move, whole upper body",
-  },
-  {
-    body: "Bodyweight only. Floor, phone, ten minutes. Nothing to book or buy.",
-    title: "No gym, no equipment",
-  },
-  {
-    body: "A small goal hit every day beats a big session skipped. pumpr. counts, you show up.",
-    title: "Consistency builds the physique",
-  },
+const ALL_STEPS = [
+  "account",
+  "goal",
+  "camera",
+  "appBlocker",
+  "screenTime",
+  "schedule",
+  "why",
 ] as const
+
+type StepKey = (typeof ALL_STEPS)[number]
+
+/**
+ * The running order. Keying the flow by name rather than by index is what lets
+ * the App Blocker drop out on Android — and any future step slot in — without
+ * every `step === 3` elsewhere in the file quietly meaning something else.
+ */
+const STEPS: StepKey[] = ALL_STEPS.filter(
+  (step) => step !== "appBlocker" || HAS_APP_BLOCKER_STEP
+)
+const STEP_COUNT = STEPS.length
+const LAST_STEP = STEP_COUNT - 1
+/** Steps that own the vertical gesture themselves, so the page must not scroll. */
+const FIXED_STEPS = new Set<StepKey>(["appBlocker", "schedule"])
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 const styles = StyleSheet.create({
   accountHeroAvatar: {
@@ -300,52 +310,32 @@ function CameraStep() {
   )
 }
 
-function WhyPushUpsStep() {
-  return (
-    <View className="flex-1 gap-6">
-      <View className="gap-3">
-        <Text className="font-heading text-4xl leading-[44px]">
-          Push-ups are enough.
-        </Text>
-        <Text className="text-lg text-muted-foreground">
-          The only exercise you need for an athletic physique. Your plan is set;
-          from here it is one set a day.
-        </Text>
-      </View>
-      <View className="gap-3">
-        {WHY_PUSH_UPS.map((item) => (
-          <Slab className="gap-1" key={item.title}>
-            <Text className="font-semibold">{item.title}</Text>
-            <Text className="text-sm text-muted-foreground">{item.body}</Text>
-          </Slab>
-        ))}
-      </View>
-    </View>
-  )
-}
-
-function StepContent({ onNext, step }: { onNext: () => void; step: number }) {
-  if (step === 0) {
+function StepContent({ onNext, step }: { onNext: () => void; step: StepKey }) {
+  if (step === "account") {
     return <AccountStep onNext={onNext} />
   }
 
-  if (step === 1) {
+  if (step === "goal") {
     return <GoalStep />
   }
 
-  if (step === 2) {
+  if (step === "camera") {
     return <CameraStep />
   }
 
-  if (HAS_APP_BLOCKER_STEP && step === 3) {
+  if (step === "appBlocker") {
     return <AppBlockerStep />
   }
 
-  if (step === LAST_STEP) {
-    return <WhyPushUpsStep />
+  if (step === "screenTime") {
+    return <ScreenTimeStep />
   }
 
-  return <ScheduleStep />
+  if (step === "schedule") {
+    return <ScheduleStep />
+  }
+
+  return <WhyPushUpsStep />
 }
 
 function getNext(
@@ -366,22 +356,21 @@ function getNext(
 
 export default function OnboardingSetup() {
   const router = useRouter()
-  const [step, setStep] = useState(0)
-  const next = getNext(router, step, setStep)
-  const action = step === LAST_STEP ? "see my plan." : "next."
-  // Only the schedule step owns a horizontal ruler that fights the scroll.
-  const scrollEnabled = step !== LAST_STEP - 1
+  const [index, setIndex] = useState(0)
+  const step = STEPS[index] ?? "account"
+  const next = getNext(router, index, setIndex)
+  const isLast = index === LAST_STEP
 
   return (
     <View style={styles.screen}>
-      {step === 2 ? <PhysicalCameraTrace /> : null}
+      {step === "camera" ? <PhysicalCameraTrace /> : null}
       <SafeAreaView style={styles.screen}>
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
-          scrollEnabled={scrollEnabled}
+          scrollEnabled={!FIXED_STEPS.has(step)}
         >
-          <ProgressRail step={step} />
+          <ProgressRail step={index} />
           <Animated.View
             entering={ENTER}
             exiting={EXIT}
@@ -390,15 +379,15 @@ export default function OnboardingSetup() {
           >
             <StepContent onNext={next} step={step} />
           </Animated.View>
-          {step > 0 ? (
+          {index > 0 ? (
             <Button
               className="h-14 rounded-full bg-foreground"
               labelClassName="font-heading lowercase text-lg text-background"
               onPress={next}
+              sfx={isLast ? "success" : undefined}
               size="lg"
-              sfx={step === STEP_COUNT - 1 ? "success" : undefined}
             >
-              {action}
+              {isLast ? "see my plan." : "next."}
             </Button>
           ) : null}
         </ScrollView>

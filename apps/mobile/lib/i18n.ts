@@ -63,6 +63,17 @@ const MESSAGES = {
     ko: "일일 푸시업 목표",
     "zh-Hans": "每日俯卧撑目标",
   },
+  "accessibility.dailyScreenTime": {
+    en: "Hours a day on your phone",
+    fr: "Heures par jour sur ton téléphone",
+    es: "Horas al día en tu teléfono",
+    "pt-BR": "Horas por dia no seu celular",
+    de: "Stunden pro Tag am Handy",
+    it: "Ore al giorno sul telefono",
+    ja: "1日のスマホ利用時間",
+    ko: "하루 휴대폰 사용 시간",
+    "zh-Hans": "每天使用手机的小时数",
+  },
   "accessibility.decrease": {
     en: "Decrease {label}",
     fr: "Diminuer {label}",
