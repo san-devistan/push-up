@@ -13,10 +13,31 @@ private struct DailyAppBlockerState: Record {
 
 private enum DailyAppBlockerError: LocalizedError {
   case notAuthorized
+  case noPresenter
 
   var errorDescription: String? {
-    "Screen Time access is required to block apps."
+    switch self {
+    case .notAuthorized:
+      return "Screen Time access is required to block apps."
+    case .noPresenter:
+      return "The app picker could not be opened."
+    }
   }
+}
+
+@MainActor
+private func topViewController() -> UIViewController? {
+  let window = UIApplication.shared.connectedScenes
+    .compactMap { $0 as? UIWindowScene }
+    .flatMap(\.windows)
+    .first { $0.isKeyWindow }
+  var top = window?.rootViewController
+
+  while let presented = top?.presentedViewController {
+    top = presented
+  }
+
+  return top
 }
 
 private enum DailyAppBlockerStore {
@@ -224,6 +245,53 @@ private final class DailyAppBlockerPickerView: ExpoView {
   }
 }
 
+/// Drives Apple's own picker sheet. The picker is a SwiftUI modifier, so it
+/// needs a host in the view hierarchy; the host itself stays invisible and is
+/// torn down once the sheet closes.
+@MainActor
+private final class FamilyPickerPresenter: ObservableObject {
+  @Published var isPresented = true
+  @Published var selection: FamilyActivitySelection
+  private var onFinish: ((FamilyActivitySelection) -> Void)?
+
+  init(
+    selection: FamilyActivitySelection,
+    onFinish: @escaping (FamilyActivitySelection) -> Void
+  ) {
+    self.selection = selection
+    self.onFinish = onFinish
+  }
+
+  func finish() {
+    guard let onFinish else {
+      return
+    }
+
+    self.onFinish = nil
+    onFinish(selection)
+  }
+}
+
+@available(iOS 16.0, *)
+private struct FamilyPickerSheet: View {
+  @ObservedObject var presenter: FamilyPickerPresenter
+
+  var body: some View {
+    Color.clear.familyActivityPicker(
+      isPresented: Binding(
+        get: { presenter.isPresented },
+        set: { presented in
+          presenter.isPresented = presented
+          if !presented {
+            presenter.finish()
+          }
+        }
+      ),
+      selection: $presenter.selection
+    )
+  }
+}
+
 public final class DailyAppBlockerModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PumprDailyAppBlocker")
@@ -244,6 +312,39 @@ public final class DailyAppBlockerModule: Module {
         // says "not authorized" and the screen keeps offering the button.
       }
       return await MainActor.run { DailyAppBlockerStore.state() }
+    }
+
+    AsyncFunction("presentPicker") { () async throws -> DailyAppBlockerState in
+      try await withCheckedThrowingContinuation { continuation in
+        Task { @MainActor in
+          guard let presentingController = topViewController() else {
+            continuation.resume(throwing: DailyAppBlockerError.noPresenter)
+            return
+          }
+
+          var host: UIHostingController<FamilyPickerSheet>?
+          let presenter = FamilyPickerPresenter(
+            selection: DailyAppBlockerStore.selection()
+          ) { selection in
+            DailyAppBlockerStore.saveSelection(selection)
+            let state = DailyAppBlockerStore.state()
+            // Let Apple's sheet finish its own dismissal before the invisible
+            // host goes away, otherwise the transition stutters.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+              host?.presentingViewController?.dismiss(animated: false)
+              continuation.resume(returning: state)
+            }
+          }
+
+          let controller = UIHostingController(
+            rootView: FamilyPickerSheet(presenter: presenter)
+          )
+          host = controller
+          controller.view.backgroundColor = .clear
+          controller.modalPresentationStyle = .overFullScreen
+          presentingController.present(controller, animated: false)
+        }
+      }
     }
 
     AsyncFunction("setEnabled") { (enabled: Bool) throws -> DailyAppBlockerState in

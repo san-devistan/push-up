@@ -16,6 +16,7 @@ export type DailyAppBlockerState = {
 
 type NativeDailyAppBlocker = {
   getState(): Promise<DailyAppBlockerState>
+  presentPicker(): Promise<DailyAppBlockerState>
   requestAuthorization(): Promise<DailyAppBlockerState>
   setEnabled(enabled: boolean): Promise<DailyAppBlockerState>
   sync(goalCompleted: boolean, localDate: string): Promise<void>
@@ -33,6 +34,11 @@ const UNSUPPORTED_STATE = {
 
 export function getDailyAppBlockerState() {
   return nativeModule?.getState() ?? Promise.resolve(UNSUPPORTED_STATE)
+}
+
+/** Opens Apple's own "Select Apps & Websites" sheet and resolves once closed. */
+export function presentDailyAppBlockerPicker() {
+  return nativeModule?.presentPicker() ?? Promise.resolve(UNSUPPORTED_STATE)
 }
 
 export function requestDailyAppBlockerAuthorization() {

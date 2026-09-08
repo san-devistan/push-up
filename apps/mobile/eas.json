@@ -8,6 +8,9 @@
       "autoIncrement": true,
       "developmentClient": true,
       "distribution": "internal",
+      "ios": {
+        "credentialsSource": "local"
+      },
       "env": {
         "EXPO_PUBLIC_META_APP_ID": "1565443168652464"
       }

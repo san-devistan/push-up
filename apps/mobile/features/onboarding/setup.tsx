@@ -369,8 +369,8 @@ export default function OnboardingSetup() {
   const [step, setStep] = useState(0)
   const next = getNext(router, step, setStep)
   const action = step === LAST_STEP ? "see my plan." : "next."
-  const scrollEnabled =
-    step !== LAST_STEP - 1 && !(HAS_APP_BLOCKER_STEP && step === 3)
+  // Only the schedule step owns a horizontal ruler that fights the scroll.
+  const scrollEnabled = step !== LAST_STEP - 1
 
   return (
     <View style={styles.screen}>

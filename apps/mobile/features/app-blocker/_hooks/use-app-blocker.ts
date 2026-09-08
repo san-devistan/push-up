@@ -1,6 +1,7 @@
 import { useI18n } from "@/hooks/use-i18n"
 import {
   getDailyAppBlockerState,
+  presentDailyAppBlockerPicker,
   requestDailyAppBlockerAuthorization,
   setDailyAppBlockerEnabled,
   type DailyAppBlockerState,
@@ -61,6 +62,46 @@ async function updateEnabled(
   }
 }
 
+/**
+ * Ask for Screen Time if needed, then hand over to Apple's own picker sheet.
+ * The blocker follows the selection: something picked turns it on, an empty
+ * selection turns it off.
+ */
+async function chooseApps(
+  current: DailyAppBlockerState | null,
+  fallback: string,
+  setError: (error: string | null) => void,
+  setPending: (pending: boolean) => void,
+  setState: (state: DailyAppBlockerState) => void
+) {
+  setPending(true)
+  setError(null)
+  try {
+    let next = current ?? (await getDailyAppBlockerState())
+
+    if (next.authorizationStatus !== "approved") {
+      next = await requestDailyAppBlockerAuthorization()
+    }
+
+    if (next.authorizationStatus === "approved") {
+      next = await presentDailyAppBlockerPicker()
+
+      if (next.selectedCount > 0 && !next.enabled) {
+        next = await setDailyAppBlockerEnabled(true)
+      }
+      if (next.selectedCount === 0 && next.enabled) {
+        next = await setDailyAppBlockerEnabled(false)
+      }
+    }
+
+    setState(next)
+  } catch (cause) {
+    setError(errorMessage(cause, fallback))
+  } finally {
+    setPending(false)
+  }
+}
+
 export function useAppBlocker() {
   const { t } = useI18n()
   const errorFallback = t("appBlocker.error")
@@ -90,15 +131,11 @@ export function useAppBlocker() {
     authorize: () =>
       state?.authorizationStatus === "denied"
         ? void Linking.openSettings()
-        : setEnabled(true),
+        : void chooseApps(state, errorFallback, setError, setPending, setState),
     error,
-    onSelectionChange: ({
-      nativeEvent,
-    }: {
-      nativeEvent: { selectedCount: number }
-    }) => setEnabled(nativeEvent.selectedCount > 0),
     pending,
     reload: () => void loadState(() => true, errorFallback, setError, setState),
+    setEnabled,
     state,
   }
 }

@@ -24,8 +24,6 @@ import { usePlan } from "@/features/workout/_hooks/use-plan"
 import {
   goalAtIndex,
   LAST_GOAL_INDEX,
-  MAX_TARGET_REPS,
-  MIN_TARGET_REPS,
   nearestGoalIndex,
 } from "@/features/workout/_lib/goal"
 import type { ReminderState } from "@/features/workout/_lib/reminders"
@@ -161,7 +159,7 @@ function SettingRow({
 }
 
 function GoalFields() {
-  const { formatNumber, t } = useI18n()
+  const { t } = useI18n()
   const { plan, updatePlan } = usePlan()
   const targetIndex = nearestGoalIndex(plan.targetReps)
   const setTarget = getSetTarget(updatePlan, targetIndex)
@@ -173,29 +171,18 @@ function GoalFields() {
         <Text className="flex-1 font-semibold">{t("plan.dailyGoal")}</Text>
         <NumericText align="end" className="text-xl" value={plan.targetReps} />
       </View>
-      {/* The end labels are what read the track as a range, not a button. */}
-      <View className="gap-1">
-        <Slider
-          formatValue={formatGoalIndex}
-          headerClassName="hidden"
-          label={t("accessibility.dailyGoal")}
-          max={LAST_GOAL_INDEX}
-          onValueChange={setTarget}
-          step={1}
-          value={targetIndex}
-        />
-        <View className="flex-row items-center justify-between">
-          <Text className="font-mono text-xs text-muted-foreground">
-            {formatNumber(MIN_TARGET_REPS)}
-          </Text>
-          <Text className="font-mono text-xs text-muted-foreground">
-            {t("plan.dragToAdjust")}
-          </Text>
-          <Text className="font-mono text-xs text-muted-foreground">
-            {formatNumber(MAX_TARGET_REPS)}
-          </Text>
-        </View>
-      </View>
+      {/* A darker track: on the card's own surface the default one reads as a
+          flat pill, so nothing says the thumb can be dragged. */}
+      <Slider
+        formatValue={formatGoalIndex}
+        headerClassName="hidden"
+        label={t("accessibility.dailyGoal")}
+        max={LAST_GOAL_INDEX}
+        onValueChange={setTarget}
+        step={1}
+        trackClassName="bg-foreground/15"
+        value={targetIndex}
+      />
     </>
   )
 }

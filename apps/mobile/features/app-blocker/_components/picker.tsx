@@ -1,60 +1,71 @@
+import { ShieldCheckIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import type { AppBlockerController } from "@/features/app-blocker/_hooks/use-app-blocker"
 import { useI18n } from "@/hooks/use-i18n"
-import { DailyAppBlockerPicker } from "@/modules/daily-app-blocker"
 import { Text } from "panelui-native"
-import { ActivityIndicator, StyleSheet, View } from "react-native"
+import { ActivityIndicator, View } from "react-native"
 
-const styles = StyleSheet.create({
-  picker: {
-    borderCurve: "continuous",
-    borderRadius: 24,
-    height: 500,
-    overflow: "hidden",
-  },
-})
-
+/**
+ * A single button, not an embedded list: Apple's picker is a sheet, and
+ * inlining it pushed the rest of the screen — including the continue button —
+ * out of reach.
+ */
 export function AppBlockerPicker({
   controller,
 }: {
   controller: AppBlockerController
 }) {
-  const { t } = useI18n()
-  const { authorize, error, onSelectionChange, pending, state } = controller
-  const approved = state?.authorizationStatus === "approved"
+  const { formatNumber, t } = useI18n()
+  const { authorize, error, pending, state } = controller
+
+  if (!state) {
+    return (
+      <View className="items-center justify-center py-6">
+        <ActivityIndicator />
+      </View>
+    )
+  }
+
+  if (state.authorizationStatus === "unsupported") {
+    return (
+      <Text className="py-4 text-muted-foreground">
+        {t("appBlocker.rebuild")}
+      </Text>
+    )
+  }
+
+  const denied = state.authorizationStatus === "denied"
+  const approved = state.authorizationStatus === "approved"
+  const label = denied
+    ? t("appBlocker.openSettings")
+    : approved
+      ? t("appBlocker.chooseApps")
+      : t("appBlocker.allow")
 
   return (
     <View className="gap-3">
-      {state ? (
-        state.authorizationStatus === "unsupported" ? (
-          <Text className="py-4 text-muted-foreground">
-            {t("appBlocker.rebuild")}
-          </Text>
-        ) : approved ? (
-          <DailyAppBlockerPicker
-            footerText={t("appBlocker.pickerFooter")}
-            headerText={t("appBlocker.pickerHeader")}
-            onSelectionChange={onSelectionChange}
-            style={styles.picker}
-          />
-        ) : (
-          <Button
-            className="mt-3 w-full rounded-full"
-            disabled={pending}
-            onPress={authorize}
-          >
-            {t(
-              state.authorizationStatus === "denied"
-                ? "appBlocker.openSettings"
-                : "appBlocker.allow"
-            )}
-          </Button>
-        )
-      ) : (
-        <View className="items-center justify-center" style={styles.picker}>
-          <ActivityIndicator />
-        </View>
-      )}
+      <Text className="text-muted-foreground">
+        {t("appBlocker.pickerHeader")}
+      </Text>
+      <Button
+        className="h-14 w-full rounded-full"
+        disabled={pending}
+        loading={pending}
+        onPress={authorize}
+      >
+        <ShieldCheckIcon size={18} />
+        {label}
+      </Button>
+      {approved && state.selectedCount > 0 ? (
+        <Text className="text-center font-semibold text-sm text-primary">
+          {t("appBlocker.selectedCount", {
+            count: formatNumber(state.selectedCount),
+          })}
+        </Text>
+      ) : null}
+      <Text className="text-center text-xs text-muted-foreground">
+        {t("appBlocker.pickerFooter")}
+      </Text>
       {error ? (
         <Text selectable className="text-sm text-destructive">
           {error}
