@@ -145,12 +145,12 @@ function RequirementText({
   const { formatNumber, t } = useI18n()
   const total = getCompactNumber(requirement.totalReps)
   const textClassName = cn(
-    "text-[15px] text-muted-foreground",
+    "text-[13px] text-muted-foreground",
     emphasized && "text-foreground"
   )
 
   return (
-    <Text className={cn(textClassName, "flex-1 text-right")}>
+    <Text className={textClassName} numberOfLines={1}>
       <RequirementLabel
         emphasized={emphasized}
         template={t("levels.total", { value: NUMERIC_TEXT_SLOT })}
@@ -205,10 +205,12 @@ function LevelTimelineItem({
       >
         {isCompleted ? <CheckIcon size={10} strokeWidth={3} /> : null}
       </Timeline.Indicator>
-      <Timeline.Content className="-translate-y-1 flex-row items-center justify-between gap-3 pb-4">
+      {/* Stacked, not a row: the requirement line is too long to sit beside
+          the title without wrapping mid-phrase on a narrow screen. */}
+      <Timeline.Content className="-translate-y-1 gap-0.5 pb-4">
         <Timeline.Title
           className={cn(
-            "shrink-0 font-heading text-base text-muted-foreground",
+            "font-heading text-base text-muted-foreground",
             isNextLevel && "text-foreground"
           )}
         >

@@ -4,6 +4,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CrosshairIcon,
+  PlayIcon,
   SolidBellIcon,
   TrophyIcon,
   Volume2Icon,
@@ -23,6 +24,8 @@ import { usePlan } from "@/features/workout/_hooks/use-plan"
 import {
   goalAtIndex,
   LAST_GOAL_INDEX,
+  MAX_TARGET_REPS,
+  MIN_TARGET_REPS,
   nearestGoalIndex,
 } from "@/features/workout/_lib/goal"
 import type { ReminderState } from "@/features/workout/_lib/reminders"
@@ -30,8 +33,9 @@ import type { TrainingPlan } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
 import { hapticFeedback, selectionTick } from "@/lib/haptics"
 import { FONT_FAMILY } from "@/lib/theme"
+import { Host, Switch } from "@expo/ui"
 import { Link, Stack, useRouter } from "expo-router"
-import { Slider, Switch, Text } from "panelui-native"
+import { Slider, Text } from "panelui-native"
 import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import type { ComponentType } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
@@ -142,16 +146,22 @@ function SettingRow({
   const SettingIcon = icon
 
   return (
-    <View className="flex-row items-center justify-between gap-4">
+    <View
+      accessibilityLabel={label}
+      className="flex-row items-center justify-between gap-4"
+    >
       <SettingIcon size={18} />
+      {/* The row owns the label; the native switch would print a second one. */}
       <Text className="flex-1 font-semibold">{label}</Text>
-      <Switch onValueChange={onCheckedChange} value={checked} />
+      <Host matchContents>
+        <Switch onValueChange={onCheckedChange} value={checked} />
+      </Host>
     </View>
   )
 }
 
 function GoalFields() {
-  const { t } = useI18n()
+  const { formatNumber, t } = useI18n()
   const { plan, updatePlan } = usePlan()
   const targetIndex = nearestGoalIndex(plan.targetReps)
   const setTarget = getSetTarget(updatePlan, targetIndex)
@@ -163,15 +173,29 @@ function GoalFields() {
         <Text className="flex-1 font-semibold">{t("plan.dailyGoal")}</Text>
         <NumericText align="end" className="text-xl" value={plan.targetReps} />
       </View>
-      <Slider
-        formatValue={formatGoalIndex}
-        headerClassName="hidden"
-        label={t("accessibility.dailyGoal")}
-        max={LAST_GOAL_INDEX}
-        onValueChange={setTarget}
-        step={1}
-        value={targetIndex}
-      />
+      {/* The end labels are what read the track as a range, not a button. */}
+      <View className="gap-1">
+        <Slider
+          formatValue={formatGoalIndex}
+          headerClassName="hidden"
+          label={t("accessibility.dailyGoal")}
+          max={LAST_GOAL_INDEX}
+          onValueChange={setTarget}
+          step={1}
+          value={targetIndex}
+        />
+        <View className="flex-row items-center justify-between">
+          <Text className="font-mono text-xs text-muted-foreground">
+            {formatNumber(MIN_TARGET_REPS)}
+          </Text>
+          <Text className="font-mono text-xs text-muted-foreground">
+            {t("plan.dragToAdjust")}
+          </Text>
+          <Text className="font-mono text-xs text-muted-foreground">
+            {formatNumber(MAX_TARGET_REPS)}
+          </Text>
+        </View>
+      </View>
     </>
   )
 }
@@ -257,18 +281,23 @@ function LevelsRow() {
   )
 }
 
-function getOpenOnboarding(router: ReturnType<typeof useRouter>) {
-  return () => router.push("/onboarding")
-}
-
-function OpenOnboardingButton() {
-  const router = useRouter()
-  const openOnboarding = getOpenOnboarding(router)
+function ReplayOnboardingRow() {
+  const { t } = useI18n()
+  const label = t("plan.replayOnboarding")
 
   return (
-    <Button onPress={openOnboarding} variant="outline">
-      open onboarding
-    </Button>
+    <Link asChild href="/onboarding">
+      <Pressable
+        accessibilityLabel={label}
+        className="min-h-8 flex-row items-center gap-4 active:opacity-60"
+        hitSlop={6}
+        onPress={selectionTick}
+      >
+        <PlayIcon size={18} />
+        <Text className="flex-1 font-semibold">{label}</Text>
+        <ChevronRightIcon size={18} />
+      </Pressable>
+    </Link>
   )
 }
 
@@ -318,6 +347,8 @@ export default function SettingsPage() {
             {process.env.EXPO_OS === "ios" ? <AppBlockerSettings /> : null}
             {process.env.EXPO_OS === "ios" ? <Divider /> : null}
             <LevelsRow />
+            <Divider />
+            <ReplayOnboardingRow />
           </Slab>
         </View>
 
@@ -326,8 +357,6 @@ export default function SettingsPage() {
             <Slab>
               <Overline>{t("plan.preferences")}</Overline>
               <PreferencesSection />
-              <Divider />
-              <OpenOnboardingButton />
             </Slab>
           </View>
         ) : null}
