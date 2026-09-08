@@ -173,6 +173,18 @@ const MESSAGES = {
     ko: "차단할 앱 선택",
     "zh-Hans": "选择要屏蔽的应用",
   },
+  "appBlocker.relaunchHint": {
+    en: "An app already open stays shielded until you close and reopen it.",
+    fr: "Une app déjà ouverte reste bloquée tant que vous ne l’avez pas fermée puis rouverte.",
+    es: "Una app ya abierta sigue bloqueada hasta que la cierras y la vuelves a abrir.",
+    "pt-BR":
+      "Um app já aberto continua bloqueado até você fechar e abrir de novo.",
+    de: "Eine bereits geöffnete App bleibt gesperrt, bis du sie schließt und neu öffnest.",
+    it: "Un’app già aperta resta bloccata finché non la chiudi e la riapri.",
+    ja: "すでに開いているアプリは、一度閉じて開き直すまでブロックされたままです。",
+    ko: "이미 열려 있는 앱은 닫았다가 다시 열어야 차단이 풀립니다.",
+    "zh-Hans": "已经打开的应用要关闭后重新打开，屏蔽才会解除。",
+  },
   "appBlocker.selectedCount": {
     en: "{count} selected",
     fr: "{count} sélectionnées",

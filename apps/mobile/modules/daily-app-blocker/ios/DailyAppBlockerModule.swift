@@ -107,8 +107,11 @@ private enum DailyAppBlockerStore {
     defaults.set(enabled, forKey: enabledKey)
 
     if enabled {
-      try ensureMonitoring()
+      // Shields first, monitoring second. The shield is what the user feels;
+      // monitoring only exists to wake us up, and a failure to start it must
+      // never be the reason the apps stay locked.
       applyShields(localDate: currentLocalDate())
+      try ensureMonitoring()
     } else {
       DeviceActivityCenter().stopMonitoring([activity])
       clearShields()
@@ -127,8 +130,8 @@ private enum DailyAppBlockerStore {
       return
     }
 
-    try ensureMonitoring()
     applyShields(localDate: localDate)
+    try ensureMonitoring()
   }
 
   private static func ensureMonitoring() throws {

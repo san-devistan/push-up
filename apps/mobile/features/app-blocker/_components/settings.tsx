@@ -40,6 +40,11 @@ export function AppBlockerSettings() {
         <Text className="flex-1 font-semibold">{t("appBlocker.title")}</Text>
         <Text className="text-sm text-muted-foreground">{summary}</Text>
       </Pressable>
+      {state?.enabled && state.selectedCount > 0 ? (
+        <Text className="text-xs text-muted-foreground">
+          {t("appBlocker.relaunchHint")}
+        </Text>
+      ) : null}
       {error ? (
         <Text selectable className="text-sm text-destructive">
           {error}
