@@ -41,3 +41,6 @@ credentials.json
 
 # asc CLI reports
 .asc/
+
+# Mirror host, kept out of a public repo
+scripts/dev/vps.env.local
