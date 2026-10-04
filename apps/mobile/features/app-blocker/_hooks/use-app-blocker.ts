@@ -1,3 +1,4 @@
+import { usePro } from "@/features/billing/_hooks/use-pro"
 import { useI18n } from "@/hooks/use-i18n"
 import {
   getDailyAppBlockerState,
@@ -36,18 +37,34 @@ async function loadState(
   }
 }
 
+type BlockerUpdate = {
+  canEnable: boolean
+  current: DailyAppBlockerState | null
+  fallback: string
+  setError: (error: string | null) => void
+  setPending: (pending: boolean) => void
+  setState: (state: DailyAppBlockerState) => void
+}
+
 async function updateEnabled(
   enabled: boolean,
-  current: DailyAppBlockerState | null,
-  fallback: string,
-  setError: (error: string | null) => void,
-  setPending: (pending: boolean) => void,
-  setState: (state: DailyAppBlockerState) => void
+  {
+    canEnable,
+    current,
+    fallback,
+    setError,
+    setPending,
+    setState,
+  }: BlockerUpdate
 ) {
   setPending(true)
   setError(null)
   try {
     let next = current ?? (await getDailyAppBlockerState())
+    if (enabled && !canEnable) {
+      setState(next)
+      return
+    }
     if (enabled && next.authorizationStatus !== "approved") {
       next = await requestDailyAppBlockerAuthorization()
     }
@@ -64,16 +81,17 @@ async function updateEnabled(
 
 /**
  * Ask for Screen Time if needed, then hand over to Apple's own picker sheet.
- * The blocker follows the selection: something picked turns it on, an empty
- * selection turns it off.
+ * Once Pro is active, the blocker follows the selection: something picked
+ * turns it on, an empty selection turns it off. Before Pro, it only saves it.
  */
-async function chooseApps(
-  current: DailyAppBlockerState | null,
-  fallback: string,
-  setError: (error: string | null) => void,
-  setPending: (pending: boolean) => void,
-  setState: (state: DailyAppBlockerState) => void
-) {
+async function chooseApps({
+  canEnable,
+  current,
+  fallback,
+  setError,
+  setPending,
+  setState,
+}: BlockerUpdate) {
   setPending(true)
   setError(null)
   try {
@@ -86,7 +104,7 @@ async function chooseApps(
     if (next.authorizationStatus === "approved") {
       next = await presentDailyAppBlockerPicker()
 
-      if (next.selectedCount > 0 && !next.enabled) {
+      if (canEnable && next.selectedCount > 0 && !next.enabled) {
         next = await setDailyAppBlockerEnabled(true)
       }
       if (next.selectedCount === 0 && next.enabled) {
@@ -104,10 +122,20 @@ async function chooseApps(
 
 export function useAppBlocker() {
   const { t } = useI18n()
+  const { isLoading: proLoading, isPro } = usePro()
+  const canEnable = !proLoading && isPro
   const errorFallback = t("appBlocker.error")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [state, setState] = useState<DailyAppBlockerState | null>(null)
+  const update = {
+    canEnable,
+    current: state,
+    fallback: errorFallback,
+    setError,
+    setPending,
+    setState,
+  }
 
   useEffect(() => {
     let active = true
@@ -117,21 +145,13 @@ export function useAppBlocker() {
     }
   }, [errorFallback])
 
-  const setEnabled = (enabled: boolean) =>
-    void updateEnabled(
-      enabled,
-      state,
-      errorFallback,
-      setError,
-      setPending,
-      setState
-    )
+  const setEnabled = (enabled: boolean) => void updateEnabled(enabled, update)
 
   return {
     authorize: () =>
       state?.authorizationStatus === "denied"
         ? void Linking.openSettings()
-        : void chooseApps(state, errorFallback, setError, setPending, setState),
+        : void chooseApps(update),
     error,
     pending,
     reload: () => void loadState(() => true, errorFallback, setError, setState),

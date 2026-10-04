@@ -75,7 +75,7 @@ const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 function getSettingsRailSections(t: ReturnType<typeof useI18n>["t"]) {
   return [
     { label: t("plan.trainingSettings"), value: "training" },
-    { label: t("connect.sync"), value: "sync" },
+    { label: t("connect.account"), value: "sync" },
   ]
 }
 
@@ -349,7 +349,7 @@ export default function SettingsPage() {
         ) : null}
 
         <View className="gap-4" onLayout={measure("sync")}>
-          <Connect showDeleteData={debugMode} />
+          <Connect />
           <AppIdentity />
         </View>
       </ScrollView>

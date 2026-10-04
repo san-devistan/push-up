@@ -4,13 +4,7 @@ import {
   isBillingConfigured,
 } from "@/features/billing/_lib/purchases"
 import { authClient, isAuthConfigured } from "@/lib/auth-client"
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react"
+import { createContext, use, useEffect, useState, type ReactNode } from "react"
 import Purchases, { type CustomerInfo } from "react-native-purchases"
 
 type ProState = {
@@ -29,12 +23,15 @@ function stateFromInfo(info: CustomerInfo): ProState {
 }
 
 /**
- * Keeps the RevenueCat customer identified as the Better Auth user so a
- * subscription follows the account across devices and sign-ins.
+ * Keeps RevenueCat anonymous until the user has a permanent account. Linking a
+ * guest account then aliases the anonymous purchase onto the provider user.
  */
 function useIdentifyCustomer() {
   const { data: session } = authClient.useSession()
-  const userId = isAuthConfigured ? session?.user.id : undefined
+  const userId =
+    isAuthConfigured && session?.user.isAnonymous !== true
+      ? session?.user.id
+      : undefined
 
   useEffect(() => {
     if (!userId) {
@@ -98,5 +95,5 @@ export function ProProvider({ children }: { children: ReactNode }) {
 }
 
 export function usePro() {
-  return useContext(ProContext)
+  return use(ProContext)
 }

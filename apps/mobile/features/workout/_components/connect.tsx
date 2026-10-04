@@ -8,13 +8,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
 import { authClient } from "@/lib/auth-client"
 import { translate, type Language } from "@/lib/i18n"
-import { api } from "@workspace/backend/api"
-import { useMutation } from "convex/react"
 import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
 import { Text } from "panelui-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
 import { Alert, StyleSheet, View } from "react-native"
+import Purchases from "react-native-purchases"
 import Svg, { Path } from "react-native-svg"
 
 const MARK_SIZE = 18
@@ -76,6 +75,14 @@ function errorCode(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error
     ? String(error.code)
     : null
+}
+
+async function resetPurchasesIdentity() {
+  if (await Purchases.isAnonymous()) {
+    return
+  }
+
+  await Purchases.logOut()
 }
 
 async function connectApple(language: Language) {
@@ -189,7 +196,15 @@ function getSignOutAction(
     setPending("sign-out")
     void authClient
       .signOut()
-      .then(({ error }) => setError(error?.message ?? null))
+      .then(async ({ error }) => {
+        if (error) {
+          setError(error.message ?? errorMessage)
+          return null
+        }
+
+        await resetPurchasesIdentity().catch(() => undefined)
+        return null
+      })
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
@@ -209,8 +224,18 @@ function getSignOutAction(
     )
 }
 
-function getDeleteDataAction(
-  clearRemoteData: () => Promise<unknown>,
+async function deleteAccount() {
+  const { error } = await authClient.deleteUser()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  clearWorkoutData()
+  await resetPurchasesIdentity().catch(() => undefined)
+}
+
+function getDeleteAccountAction(
   errorMessage: string,
   language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
@@ -219,8 +244,7 @@ function getDeleteDataAction(
   const deleteData = () => {
     setError(null)
     setPending("delete")
-    void clearRemoteData()
-      .then(() => clearWorkoutData())
+    void deleteAccount()
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
@@ -311,10 +335,9 @@ export function ConnectProviders({
   )
 }
 
-export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
+export function Connect() {
   const { language, t } = useI18n()
   const { data: authSession } = authClient.useSession()
-  const clearRemoteData = useMutation(api.workoutSessions.clear)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>(null)
 
@@ -324,8 +347,7 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
     setError,
     setPending
   )
-  const deleteData = getDeleteDataAction(
-    () => clearRemoteData({}),
+  const deleteData = getDeleteAccountAction(
     t("connect.couldNotDelete"),
     language,
     setError,
@@ -342,7 +364,7 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
 
   return (
     <Slab>
-      <Overline>{t(isConnected ? "connect.account" : "connect.sync")}</Overline>
+      <Overline>{t("connect.account")}</Overline>
       {isAnonymous ? <ConnectProviders /> : null}
       <View className="gap-3">
         {isConnected ? (
@@ -366,19 +388,15 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
             {t("connect.signOut")}
           </Button>
         ) : null}
-        {showDeleteData ? (
-          <ProgressButton
-            autoReset
-            disabled={disabled}
-            haptics
-            onComplete={deleteData}
-            variant="destructive"
-          >
-            <ProgressButton.Label>
-              {t("connect.deleteData")}
-            </ProgressButton.Label>
-          </ProgressButton>
-        ) : null}
+        <ProgressButton
+          autoReset
+          disabled={disabled}
+          haptics
+          onComplete={deleteData}
+          variant="destructive"
+        >
+          <ProgressButton.Label>{t("connect.deleteData")}</ProgressButton.Label>
+        </ProgressButton>
       </View>
       {error ? (
         <Text selectable className="text-destructive">

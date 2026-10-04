@@ -199,9 +199,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
                 />
               </View>
               <View className="flex-1 gap-1">
-                <Text className="font-semibold">
-                  {t("onboarding.syncOn")}
-                </Text>
+                <Text className="font-semibold">{t("onboarding.syncOn")}</Text>
                 {identity ? (
                   <Text className="text-sm text-muted-foreground">
                     {identity}

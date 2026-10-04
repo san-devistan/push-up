@@ -1,6 +1,11 @@
 import { ConvexError, v } from "convex/values"
 
-import { internalMutation, mutation, query } from "./_generated/server"
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./_generated/server"
 import { authComponent } from "./auth"
 import {
   isDateKey,
@@ -101,6 +106,31 @@ function validateSession(args: {
   }
 }
 
+async function deleteOwnerSessions(ctx: MutationCtx, ownerId: string) {
+  let attempts = 0
+  let sessions = 0
+
+  for await (const session of ctx.db
+    .query("workoutSessions")
+    .withIndex("by_owner_id_and_started_at", (index) =>
+      index.eq("ownerId", ownerId)
+    )) {
+    for await (const row of ctx.db
+      .query("workoutAttempts")
+      .withIndex("by_session_id_and_started_at_offset_ms", (index) =>
+        index.eq("sessionId", session._id)
+      )) {
+      await ctx.db.delete(row._id)
+      attempts += 1
+    }
+
+    await ctx.db.delete(session._id)
+    sessions += 1
+  }
+
+  return { attempts, sessions }
+}
+
 export const sync = mutation({
   args: {
     activeRepetitionTimeMs: v.number(),
@@ -175,28 +205,17 @@ export const clear = mutation({
       throw new ConvexError("Not authenticated")
     }
 
-    let attempts = 0
-    let sessions = 0
+    return deleteOwnerSessions(ctx, authUser._id)
+  },
+})
 
-    for await (const session of ctx.db
-      .query("workoutSessions")
-      .withIndex("by_owner_id_and_started_at", (index) =>
-        index.eq("ownerId", authUser._id)
-      )) {
-      for await (const row of ctx.db
-        .query("workoutAttempts")
-        .withIndex("by_session_id_and_started_at_offset_ms", (index) =>
-          index.eq("sessionId", session._id)
-        )) {
-        await ctx.db.delete(row._id)
-        attempts += 1
-      }
-
-      await ctx.db.delete(session._id)
-      sessions += 1
-    }
-
-    return { attempts, sessions }
+export const deleteOwner = internalMutation({
+  args: {
+    ownerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await deleteOwnerSessions(ctx, args.ownerId)
+    return null
   },
 })
 

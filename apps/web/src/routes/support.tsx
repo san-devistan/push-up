@@ -54,10 +54,11 @@ function SupportPage() {
         </li>
       </ul>
 
-      <h2>Delete my data</h2>
+      <h2>Delete my account</h2>
       <p>
-        Settings → Sync → Delete data removes your account and workouts from our
-        servers.
+        Settings → Account → Delete account removes your pumpr. account, sign-in
+        records and synced workouts from our servers. Cancel any App Store
+        subscription separately.
       </p>
     </LegalPage>
   )

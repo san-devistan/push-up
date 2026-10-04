@@ -8,12 +8,7 @@ import { Overline, Slab } from "@/features/workout/_components/figures"
 import { useI18n } from "@/hooks/use-i18n"
 import type { TranslationKey } from "@/lib/i18n"
 import { Text } from "panelui-native"
-import {
-  useEffect,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react"
+import { useEffect, type ComponentType, type ReactNode } from "react"
 import { StyleSheet, View } from "react-native"
 import {
   createAnimatedComponent,
@@ -28,11 +23,11 @@ import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg"
 import { useCSSVariable } from "uniwind"
 
 /**
- * Years of life bought back by activity at the recommended level, from the
- * pooled 650,000-adult cohort in Moore et al., PLoS Medicine 2012 (3.4-4.5
- * years). Doing nothing is the zero the other card is read against.
+ * Moore et al., PLoS Medicine 2012: activity equivalent to brisk walking for up
+ * to 75 min/week was associated with 1.8 more years of life expectancy after
+ * age 40 than no leisure-time activity.
  */
-const YEARS_GAINED = 4
+const YEARS_ASSOCIATED = 1.8
 
 /**
  * Both curves are drawn in the same box so the cards compare at a glance: one
@@ -66,22 +61,23 @@ function resolveColor(token: unknown, fallback: string) {
   return typeof token === "string" ? token : fallback
 }
 
-function useDrawOffset(active: boolean) {
+function useDrawOffset() {
   const offset = useSharedValue(CURVE_LENGTH)
   const reducedMotion = useReducedMotion()
 
   useEffect(() => {
-    if (!active) return
-    offset.value = reducedMotion
-      ? 0
-      : withDelay(
-          DRAW_DELAY_MS,
-          withTiming(0, {
-            duration: DRAW_DURATION_MS,
-            reduceMotion: ReduceMotion.System,
-          })
-        )
-  }, [active, offset, reducedMotion])
+    offset.set(
+      reducedMotion
+        ? 0
+        : withDelay(
+            DRAW_DELAY_MS,
+            withTiming(0, {
+              duration: DRAW_DURATION_MS,
+              reduceMotion: ReduceMotion.System,
+            })
+          )
+    )
+  }, [offset, reducedMotion])
 
   return offset
 }
@@ -104,10 +100,10 @@ function FlatCurve({ color }: { color: string }) {
  * The rising curve draws itself in. Only the card making a claim earns the
  * motion; the flat one is already there when the step appears.
  */
-function RisingCurve({ active, color }: { active: boolean; color: string }) {
-  const offset = useDrawOffset(active)
+function RisingCurve({ color }: { color: string }) {
+  const offset = useDrawOffset()
   const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: offset.value,
+    strokeDashoffset: offset.get(),
   }))
 
   return (
@@ -181,7 +177,6 @@ function ComparisonCard({
 
 export default function WhyPushUpsStep() {
   const { formatNumber, t } = useI18n()
-  const [drawing, setDrawing] = useState(false)
   const primary = resolveColor(
     useCSSVariable("--color-primary"),
     FALLBACK_COLORS.active
@@ -191,12 +186,6 @@ export default function WhyPushUpsStep() {
     FALLBACK_COLORS.rest
   )
   const unit = t("onboarding.yearsShort")
-
-  // The curve is armed a frame after mount, so it is seen arriving rather than
-  // found already drawn when the step slides in.
-  useEffect(() => {
-    setDrawing(true)
-  }, [])
 
   return (
     <View className="flex-1 justify-between gap-8">
@@ -217,9 +206,9 @@ export default function WhyPushUpsStep() {
           <ComparisonCard
             active
             label={t("onboarding.oneSetADay")}
-            value={`+${formatNumber(YEARS_GAINED)} ${unit}`}
+            value={`+${formatNumber(YEARS_ASSOCIATED, { maximumFractionDigits: 1 })} ${unit}`}
           >
-            <RisingCurve active={drawing} color={primary} />
+            <RisingCurve color={primary} />
           </ComparisonCard>
         </View>
         <Slab className="gap-0">

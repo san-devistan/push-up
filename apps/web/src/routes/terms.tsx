@@ -47,9 +47,10 @@ function TermsPage() {
 
       <h2>Your account</h2>
       <p>
-        An anonymous account is created when you start. You are responsible for
-        the device and Apple or Google account you link to it. You can delete
-        your account and data at any time from Settings → Sync.
+        You can continue as a guest or connect with Apple or Google. You are
+        responsible for the device and Apple or Google account you use. You can
+        delete your account and synced workouts at any time from Settings →
+        Account → Delete account.
       </p>
 
       <h2>Acceptable use</h2>

@@ -49,9 +49,9 @@ function PrivacyPage() {
 
       <h2>What we store</h2>
       <p>
-        When you start using the app, an anonymous account is created so your
-        workouts can be backed up. You can later link it to Sign in with Apple
-        or Google. We store:
+        You can continue as a guest, which creates an anonymous account so your
+        workouts can be backed up, or connect with Apple or Google. A guest
+        account can later be linked to Apple or Google. We store:
       </p>
       <ul>
         <li>
@@ -63,8 +63,8 @@ function PrivacyPage() {
           address and name provided by Apple or Google.
         </li>
         <li>
-          Preferences that need to follow your account across devices, such as
-          your daily goal and training times.
+          Technical account data used to keep you signed in, such as session
+          records and linked Apple or Google account identifiers.
         </li>
       </ul>
       <p>
@@ -76,9 +76,10 @@ function PrivacyPage() {
       <h2>Subscriptions</h2>
       <p>
         Purchases are handled by Apple. To unlock your subscription across
-        devices we use RevenueCat, which receives the App Store receipt and your
-        pumpr. user id. Apple does not share your payment details with us.
-        RevenueCat&apos;s policy is available at revenuecat.com/privacy.
+        devices we use RevenueCat, which receives App Store purchase data and,
+        after you connect Apple or Google, your pumpr. user id. Apple does not
+        share your payment details with us. RevenueCat&apos;s policy is
+        available at revenuecat.com/privacy.
       </p>
 
       <h2>Analytics and tracking</h2>
@@ -90,8 +91,9 @@ function PrivacyPage() {
       <h2>Your choices</h2>
       <ul>
         <li>
-          <strong>Delete everything.</strong> Settings → Sync → Delete data
-          removes your account and all workouts from our servers immediately.
+          <strong>Delete account.</strong> Settings → Account → Delete account
+          removes your pumpr. account, sign-in records and synced workouts from
+          our servers. Cancel any App Store subscription separately.
         </li>
         <li>
           <strong>Sign out.</strong> Keeps the account and clears the device.

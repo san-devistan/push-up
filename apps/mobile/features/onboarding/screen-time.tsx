@@ -1,8 +1,4 @@
-import {
-  SmartphoneIcon,
-  TimerIcon,
-  type IconProps,
-} from "@/components/icons"
+import { SmartphoneIcon, TimerIcon, type IconProps } from "@/components/icons"
 import { NumericText } from "@/components/numeric-text"
 import { Slab } from "@/features/workout/_components/figures"
 import { usePlan } from "@/features/workout/_hooks/use-plan"

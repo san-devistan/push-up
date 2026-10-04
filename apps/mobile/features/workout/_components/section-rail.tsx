@@ -31,7 +31,7 @@ const SECTIONS = {
   settings: [
     { label: "plan.trainingSettings", value: "training" },
     { label: "plan.preferences", value: "preferences" },
-    { label: "connect.sync", value: "sync" },
+    { label: "connect.account", value: "sync" },
   ],
 } as const
 
