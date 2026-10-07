@@ -1,58 +1,53 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { api } from "@workspace/backend/api"
-import { Button } from "@workspace/ui/components/button"
-import { Effect } from "effect"
-import { DatabaseZapIcon } from "lucide-react"
-import { useCallback, useState } from "react"
-import { match } from "ts-pattern"
-import { useMediaQuery } from "usehooks-ts"
+import { createFileRoute, Link } from "@tanstack/react-router"
 
-export const Route = createFileRoute("/")({ component: App })
+export const Route = createFileRoute("/")({ component: LandingPage })
 
-type BackendModuleStatus =
-  | { status: "empty" }
-  | { status: "ready"; moduleCount: number }
+const FEATURES = [
+  {
+    body: "On-device pose tracking counts every rep. No video leaves your phone.",
+    title: "Counted by the camera",
+  },
+  {
+    body: "Pick the apps that distract you. They stay locked until today's goal is done.",
+    title: "No reps, no apps",
+  },
+  {
+    body: "Levels, streaks and a shareable card for every session.",
+    title: "Progress you can see",
+  },
+] as const
 
-const backendModuleCount = Object.keys(api).length
-const backendModuleStatus: BackendModuleStatus =
-  backendModuleCount === 0
-    ? { status: "empty" }
-    : { status: "ready", moduleCount: backendModuleCount }
-const backendModuleLabel = match(backendModuleStatus)
-  .with({ status: "empty" }, () => "Backend modules: none")
-  .with({ status: "ready" }, ({ moduleCount }) => {
-    return `Backend modules: ${moduleCount}`
-  })
-  .exhaustive()
-
-function App() {
-  const [count, setCount] = useState(0)
-  const isCompactViewport = useMediaQuery("(max-width: 767px)", {
-    defaultValue: false,
-    initializeWithValue: false,
-  })
-
-  const increment = useCallback(() => {
-    Effect.runSync(Effect.sync(() => setCount((current) => current + 1)))
-  }, [])
-
+function LandingPage() {
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="text-2xl font-bold tracking-[0.2em]">pumpr.</h1>
-          <p>Push-up training, counted on-device.</p>
-          <p>Effect is installed for this workspace.</p>
-          <p>{isCompactViewport ? "Compact viewport" : "Wide viewport"}</p>
-          <Button className="mt-2" onClick={increment}>
-            Effect count: {count}
-          </Button>
-          <div className="mt-4 flex items-center gap-2 text-muted-foreground">
-            <DatabaseZapIcon className="size-4" aria-hidden="true" />
-            <span>{backendModuleLabel}</span>
+    <main className="mx-auto flex min-h-svh w-full max-w-2xl flex-col justify-between gap-16 px-6 py-16">
+      <header className="flex flex-col gap-6">
+        <p className="text-sm font-bold tracking-[0.2em]">pumpr.</p>
+        <h1 className="text-5xl font-bold tracking-tight text-balance">
+          Push-ups, counted. Distractions, locked.
+        </h1>
+        <p className="max-w-prose text-lg leading-relaxed text-muted-foreground">
+          pumpr. turns your daily push-ups into the key that unlocks your phone.
+          Set a goal, drop to the floor, and let the camera do the counting.
+        </p>
+      </header>
+
+      <section className="grid gap-8 sm:grid-cols-3">
+        {FEATURES.map((feature) => (
+          <div className="flex flex-col gap-2" key={feature.title}>
+            <h2 className="font-semibold">{feature.title}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {feature.body}
+            </p>
           </div>
-        </div>
-      </div>
-    </div>
+        ))}
+      </section>
+
+      <footer className="flex flex-wrap gap-4 border-t pt-6 text-sm text-muted-foreground">
+        <Link to="/privacy">Privacy Policy</Link>
+        <Link to="/terms">Terms of Use</Link>
+        <Link to="/support">Support</Link>
+        <span>hello@brise.care</span>
+      </footer>
+    </main>
   )
 }

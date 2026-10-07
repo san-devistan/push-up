@@ -72,6 +72,8 @@
     "react-native-nitro-image": "0.15.1",
     "react-native-nitro-modules": "0.36.5",
     "react-native-numeric-text": "0.2.0",
+    "react-native-purchases": "^10.8.1",
+    "react-native-purchases-ui": "^10.8.1",
     "react-native-reanimated": "~4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.2",

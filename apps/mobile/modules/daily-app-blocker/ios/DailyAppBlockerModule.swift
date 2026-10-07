@@ -13,15 +13,36 @@ private struct DailyAppBlockerState: Record {
 
 private enum DailyAppBlockerError: LocalizedError {
   case notAuthorized
+  case noPresenter
 
   var errorDescription: String? {
-    "Screen Time access is required to block apps."
+    switch self {
+    case .notAuthorized:
+      return "Screen Time access is required to block apps."
+    case .noPresenter:
+      return "The app picker could not be opened."
+    }
   }
+}
+
+@MainActor
+private func topViewController() -> UIViewController? {
+  let window = UIApplication.shared.connectedScenes
+    .compactMap { $0 as? UIWindowScene }
+    .flatMap(\.windows)
+    .first { $0.isKeyWindow }
+  var top = window?.rootViewController
+
+  while let presented = top?.presentedViewController {
+    top = presented
+  }
+
+  return top
 }
 
 private enum DailyAppBlockerStore {
   static let activity = DeviceActivityName("pumpr.daily-goal")
-  static let defaults = UserDefaults(suiteName: "group.com.leocombaret.pumpr") ?? .standard
+  static let defaults = UserDefaults(suiteName: "group.com.rukahiga.pumpr") ?? .standard
   static let managedSettings = ManagedSettingsStore(named: .init("pumpr.daily-goal"))
 
   private static let completedDateKey = "dailyAppBlocker.completedDate"
@@ -86,8 +107,11 @@ private enum DailyAppBlockerStore {
     defaults.set(enabled, forKey: enabledKey)
 
     if enabled {
-      try ensureMonitoring()
+      // Shields first, monitoring second. The shield is what the user feels;
+      // monitoring only exists to wake us up, and a failure to start it must
+      // never be the reason the apps stay locked.
       applyShields(localDate: currentLocalDate())
+      try ensureMonitoring()
     } else {
       DeviceActivityCenter().stopMonitoring([activity])
       clearShields()
@@ -106,8 +130,8 @@ private enum DailyAppBlockerStore {
       return
     }
 
-    try ensureMonitoring()
     applyShields(localDate: localDate)
+    try ensureMonitoring()
   }
 
   private static func ensureMonitoring() throws {
@@ -224,6 +248,53 @@ private final class DailyAppBlockerPickerView: ExpoView {
   }
 }
 
+/// Drives Apple's own picker sheet. The picker is a SwiftUI modifier, so it
+/// needs a host in the view hierarchy; the host itself stays invisible and is
+/// torn down once the sheet closes.
+@MainActor
+private final class FamilyPickerPresenter: ObservableObject {
+  @Published var isPresented = true
+  @Published var selection: FamilyActivitySelection
+  private var onFinish: ((FamilyActivitySelection) -> Void)?
+
+  init(
+    selection: FamilyActivitySelection,
+    onFinish: @escaping (FamilyActivitySelection) -> Void
+  ) {
+    self.selection = selection
+    self.onFinish = onFinish
+  }
+
+  func finish() {
+    guard let onFinish else {
+      return
+    }
+
+    self.onFinish = nil
+    onFinish(selection)
+  }
+}
+
+@available(iOS 16.0, *)
+private struct FamilyPickerSheet: View {
+  @ObservedObject var presenter: FamilyPickerPresenter
+
+  var body: some View {
+    Color.clear.familyActivityPicker(
+      isPresented: Binding(
+        get: { presenter.isPresented },
+        set: { presented in
+          presenter.isPresented = presented
+          if !presented {
+            presenter.finish()
+          }
+        }
+      ),
+      selection: $presenter.selection
+    )
+  }
+}
+
 public final class DailyAppBlockerModule: Module {
   public func definition() -> ModuleDefinition {
     Name("PumprDailyAppBlocker")
@@ -233,8 +304,50 @@ public final class DailyAppBlockerModule: Module {
     }.runOnQueue(.main)
 
     AsyncFunction("requestAuthorization") { () async throws -> DailyAppBlockerState in
-      try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-      return DailyAppBlockerStore.state()
+      // The Screen Time consent sheet is UI: request it on the main actor,
+      // otherwise the call can resolve without ever presenting the prompt.
+      do {
+        try await Task { @MainActor in
+          try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+        }.value
+      } catch FamilyControlsError.authorizationCanceled {
+        // The user closed the sheet. That is an answer, not a failure: the returned state
+        // says "not authorized" and the screen keeps offering the button.
+      }
+      return await MainActor.run { DailyAppBlockerStore.state() }
+    }
+
+    AsyncFunction("presentPicker") { () async throws -> DailyAppBlockerState in
+      try await withCheckedThrowingContinuation { continuation in
+        Task { @MainActor in
+          guard let presentingController = topViewController() else {
+            continuation.resume(throwing: DailyAppBlockerError.noPresenter)
+            return
+          }
+
+          var host: UIHostingController<FamilyPickerSheet>?
+          let presenter = FamilyPickerPresenter(
+            selection: DailyAppBlockerStore.selection()
+          ) { selection in
+            DailyAppBlockerStore.saveSelection(selection)
+            let state = DailyAppBlockerStore.state()
+            // Let Apple's sheet finish its own dismissal before the invisible
+            // host goes away, otherwise the transition stutters.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+              host?.presentingViewController?.dismiss(animated: false)
+              continuation.resume(returning: state)
+            }
+          }
+
+          let controller = UIHostingController(
+            rootView: FamilyPickerSheet(presenter: presenter)
+          )
+          host = controller
+          controller.view.backgroundColor = .clear
+          controller.modalPresentationStyle = .overFullScreen
+          presentingController.present(controller, animated: false)
+        }
+      }
     }
 
     AsyncFunction("setEnabled") { (enabled: Bool) throws -> DailyAppBlockerState in

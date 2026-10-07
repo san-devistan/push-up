@@ -1,5 +1,6 @@
 import { PanelUIProvider as LocalPanelUIProvider } from "@/components/ui/panel-ui-provider"
 import { AppBlockerSync } from "@/features/app-blocker/_components/sync"
+import { ProProvider } from "@/features/billing/_hooks/use-pro"
 import { isOnboardingComplete } from "@/features/onboarding/storage"
 import {
   PreferencesProvider,
@@ -45,6 +46,10 @@ const sessionScreenOptions = {
   animation: "fade",
   gestureEnabled: false,
 } as const
+const paywallScreenOptions = {
+  animation: "fade",
+  gestureEnabled: false,
+} as const
 function OptionalConvexProvider({ children }: { children: ReactNode }) {
   if (!convex) {
     return <>{children}</>
@@ -54,7 +59,7 @@ function OptionalConvexProvider({ children }: { children: ReactNode }) {
     <ConvexBetterAuthProvider authClient={authClient} client={convex}>
       <AnonymousSession />
       <OutboxSync />
-      {children}
+      <ProProvider>{children}</ProProvider>
     </ConvexBetterAuthProvider>
   )
 }
@@ -181,6 +186,7 @@ function RootStack() {
       <Stack.Screen name="onboarding" options={onboardingScreenOptions} />
       <Stack.Screen name="(tabs)" options={homeScreenOptions} />
       <Stack.Screen name="session" options={sessionScreenOptions} />
+      <Stack.Screen name="paywall" options={paywallScreenOptions} />
       <Stack.Screen name="levels" />
       <Stack.Screen name="settings" />
     </Stack>

@@ -44,10 +44,10 @@ export default function ScheduleStep() {
     <View className="flex-1 gap-8">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Pick your training time.
+          {t("onboarding.scheduleTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          Choose a time you can keep every day.
+          {t("onboarding.scheduleBody")}
         </Text>
         <View className="flex-row items-center justify-between pt-2">
           <View className="flex-row items-center gap-2">

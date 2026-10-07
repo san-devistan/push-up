@@ -325,15 +325,6 @@ export default function TodayPage() {
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.View hidesSharedBackground>
           <View className="flex-row items-center gap-2">
-            <Button
-              accessibilityLabel="Upgrade to Pro"
-              className="rounded-full bg-foreground px-4"
-              labelClassName="font-heading lowercase text-sm text-background"
-              size="sm"
-              sfx="success"
-            >
-              upgrade to pro.
-            </Button>
             <Streak
               animationDuration={HOME_VALUE_ANIMATION_DURATION_MS}
               days={activity?.currentStreak ?? 0}

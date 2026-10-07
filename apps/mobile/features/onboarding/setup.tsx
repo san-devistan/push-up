@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import TrackingIllustration from "@/features/onboarding/_components/tracking-illustration"
 import AppBlockerStep from "@/features/onboarding/app-blocker"
 import ScheduleStep from "@/features/onboarding/schedule"
+import ScreenTimeStep from "@/features/onboarding/screen-time"
 import { completeOnboarding } from "@/features/onboarding/storage"
+import WhyPushUpsStep from "@/features/onboarding/why"
 import WorkoutAvatar from "@/features/workout/_components/avatar"
 import { ConnectProviders } from "@/features/workout/_components/connect"
 import { Slab } from "@/features/workout/_components/figures"
@@ -33,7 +35,30 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { useCSSVariable } from "uniwind"
 
 const HAS_APP_BLOCKER_STEP = process.env.EXPO_OS === "ios"
-const STEP_COUNT = HAS_APP_BLOCKER_STEP ? 5 : 4
+const ALL_STEPS = [
+  "account",
+  "goal",
+  "camera",
+  "appBlocker",
+  "screenTime",
+  "schedule",
+  "why",
+] as const
+
+type StepKey = (typeof ALL_STEPS)[number]
+
+/**
+ * The running order. Keying the flow by name rather than by index is what lets
+ * the App Blocker drop out on Android — and any future step slot in — without
+ * every `step === 3` elsewhere in the file quietly meaning something else.
+ */
+const STEPS: StepKey[] = ALL_STEPS.filter(
+  (step) => step !== "appBlocker" || HAS_APP_BLOCKER_STEP
+)
+const STEP_COUNT = STEPS.length
+const LAST_STEP = STEP_COUNT - 1
+/** Steps that own the vertical gesture themselves, so the page must not scroll. */
+const FIXED_STEPS = new Set<StepKey>(["appBlocker", "schedule"])
 const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 const styles = StyleSheet.create({
   accountHeroAvatar: {
@@ -56,9 +81,14 @@ const ACCOUNT_AVATAR_DOM_PROPS = {
 }
 
 function ProgressRail({ step }: { step: number }) {
+  const { t } = useI18n()
+
   return (
     <View
-      accessibilityLabel={`Step ${step + 1} of ${STEP_COUNT}`}
+      accessibilityLabel={t("accessibility.step", {
+        count: STEP_COUNT,
+        step: step + 1,
+      })}
       className="flex-row gap-2"
     >
       {Array.from({ length: STEP_COUNT }, (_, index) => (
@@ -76,6 +106,7 @@ function ProgressRail({ step }: { step: number }) {
 }
 
 function getContinueAsGuest(
+  errorFallback: string,
   isAnonymous: boolean,
   onNext: () => void,
   setError: Dispatch<SetStateAction<string | null>>,
@@ -92,7 +123,7 @@ function getContinueAsGuest(
     void authClient.signIn
       .anonymous()
       .then(({ error }) => error?.message ?? null)
-      .catch(() => "Could not start guest session. Check your connection.")
+      .catch(() => errorFallback)
       .then((error) => {
         setPending(false)
         setError(error)
@@ -103,6 +134,7 @@ function getContinueAsGuest(
 }
 
 function AccountStep({ onNext }: { onNext: () => void }) {
+  const { t } = useI18n()
   const { data: session, isPending: sessionPending } = authClient.useSession()
   const primaryForeground = useCSSVariable("--color-primary-foreground")
   const [guestError, setGuestError] = useState<string | null>(null)
@@ -111,6 +143,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
   const connected = session && !isAnonymous
   const identity = session?.user.email ?? session?.user.name
   const continueAsGuest = getContinueAsGuest(
+    t("onboarding.guestError"),
     isAnonymous,
     onNext,
     setGuestError,
@@ -137,7 +170,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
               expression="upward-side-glance"
             />
             <SpeechBubble className="absolute top-1 -right-5">
-              hello.
+              {t("onboarding.hello")}
             </SpeechBubble>
           </View>
         </View>
@@ -146,33 +179,43 @@ function AccountStep({ onNext }: { onNext: () => void }) {
       <View className="gap-5">
         <View className="gap-3">
           <Text className="font-heading text-4xl leading-[44px]">
-            Your reps. Your record.
+            {t("onboarding.accountTitle")}
           </Text>
           <Text className="text-lg text-muted-foreground">
-            Connect to sync across devices, or start instantly as a guest.
+            {t("onboarding.accountBody")}
           </Text>
         </View>
 
         {connected ? (
-          <Slab className="flex-row items-center gap-3">
-            <View className="size-10 items-center justify-center rounded-full bg-primary">
-              <CheckIcon
-                color={
-                  typeof primaryForeground === "string"
-                    ? primaryForeground
-                    : undefined
-                }
-              />
-            </View>
-            <View className="flex-1 gap-1">
-              <Text className="font-semibold">Progress sync is on</Text>
-              {identity ? (
-                <Text className="text-sm text-muted-foreground">
-                  {identity}
-                </Text>
-              ) : null}
-            </View>
-          </Slab>
+          <View className="gap-3">
+            <Slab className="flex-row items-center gap-3">
+              <View className="size-10 items-center justify-center rounded-full bg-primary">
+                <CheckIcon
+                  color={
+                    typeof primaryForeground === "string"
+                      ? primaryForeground
+                      : undefined
+                  }
+                />
+              </View>
+              <View className="flex-1 gap-1">
+                <Text className="font-semibold">{t("onboarding.syncOn")}</Text>
+                {identity ? (
+                  <Text className="text-sm text-muted-foreground">
+                    {identity}
+                  </Text>
+                ) : null}
+              </View>
+            </Slab>
+            <Button
+              className="h-14 rounded-full bg-foreground"
+              labelClassName="font-heading lowercase text-lg text-background"
+              onPress={onNext}
+              size="lg"
+            >
+              {t("onboarding.next")}
+            </Button>
+          </View>
         ) : (
           <View className="gap-1">
             <ConnectProviders onConnected={onNext} />
@@ -183,7 +226,7 @@ function AccountStep({ onNext }: { onNext: () => void }) {
               onPress={continueAsGuest}
               variant="ghost"
             >
-              continue as guest.
+              {t("onboarding.guest")}
             </Button>
             {guestError ? (
               <Text selectable className="text-center text-sm text-destructive">
@@ -219,11 +262,10 @@ function GoalStep() {
     <View className="flex-1 gap-8">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Pick a goal you can repeat.
+          {t("onboarding.goalTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          Choose a number you can reach every day. Consistency matters more than
-          starting big.
+          {t("onboarding.goalBody")}
         </Text>
       </View>
 
@@ -234,7 +276,7 @@ function GoalStep() {
           value={plan.targetReps}
         />
         <Text className="font-mono text-xs tracking-[3px] text-muted-foreground uppercase">
-          every day
+          {t("onboarding.everyDay")}
         </Text>
       </View>
 
@@ -254,45 +296,54 @@ function GoalStep() {
 }
 
 function CameraStep() {
+  const { t } = useI18n()
+
   return (
     <View className="flex-1 gap-5">
       <View className="gap-3">
         <Text className="font-heading text-4xl leading-[44px]">
-          Your phone counts every rep.
+          {t("onboarding.cameraTitle")}
         </Text>
         <Text className="text-lg text-muted-foreground">
-          pumpr. uses on-device pose tracking to count your push-ups. Place your
-          phone flat on the ground with the camera facing you.
+          {t("onboarding.cameraBody")}
         </Text>
       </View>
 
       <TrackingIllustration />
 
       <Text className="text-center text-sm text-muted-foreground">
-        Tracking stays on your device. No video leaves your phone.
+        {t("onboarding.cameraPrivacy")}
       </Text>
     </View>
   )
 }
 
-function StepContent({ onNext, step }: { onNext: () => void; step: number }) {
-  if (step === 0) {
+function StepContent({ onNext, step }: { onNext: () => void; step: StepKey }) {
+  if (step === "account") {
     return <AccountStep onNext={onNext} />
   }
 
-  if (step === 1) {
+  if (step === "goal") {
     return <GoalStep />
   }
 
-  if (step === 2) {
+  if (step === "camera") {
     return <CameraStep />
   }
 
-  if (HAS_APP_BLOCKER_STEP && step === 3) {
+  if (step === "appBlocker") {
     return <AppBlockerStep />
   }
 
-  return <ScheduleStep />
+  if (step === "screenTime") {
+    return <ScreenTimeStep />
+  }
+
+  if (step === "schedule") {
+    return <ScheduleStep />
+  }
+
+  return <WhyPushUpsStep />
 }
 
 function getNext(
@@ -301,7 +352,7 @@ function getNext(
   setStep: Dispatch<SetStateAction<number>>
 ) {
   return () => {
-    if (step < STEP_COUNT - 1) {
+    if (step < LAST_STEP) {
       setStep((current) => current + 1)
       return
     }
@@ -312,23 +363,23 @@ function getNext(
 }
 
 export default function OnboardingSetup() {
+  const { t } = useI18n()
   const router = useRouter()
-  const [step, setStep] = useState(0)
-  const next = getNext(router, step, setStep)
-  const action = step === STEP_COUNT - 1 ? "start training." : "next."
-  const scrollEnabled =
-    step < STEP_COUNT - 1 && !(HAS_APP_BLOCKER_STEP && step === 3)
+  const [index, setIndex] = useState(0)
+  const step = STEPS[index] ?? "account"
+  const next = getNext(router, index, setIndex)
+  const isLast = index === LAST_STEP
 
   return (
     <View style={styles.screen}>
-      {step === 2 ? <PhysicalCameraTrace /> : null}
+      {step === "camera" ? <PhysicalCameraTrace /> : null}
       <SafeAreaView style={styles.screen}>
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
-          scrollEnabled={scrollEnabled}
+          scrollEnabled={!FIXED_STEPS.has(step)}
         >
-          <ProgressRail step={step} />
+          <ProgressRail step={index} />
           <Animated.View
             entering={ENTER}
             exiting={EXIT}
@@ -337,15 +388,15 @@ export default function OnboardingSetup() {
           >
             <StepContent onNext={next} step={step} />
           </Animated.View>
-          {step > 0 ? (
+          {index > 0 ? (
             <Button
               className="h-14 rounded-full bg-foreground"
               labelClassName="font-heading lowercase text-lg text-background"
               onPress={next}
+              sfx={isLast ? "success" : undefined}
               size="lg"
-              sfx={step === STEP_COUNT - 1 ? "success" : undefined}
             >
-              {action}
+              {isLast ? t("onboarding.seePlan") : t("onboarding.next")}
             </Button>
           ) : null}
         </ScrollView>

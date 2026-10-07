@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Run work on the remote server against the *working tree* you are editing.
+#
+#   scripts/dev/vps push               mirror the tree, nothing else
+#   scripts/dev/vps check              mirror, then run $VPS_CHECK
+#   scripts/dev/vps session [name]     mirror, then attach a tmux session on the mirror
+#   scripts/dev/vps -- <command...>    mirror, then run that command
+#
+# The server holds whatever was last pushed to git, which is the wrong thing to work against
+# while you are still writing. So the working tree is mirrored first — uncommitted changes
+# included — and everything runs on that. Nothing is committed, nothing is pushed back.
+#
+# This file is identical in every project. Everything project-specific lives next to it in
+# vps.env, so the two never have to be merged by hand. The host itself lives in vps.env.local,
+# untracked, because vps.env is committed to a public repo.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+[ -f "$ROOT/scripts/dev/vps.env" ] && . "$ROOT/scripts/dev/vps.env"
+[ -f "$ROOT/scripts/dev/vps.env.local" ] && . "$ROOT/scripts/dev/vps.env.local"
+
+HOST="${VPS_HOST:-}"
+REMOTE="${VPS_PATH:-/root/$(basename "$ROOT")}"
+CHECK="${VPS_CHECK:-}"
+INSTALL="${VPS_INSTALL:-}"
+
+[ -n "$HOST" ] || { echo "VPS_HOST is not set — put it in scripts/dev/vps.env.local" >&2; exit 1; }
+command -v rsync >/dev/null || { echo "rsync is missing" >&2; exit 1; }
+
+# Never mirrored. The first three are noise; the rest is the honest part — a public server is a
+# wider target than a laptop, so credentials stay on the laptop even when it costs convenience.
+EXCLUDES=(
+  --exclude '.git/' --exclude '.DS_Store' --exclude 'node_modules/'
+  --exclude 'build/' --exclude 'dist/' --exclude '.next/' --exclude 'DerivedData/'
+  --exclude 'Secrets/' --exclude '*.p8' --exclude '*.p12' --exclude '*.mobileprovision'
+  --exclude '*.cer' --exclude '*.keystore' --exclude '.env' --exclude '.env.*'
+)
+# VPS_EXCLUDES in vps.env adds to that list; it is a plain space-separated list of patterns.
+for pattern in ${VPS_EXCLUDES:-}; do EXCLUDES+=(--exclude "$pattern"); done
+
+mirror() {
+  echo "→ mirroring the working tree to $HOST:$REMOTE"
+  ssh "$HOST" "mkdir -p $(printf %q "$REMOTE")"
+  rsync -az --delete "${EXCLUDES[@]}" "$ROOT/" "$HOST:$REMOTE/"
+}
+
+# printf %q re-quotes each argument, because the command crosses a second shell on the far side
+# and would otherwise lose every quoted string it was given.
+remote() {
+  # The prelude is built before the string rather than inside it: bash closes ${VAR:+...} at
+  # the first unescaped }, so wrapping $INSTALL in a brace group inside the expansion silently
+  # leaves the group unterminated as soon as VPS_INSTALL is non-empty.
+  local prelude=""
+  [ -n "$INSTALL" ] && prelude="$INSTALL; "
+  ssh "$HOST" "set -e; cd $(printf %q "$REMOTE"); $prelude$*"
+}
+
+case "${1:-check}" in
+  push)
+    mirror
+    ;;
+  check)
+    [ -n "$CHECK" ] || { echo "VPS_CHECK is empty: this project has nothing that runs off the Mac." >&2; exit 1; }
+    mirror; remote "$CHECK"
+    ;;
+  session)
+    mirror
+    name="${2:-work}"
+    echo "→ tmux '$name' on $HOST — Ctrl-b d to detach, it survives the disconnection"
+    echo "  no simulator, no native build, no signing from here: those need the Mac."
+    ssh -t "$HOST" "tmux new -As $(printf %q "$name") -c $(printf %q "$REMOTE")"
+    ;;
+  --)
+    shift
+    [ $# -gt 0 ] || { echo "usage: $0 -- <command...>" >&2; exit 1; }
+    mirror; remote "$(printf '%q ' "$@")"
+    ;;
+  *)
+    echo "usage: $0 [push|check|session [name]|-- <command...>]" >&2; exit 1
+    ;;
+esac

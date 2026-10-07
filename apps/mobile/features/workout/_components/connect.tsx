@@ -8,13 +8,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme"
 import { useI18n } from "@/hooks/use-i18n"
 import { authClient } from "@/lib/auth-client"
 import { translate, type Language } from "@/lib/i18n"
-import { api } from "@workspace/backend/api"
-import { useMutation } from "convex/react"
 import * as AppleAuthentication from "expo-apple-authentication"
 import * as Crypto from "expo-crypto"
 import { Text } from "panelui-native"
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
 import { Alert, StyleSheet, View } from "react-native"
+import Purchases from "react-native-purchases"
 import Svg, { Path } from "react-native-svg"
 
 const MARK_SIZE = 18
@@ -78,6 +77,14 @@ function errorCode(error: unknown) {
     : null
 }
 
+async function resetPurchasesIdentity() {
+  if (await Purchases.isAnonymous()) {
+    return
+  }
+
+  await Purchases.logOut()
+}
+
 async function connectApple(language: Language) {
   try {
     const nonce = Crypto.randomUUID()
@@ -131,28 +138,50 @@ async function connectGoogle(language: Language) {
   }
 }
 
+/**
+ * The provider call resolving is not proof of a signed-in account: the Google
+ * flow resolves when the browser closes, whatever happened inside. Only a
+ * fresh non-anonymous session counts as connected.
+ */
+async function hasConnectedSession() {
+  const { data } = await authClient.getSession({
+    query: { disableCookieCache: true },
+  })
+
+  return Boolean(data?.user) && data?.user.isAnonymous !== true
+}
+
 function getConnectAction(
+  language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
   setPending: Dispatch<SetStateAction<PendingAction>>,
   pending: PendingAction,
   connect: () => Promise<string | null | undefined>,
   onConnected?: () => void
 ) {
+  async function run() {
+    const error = await connect()
+
+    if (error === undefined) {
+      return
+    }
+
+    if (error !== null) {
+      setError(error)
+      return
+    }
+
+    if (await hasConnectedSession()) {
+      onConnected?.()
+    } else {
+      setError(translate(language, "connect.incomplete"))
+    }
+  }
+
   return () => {
     setError(null)
     setPending(pending)
-    void connect()
-      .then((error) => {
-        if (error !== undefined) {
-          setError(error)
-          if (error === null) {
-            onConnected?.()
-          }
-        }
-
-        return error
-      })
-      .finally(() => setPending(null))
+    void run().finally(() => setPending(null))
   }
 }
 
@@ -167,7 +196,15 @@ function getSignOutAction(
     setPending("sign-out")
     void authClient
       .signOut()
-      .then(({ error }) => setError(error?.message ?? null))
+      .then(async ({ error }) => {
+        if (error) {
+          setError(error.message ?? errorMessage)
+          return null
+        }
+
+        await resetPurchasesIdentity().catch(() => undefined)
+        return null
+      })
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
@@ -187,8 +224,18 @@ function getSignOutAction(
     )
 }
 
-function getDeleteDataAction(
-  clearRemoteData: () => Promise<unknown>,
+async function deleteAccount() {
+  const { error } = await authClient.deleteUser()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  clearWorkoutData()
+  await resetPurchasesIdentity().catch(() => undefined)
+}
+
+function getDeleteAccountAction(
   errorMessage: string,
   language: Language,
   setError: Dispatch<SetStateAction<string | null>>,
@@ -197,8 +244,7 @@ function getDeleteDataAction(
   const deleteData = () => {
     setError(null)
     setPending("delete")
-    void clearRemoteData()
-      .then(() => clearWorkoutData())
+    void deleteAccount()
       .catch(() => setError(errorMessage))
       .finally(() => setPending(null))
   }
@@ -234,6 +280,7 @@ export function ConnectProviders({
   }, [])
 
   const withApple = getConnectAction(
+    language,
     setError,
     setPending,
     "apple",
@@ -241,6 +288,7 @@ export function ConnectProviders({
     onConnected
   )
   const withGoogle = getConnectAction(
+    language,
     setError,
     setPending,
     "google",
@@ -287,10 +335,9 @@ export function ConnectProviders({
   )
 }
 
-export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
+export function Connect() {
   const { language, t } = useI18n()
   const { data: authSession } = authClient.useSession()
-  const clearRemoteData = useMutation(api.workoutSessions.clear)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction>(null)
 
@@ -300,8 +347,7 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
     setError,
     setPending
   )
-  const deleteData = getDeleteDataAction(
-    () => clearRemoteData({}),
+  const deleteData = getDeleteAccountAction(
     t("connect.couldNotDelete"),
     language,
     setError,
@@ -318,7 +364,7 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
 
   return (
     <Slab>
-      <Overline>{t(isConnected ? "connect.account" : "connect.sync")}</Overline>
+      <Overline>{t("connect.account")}</Overline>
       {isAnonymous ? <ConnectProviders /> : null}
       <View className="gap-3">
         {isConnected ? (
@@ -342,19 +388,15 @@ export function Connect({ showDeleteData }: { showDeleteData: boolean }) {
             {t("connect.signOut")}
           </Button>
         ) : null}
-        {showDeleteData ? (
-          <ProgressButton
-            autoReset
-            disabled={disabled}
-            haptics
-            onComplete={deleteData}
-            variant="destructive"
-          >
-            <ProgressButton.Label>
-              {t("connect.deleteData")}
-            </ProgressButton.Label>
-          </ProgressButton>
-        ) : null}
+        <ProgressButton
+          autoReset
+          disabled={disabled}
+          haptics
+          onComplete={deleteData}
+          variant="destructive"
+        >
+          <ProgressButton.Label>{t("connect.deleteData")}</ProgressButton.Label>
+        </ProgressButton>
       </View>
       {error ? (
         <Text selectable className="text-destructive">

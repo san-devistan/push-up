@@ -4,6 +4,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CrosshairIcon,
+  PlayIcon,
   SolidBellIcon,
   TrophyIcon,
   Volume2Icon,
@@ -30,8 +31,9 @@ import type { TrainingPlan } from "@/features/workout/_lib/storage"
 import { useI18n } from "@/hooks/use-i18n"
 import { hapticFeedback, selectionTick } from "@/lib/haptics"
 import { FONT_FAMILY } from "@/lib/theme"
+import { Host, Switch } from "@expo/ui"
 import { Link, Stack, useRouter } from "expo-router"
-import { Slider, Switch, Text } from "panelui-native"
+import { Slider, Text } from "panelui-native"
 import { useScrollSections } from "panelui-native/hooks/use-scroll-sections"
 import type { ComponentType } from "react"
 import { Pressable, ScrollView, StyleSheet, View } from "react-native"
@@ -73,7 +75,7 @@ const formatGoalIndex = (index: number) => String(goalAtIndex(index))
 function getSettingsRailSections(t: ReturnType<typeof useI18n>["t"]) {
   return [
     { label: t("plan.trainingSettings"), value: "training" },
-    { label: t("connect.sync"), value: "sync" },
+    { label: t("connect.account"), value: "sync" },
   ]
 }
 
@@ -142,10 +144,16 @@ function SettingRow({
   const SettingIcon = icon
 
   return (
-    <View className="flex-row items-center justify-between gap-4">
+    <View
+      accessibilityLabel={label}
+      className="flex-row items-center justify-between gap-4"
+    >
       <SettingIcon size={18} />
+      {/* The row owns the label; the native switch would print a second one. */}
       <Text className="flex-1 font-semibold">{label}</Text>
-      <Switch onValueChange={onCheckedChange} value={checked} />
+      <Host matchContents>
+        <Switch onValueChange={onCheckedChange} value={checked} />
+      </Host>
     </View>
   )
 }
@@ -163,6 +171,8 @@ function GoalFields() {
         <Text className="flex-1 font-semibold">{t("plan.dailyGoal")}</Text>
         <NumericText align="end" className="text-xl" value={plan.targetReps} />
       </View>
+      {/* A darker track: on the card's own surface the default one reads as a
+          flat pill, so nothing says the thumb can be dragged. */}
       <Slider
         formatValue={formatGoalIndex}
         headerClassName="hidden"
@@ -170,6 +180,7 @@ function GoalFields() {
         max={LAST_GOAL_INDEX}
         onValueChange={setTarget}
         step={1}
+        trackClassName="bg-foreground/15"
         value={targetIndex}
       />
     </>
@@ -257,18 +268,23 @@ function LevelsRow() {
   )
 }
 
-function getOpenOnboarding(router: ReturnType<typeof useRouter>) {
-  return () => router.push("/onboarding")
-}
-
-function OpenOnboardingButton() {
-  const router = useRouter()
-  const openOnboarding = getOpenOnboarding(router)
+function ReplayOnboardingRow() {
+  const { t } = useI18n()
+  const label = t("plan.replayOnboarding")
 
   return (
-    <Button onPress={openOnboarding} variant="outline">
-      open onboarding
-    </Button>
+    <Link asChild href="/onboarding">
+      <Pressable
+        accessibilityLabel={label}
+        className="min-h-8 flex-row items-center gap-4 active:opacity-60"
+        hitSlop={6}
+        onPress={selectionTick}
+      >
+        <PlayIcon size={18} />
+        <Text className="flex-1 font-semibold">{label}</Text>
+        <ChevronRightIcon size={18} />
+      </Pressable>
+    </Link>
   )
 }
 
@@ -318,6 +334,8 @@ export default function SettingsPage() {
             {process.env.EXPO_OS === "ios" ? <AppBlockerSettings /> : null}
             {process.env.EXPO_OS === "ios" ? <Divider /> : null}
             <LevelsRow />
+            <Divider />
+            <ReplayOnboardingRow />
           </Slab>
         </View>
 
@@ -326,14 +344,12 @@ export default function SettingsPage() {
             <Slab>
               <Overline>{t("plan.preferences")}</Overline>
               <PreferencesSection />
-              <Divider />
-              <OpenOnboardingButton />
             </Slab>
           </View>
         ) : null}
 
         <View className="gap-4" onLayout={measure("sync")}>
-          <Connect showDeleteData={debugMode} />
+          <Connect />
           <AppIdentity />
         </View>
       </ScrollView>

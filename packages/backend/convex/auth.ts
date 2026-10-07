@@ -15,6 +15,10 @@ declare const process: { env: Record<string, string | undefined> }
 type DataModel = DataModelFromSchemaDefinition<typeof schema>
 
 export const authComponent = createClient<DataModel>(components.betterAuth)
+const APPLE_NATIVE_BUNDLE_IDENTIFIERS = [
+  "com.rukahiga.pumpr",
+  "com.leocombaret.pumpr",
+] as const
 
 async function createAppleClientSecret() {
   const clientId = process.env.APPLE_CLIENT_ID
@@ -40,16 +44,15 @@ async function createAppleClientSecret() {
 }
 
 function appleProvider() {
-  const appBundleIdentifier = process.env.APPLE_APP_BUNDLE_IDENTIFIER
   const clientId = process.env.APPLE_CLIENT_ID
 
-  if (!(appBundleIdentifier && clientId)) {
+  if (!clientId) {
     return {}
   }
 
   return {
     apple: async () => ({
-      appBundleIdentifier,
+      audience: [...APPLE_NATIVE_BUNDLE_IDENTIFIERS],
       clientId,
       clientSecret: await createAppleClientSecret(),
     }),
@@ -79,6 +82,17 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) =>
       storage: "database",
     },
     socialProviders: { ...appleProvider(), ...googleProvider() },
+    user: {
+      deleteUser: {
+        enabled: true,
+        beforeDelete: async (user) => {
+          await requireRunMutationCtx(ctx).runMutation(
+            internal.workoutSessions.deleteOwner,
+            { ownerId: user.id }
+          )
+        },
+      },
+    },
     trustedOrigins: [
       "pumpr://",
       "pushup://",
